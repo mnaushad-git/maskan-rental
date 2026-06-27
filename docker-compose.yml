@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: maskan_app
+      POSTGRES_PASSWORD: maskan_secret
+      POSTGRES_DB: maskan
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maskan_app -d maskan"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── FastAPI backend ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENV: development
+      API_HOST: "0.0.0.0"
+      API_PORT: "8000"
+      DATABASE_URL: postgresql://maskan_app:maskan_secret@db:5432/maskan
+      FRONTEND_ORIGIN: http://localhost:5173
+      SECRET_KEY: dev-secret-change-in-production
+      ACCESS_TOKEN_EXPIRE_MINUTES: "1440"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      WATCHFILES_FORCE_POLLING: "1"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "alembic upgrade head && python seed.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  # ── React / TanStack frontend ───────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:

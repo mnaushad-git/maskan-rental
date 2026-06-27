@@ -1,0 +1,48 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/node_modules/
+
+# Alembic compiled
+backend/alembic/__pycache__/
+backend/alembic/versions/__pycache__/
+
+# Office temp files
+~$*
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Docker volumes (not committed)
+pgdata/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log

@@ -1,0 +1,11 @@
+title,city,area,monthly_rent,bedrooms,bathrooms,size_sq_m,owner_name,status,description,image_url,external_id
+"3BR Apartment in Al Yasmin","Riyadh","Al Yasmin",4500,3,2,150,"Ahmed Al-Rashid","Published","Spacious 3-bedroom apartment with modern kitchen and balcony. Close to King Fahd Road.","","PROP-001"
+"2BR Flat in Al Olaya","Riyadh","Al Olaya",6000,2,2,110,"Khalid Al-Saud","Published","Fully furnished 2-bedroom flat in the heart of Al Olaya. Includes parking and gym access.","","PROP-002"
+"Studio in Al Malaz","Riyadh","Al Malaz",1800,1,1,55,"Nora Al-Zahrani","Published","Cozy studio apartment ideal for singles. 5 minutes from Al Malaz Park.","","PROP-003"
+"4BR Villa in Al Nakheel","Riyadh","Al Nakheel",12000,4,3,320,"Faisal Al-Otaibi","Published","Luxury 4-bedroom villa with private garden, maid's room and double garage.","","PROP-004"
+"2BR Apartment in Al Hamra","Jeddah","Al Hamra",3800,2,1,95,"Sara Al-Ghamdi","Published","Sea-view 2-bedroom apartment on the 8th floor. Walking distance to the Corniche.","","PROP-005"
+"3BR Apartment in Al Rawdah","Jeddah","Al Rawdah",5200,3,2,140,"Mohammed Al-Harbi","Published","Well-maintained 3-bedroom unit with central AC and covered parking.","","PROP-006"
+"1BR in Al Khobar Corniche","Khobar","Al Corniche",2900,1,1,70,"Abdulaziz Al-Qahtani","Published","Modern 1-bedroom apartment with Corniche view and building pool.","","PROP-007"
+"3BR Villa in Al Aqrabiyah","Khobar","Al Aqrabiyah",8500,3,3,240,"Hana Al-Dossari","Published","Semi-furnished villa with large living area and private parking for 2 cars.","","PROP-008"
+"2BR in Al Andalus","Dammam","Al Andalus",3200,2,2,100,"Omar Al-Shehri","Published","Clean 2-bedroom apartment near Al Andalus Mall. Includes water and electricity.","","PROP-009"
+"Studio in Al Faisaliyah","Dammam","Al Faisaliyah",1600,1,1,50,"Reem Al-Mulhem","Published","Budget-friendly studio with built-in wardrobes and kitchenette.","","PROP-010"
