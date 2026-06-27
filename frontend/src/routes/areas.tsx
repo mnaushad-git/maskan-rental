@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   ArrowUp,
   ArrowUpDown,
-  ArrowUpRight,
   Building2,
   Compass,
   Download,
@@ -810,26 +809,26 @@ function AreasPage() {
     <div className="flex min-h-screen bg-surface">
       <AreaSidebar />
 
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         {/* Top bar */}
         <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur">
-          <div className="flex items-center justify-between gap-3 px-6 py-3">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <Link
                 to="/"
-                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-surface hover:text-foreground"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-surface hover:text-foreground"
               >
                 <ArrowLeft className="size-3.5" /> Maskan
               </Link>
               <span className="text-muted-foreground">/</span>
-              <span className="text-sm font-semibold">Area Intelligence</span>
+              <span className="truncate text-sm font-semibold">Area Intelligence</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <Button variant="outline" size="sm" onClick={exportCSV}>
-                <Download className="size-4" /> Export
+                <Download className="size-4" /> <span className="hidden sm:inline">Export</span>
               </Button>
               <Button size="sm" onClick={() => setShowNewDistrict(true)}>
-                <Plus className="size-4" /> New district
+                <Plus className="size-4" /> <span className="hidden sm:inline">New district</span>
               </Button>
             </div>
           </div>
@@ -850,7 +849,7 @@ function AreasPage() {
           </div>
 
           {/* Stat cards */}
-          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               label="Districts tracked"
               value={String(stats.districts)}
@@ -948,21 +947,17 @@ function AreasPage() {
                       <SortableHeader label="Avg. rent" sortKey="avgRent" active={sortKey} dir={sortDir} onSort={handleSort} />
                     </th>
                     <th className="px-3 py-3 text-left font-semibold">Trend</th>
-                    <th className="px-3 py-3 text-right font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((d) => (
                     <tr
                       key={d.id}
-                      className="border-b border-border last:border-0 transition-colors hover:bg-surface/60"
+                      onClick={() => setActiveId(d.id)}
+                      className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-surface/60"
                     >
                       <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => setActiveId(d.id)}
-                          className="flex items-center gap-3 text-left"
-                        >
+                        <div className="flex items-center gap-3 text-left">
                           <div className="grid size-9 place-items-center rounded-lg bg-primary-soft text-accent-foreground">
                             <MapPin className="size-4" />
                           </div>
@@ -972,7 +967,7 @@ function AreasPage() {
                               {d.city} · {d.listings} listings
                             </div>
                           </div>
-                        </button>
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-center">
                         <ScorePill value={d.areaScore} />
@@ -1010,21 +1005,11 @@ function AreasPage() {
                       <td className="px-3 py-3">
                         <MiniTrend data={d.trends} />
                       </td>
-                      <td className="px-3 py-3 text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setActiveId(d.id)}
-                          className="gap-1"
-                        >
-                          Open <ArrowUpRight className="size-3.5" />
-                        </Button>
-                      </td>
                     </tr>
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                      <td colSpan={9} className="px-4 py-12 text-center text-sm text-muted-foreground">
                         No districts match the current filters.
                       </td>
                     </tr>

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.api.routes import properties, search, analytics, areas, auth, users, saved_searches, saved_properties, ai
-from app.api.routes import area_intelligence, mediators, leads, payments
+from app.api.routes import area_intelligence, mediators, leads, payments, reviews
 
 
 @asynccontextmanager
@@ -52,6 +52,7 @@ app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(mediators.router, prefix="/api/mediators", tags=["mediators"])
 app.include_router(leads.router, prefix="/api/leads", tags=["leads"])
 app.include_router(payments.router, prefix="/api/payments", tags=["payments"])
+app.include_router(reviews.router, prefix="/api/reviews", tags=["reviews"])
 
 
 @app.get("/api/health", tags=["health"])

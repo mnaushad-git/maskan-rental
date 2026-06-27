@@ -30,6 +30,10 @@ backend/alembic/versions/__pycache__/
 
 # Office temp files
 ~$*
+~*.tmp
+
+# Claude Code workspace (memory, plans, session files)
+.claude/
 
 # OS
 .DS_Store

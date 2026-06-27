@@ -335,28 +335,28 @@ function ImportPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-4 sm:gap-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <Link
               to="/admin"
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+              className="inline-flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
             >
-              <ArrowLeft className="size-4" /> Admin Console
+              <ArrowLeft className="size-4" /> <span className="hidden sm:inline">Admin Console</span>
             </Link>
             <span className="text-muted-foreground">/</span>
-            <span className="text-sm font-semibold">Data Import</span>
+            <span className="truncate text-sm font-semibold">Data Import</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <a
               href="data:text/csv;charset=utf-8,external_id%2Ctitle%2Carea%2Ccity%2Crent_sar%2Cbedrooms%2Cbathrooms%2Carea_sqm%2Cowner_name%0AMSK-101%2CModern%202BR%20-%20Al%20Yasmin%2CAl%20Yasmin%2CRiyadh%2C8500%2C2%2C2%2C120%2CAhmed%20Al-Harbi"
               download="maskan_import_template.csv"
             >
               <Button variant="outline" size="sm">
-                <Download className="size-4" /> Download template
+                <Download className="size-4" /> <span className="hidden sm:inline">Download template</span>
               </Button>
             </a>
             <Button size="sm" onClick={() => inputRef.current?.click()}>
-              <UploadCloud className="size-4" /> New import
+              <UploadCloud className="size-4" /> <span className="hidden sm:inline">New import</span>
             </Button>
           </div>
         </div>
@@ -387,7 +387,7 @@ function ImportPage() {
             drag ? "border-primary bg-primary/5" : "border-border",
           )}
         >
-          <div className="grid gap-8 md:grid-cols-[1.4fr_1fr] md:items-center">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-[1.4fr_1fr] md:items-center">
             <div className="flex flex-col items-start gap-4">
               <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <UploadCloud className="size-7" />

@@ -19,6 +19,7 @@ import {
   Sparkles,
   Twitter,
   Users,
+  X,
 } from "lucide-react";
 import heroImg from "@/assets/hero-villa.jpg";
 import { Button } from "@/components/ui/button";
@@ -123,6 +124,7 @@ function Logo() {
 }
 
 function TopNav() {
+  const [open, setOpen] = useState(false);
   const links = [
     { label: "Search", to: "/search" },
     { label: "Explore Areas", to: "/areas" },
@@ -151,11 +153,39 @@ function TopNav() {
         </div>
         <div className="flex items-center gap-2">
           <NavAuthButton className="hidden md:inline-flex" />
-          <Button variant="outline" size="icon" className="md:hidden" aria-label="Menu">
-            <Menu />
+          <Button
+            variant="outline"
+            size="icon"
+            className="md:hidden"
+            aria-label={open ? "Close menu" : "Open menu"}
+            onClick={() => setOpen((o) => !o)}
+          >
+            {open ? <X /> : <Menu />}
           </Button>
         </div>
       </div>
+
+      {/* Mobile slide-down drawer */}
+      {open && (
+        <div className="absolute inset-x-0 top-full z-50 border-b border-border bg-background shadow-lg md:hidden">
+          <nav className="container-page flex flex-col gap-0.5 py-3">
+            {links.map((l) => (
+              <Link
+                key={l.label}
+                to={l.to}
+                onClick={() => setOpen(false)}
+                className="flex items-center rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-surface hover:text-foreground"
+                activeProps={{ className: "flex items-center rounded-xl px-3 py-3 text-sm font-medium bg-surface text-foreground" }}
+              >
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+          <div className="container-page border-t border-border py-3">
+            <NavAuthButton className="w-full justify-center" />
+          </div>
+        </div>
+      )}
     </header>
   );
 }
@@ -164,50 +194,51 @@ function TopNav() {
 function Hero({ totalListings, totalUsers }: { totalListings: number; totalUsers: number | null }) {
   return (
     <section id="search" className="relative overflow-hidden">
-      <div className="container-page grid gap-12 py-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-20">
+      <div className="container-page grid grid-cols-1 gap-8 py-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-12 lg:py-20">
         <div>
-          <Badge tone="ai" className="mb-5">
+          <Badge tone="ai" className="mb-4">
             <Sparkles className="size-3.5" /> Powered by Maskan AI
           </Badge>
-          <h1 className="font-display text-4xl font-bold leading-[1.05] tracking-tight md:text-5xl lg:text-[3.4rem]">
+          <h1 className="font-display text-2xl font-bold leading-[1.1] tracking-tight sm:text-4xl lg:text-[3.4rem] lg:leading-[1.05]">
             Find the right home with{" "}
             <span className="text-primary">AI rental intelligence</span>.
           </h1>
-          <p className="mt-5 max-w-xl text-lg text-muted-foreground">
+          <p className="mt-3 max-w-xl text-sm text-muted-foreground sm:mt-4 sm:text-base lg:text-lg">
             Compare areas, evaluate rental value, and discover homes that match your lifestyle —
             across Riyadh, Jeddah, Dammam, Khobar and Madinah.
           </p>
 
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button variant="hero" size="lg" asChild>
+          <div className="mt-5 flex flex-col gap-2.5 sm:mt-6 sm:flex-row sm:flex-wrap sm:gap-3">
+            <Button variant="hero" size="lg" className="w-full sm:w-auto" asChild>
               <Link to="/search">
                 <Search /> Find properties
               </Link>
             </Button>
-            <Button variant="outline" size="lg" asChild>
+            <Button variant="outline" size="lg" className="w-full sm:w-auto" asChild>
               <Link to="/advisor">
                 <Sparkles /> Ask AI Advisor
               </Link>
             </Button>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-6">
             <SearchBar />
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-2">
               <span className="size-2 rounded-full bg-success" />
               {totalListings > 0 ? totalListings.toLocaleString() : "—"} verified listings
             </span>
             <span className="inline-flex items-center gap-2">
               <Users className="size-4" />
-              {totalUsers !== null ? `Trusted by ${totalUsers.toLocaleString()} renters` : "Trusted by renters across Saudi Arabia"}
+              {totalUsers !== null ? `${totalUsers.toLocaleString()} renters` : "Trusted by renters"}
             </span>
           </div>
         </div>
 
-        <div className="relative">
+        {/* Hero image — hidden on small screens to keep the hero compact */}
+        <div className="relative hidden md:block">
           <div className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-elevated">
             <img
               src={heroImg}
@@ -257,7 +288,7 @@ function CitySelector({ liveCounts }: { liveCounts: Record<string, number> }) {
 
   return (
     <section className="border-y border-border bg-surface">
-      <div className="container-page flex flex-col gap-5 py-8 md:flex-row md:items-center md:justify-between">
+      <div className="container-page flex flex-col gap-3 py-5 md:flex-row md:items-center md:justify-between md:gap-5 md:py-8">
         <div className="flex items-center gap-3">
           <div className="grid size-9 place-items-center rounded-xl bg-primary-soft text-primary">
             <Compass className="size-4" />
@@ -302,16 +333,16 @@ function AiQuickQuestions() {
   }
 
   return (
-    <section id="ai" className="container-page py-16">
+    <section id="ai" className="container-page py-10 sm:py-16">
       <div className="flex items-end justify-between gap-6">
         <div>
           <Badge tone="ai" className="mb-3">
             <Sparkles className="size-3.5" /> AI Advisor
           </Badge>
-          <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
+          <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
             Ask Maskan AI anything
           </h2>
-          <p className="mt-2 max-w-2xl text-muted-foreground">
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
             Get instant, data-backed answers about neighborhoods, fair pricing and the best fit for
             your family.
           </p>
@@ -323,7 +354,7 @@ function AiQuickQuestions() {
         </Button>
       </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {aiQuickQuestions.map((q) => (
           <button
             key={q}
@@ -360,16 +391,16 @@ function FeaturedAreas({
 }) {
   return (
     <section id="areas" className="bg-surface">
-      <div className="container-page py-16">
+      <div className="container-page py-10 sm:py-16">
         <div className="flex items-end justify-between gap-6">
           <div>
             <Badge tone="primary" className="mb-3">
               <Compass className="size-3.5" /> Featured areas
             </Badge>
-            <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
+            <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
               Top neighborhoods in Riyadh
             </h2>
-            <p className="mt-2 max-w-2xl text-muted-foreground">
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
               AI-scored areas based on family suitability, amenities and rental value.
             </p>
           </div>
@@ -380,7 +411,7 @@ function FeaturedAreas({
           </Button>
         </div>
 
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {featuredAreas.map((a) => {
             const avgRent = liveRents[a.name] ?? a.avgRent;
             const intel = intelList.find((i) => i.area_name === a.name);
@@ -459,16 +490,16 @@ function FeaturedProperties() {
   }, []);
 
   return (
-    <section className="container-page py-16">
+    <section className="container-page py-10 sm:py-16">
       <div className="flex items-end justify-between gap-6">
         <div>
           <Badge tone="secondary" className="mb-3">
             <Home className="size-3.5" /> Featured properties
           </Badge>
-          <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
+          <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
             Handpicked homes this week
           </h2>
-          <p className="mt-2 max-w-2xl text-muted-foreground">
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
             Verified listings ranked by Maskan AI for match quality and rental value.
           </p>
         </div>
@@ -479,7 +510,7 @@ function FeaturedProperties() {
         </Button>
       </div>
 
-      <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {properties.slice(0, 6).map((p) => (
           <PropertyCard key={p.id} p={p} />
         ))}
@@ -511,16 +542,16 @@ function FeaturedPartners({ partners }: { partners: ApiPartnerPublic[] }) {
   if (partners.length === 0) return null;
 
   return (
-    <section className="container-page py-16">
+    <section className="container-page py-10 sm:py-16">
       <div className="flex items-end justify-between gap-6">
         <div>
           <Badge tone="primary" className="mb-3">
             <Briefcase className="size-3.5" /> Verified partners
           </Badge>
-          <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
+          <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
             Meet our partners
           </h2>
-          <p className="mt-2 max-w-2xl text-muted-foreground">
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
             Licensed real estate agents covering every district. Submit a lead and get matched within 24 hours.
           </p>
         </div>
@@ -531,7 +562,7 @@ function FeaturedPartners({ partners }: { partners: ApiPartnerPublic[] }) {
         </Button>
       </div>
 
-      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {partners.map((p) => {
           const displayName = p.agency_name ?? `Partner #${p.id}`;
           const partnerCities = Array.from(new Set(p.areas.map((a) => a.city)));
@@ -603,17 +634,17 @@ function FeaturedPartners({ partners }: { partners: ApiPartnerPublic[] }) {
 function LeadCTA() {
   return (
     <section className="bg-surface border-y border-border">
-      <div className="container-page py-14">
-        <div className="mx-auto max-w-3xl rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-background p-8 shadow-card">
+      <div className="container-page py-10 sm:py-14">
+        <div className="mx-auto max-w-3xl rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-background p-5 shadow-card sm:p-8">
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
               <Badge tone="primary" className="mb-3">
                 <Briefcase className="size-3.5" /> Partner matching
               </Badge>
-              <h2 className="font-display text-2xl font-bold tracking-tight md:text-3xl">
+              <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl md:text-3xl">
                 Can't find the right property?
               </h2>
-              <p className="mt-2 max-w-lg text-muted-foreground">
+              <p className="mt-2 max-w-lg text-sm text-muted-foreground sm:text-base">
                 Submit a free lead request — licensed partners covering your district will reach out within 24 hours with matching options.
               </p>
               <ul className="mt-4 space-y-1.5 text-sm text-muted-foreground">
@@ -670,24 +701,24 @@ function HowItWorks() {
 
   return (
     <section className="bg-surface">
-      <div className="container-page py-16">
+      <div className="container-page py-10 sm:py-16">
         <div className="mx-auto max-w-2xl text-center">
           <Badge tone="neutral" className="mb-3">
             How Maskan works
           </Badge>
-          <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
+          <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
             From search to signed lease — in 3 steps
           </h2>
-          <p className="mt-2 text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
             A smarter rental journey, built around Saudi renters.
           </p>
         </div>
 
-        <ol className="mt-10 grid gap-5 md:grid-cols-3">
+        <ol className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {steps.map((s, i) => (
             <li
               key={s.title}
-              className="relative flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-card"
+              className="relative flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-card sm:p-6"
             >
               <div className="flex items-center justify-between">
                 <div className="grid size-12 place-items-center rounded-2xl bg-primary-soft text-primary">
@@ -703,13 +734,13 @@ function HowItWorks() {
           ))}
         </ol>
 
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-          <Button variant="hero" size="lg" asChild>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Button variant="hero" size="lg" className="flex-1 sm:flex-none" asChild>
             <Link to="/search">
               <Search /> Find properties
             </Link>
           </Button>
-          <Button variant="outline" size="lg" asChild>
+          <Button variant="outline" size="lg" className="flex-1 sm:flex-none" asChild>
             <Link to="/advisor">
               <Sparkles /> Ask AI Advisor
             </Link>
@@ -749,9 +780,9 @@ function Footer() {
 
   return (
     <footer id="list" className="border-t border-border bg-background">
-      <div className="container-page py-14">
-        <div className="grid gap-10 md:grid-cols-5">
-          <div className="md:col-span-2">
+      <div className="container-page py-10 sm:py-14">
+        <div className="grid gap-8 grid-cols-2 md:grid-cols-5">
+          <div className="col-span-2">
             <Logo />
             <p className="mt-3 max-w-sm text-sm text-muted-foreground">
               Maskan is the AI-powered rental intelligence platform for Saudi Arabia. Smarter

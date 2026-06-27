@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import { BedDouble, Bath, MapPin, ExternalLink, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import type { Map as LeafletMap, Marker } from "leaflet";
 import type { SearchProperty } from "@/lib/maskan-search-data";
 import { formatSAR } from "@/lib/maskan-data";
 
@@ -15,7 +15,6 @@ const CITY_CENTERS: Record<string, [number, number]> = {
   Madinah: [24.5247, 39.5692],
 };
 
-// "District|City" → [lat, lng]
 const DISTRICT_COORDS: Record<string, [number, number]> = {
   "Al Yasmin|Riyadh":            [24.8341, 46.6349],
   "Al Narjis|Riyadh":            [24.8156, 46.6285],
@@ -63,9 +62,7 @@ const DISTRICT_COORDS: Record<string, [number, number]> = {
 };
 
 function getCoords(p: SearchProperty): [number, number] {
-  const c = DISTRICT_COORDS[`${p.district}|${p.city}`];
-  if (c) return c;
-  return CITY_CENTERS[p.city] ?? CITY_CENTERS.Riyadh;
+  return DISTRICT_COORDS[`${p.district}|${p.city}`] ?? CITY_CENTERS[p.city] ?? CITY_CENTERS.Riyadh;
 }
 
 function jitter(val: number, seed: number, scale = 0.007): number {
@@ -73,61 +70,71 @@ function jitter(val: number, seed: number, scale = 0.007): number {
   return val + (x - Math.floor(x) - 0.5) * scale;
 }
 
-// ── Google Maps init ──────────────────────────────────────────────────────────
-
-setOptions({
-  key: import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string,
-  v: "weekly",
-});
-
-type GMap = google.maps.Map;
-type Marker = google.maps.marker.AdvancedMarkerElement;
+function injectLeafletCss() {
+  if (document.getElementById("leaflet-css")) return;
+  const link = document.createElement("link");
+  link.id = "leaflet-css";
+  link.rel = "stylesheet";
+  link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+  document.head.appendChild(link);
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function PropertyMapView({ properties }: { properties: SearchProperty[] }) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapObjRef = useRef<GMap | null>(null);
+  const mapObjRef = useRef<LeafletMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const [selected, setSelected] = useState<SearchProperty | null>(null);
-  const [mapError, setMapError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
-  // Load Maps API once
+  // Init map once on mount, destroy on unmount
   useEffect(() => {
+    if (!mapRef.current) return;
     let cancelled = false;
+
     (async () => {
-      try {
-        const { Map: GMap } = await importLibrary("maps");
-        if (cancelled || !mapRef.current) return;
+      const L = (await import("leaflet")).default;
+      if (cancelled || !mapRef.current) return;
 
-        const firstCity = properties[0]?.city ?? "Riyadh";
-        const [clat, clng] = CITY_CENTERS[firstCity] ?? CITY_CENTERS.Riyadh;
+      injectLeafletCss();
 
-        mapObjRef.current = new GMap(mapRef.current, {
-          center: { lat: clat, lng: clng },
-          zoom: 12,
-          mapId: "maskan_property_map",
-          streetViewControl: false,
-          mapTypeControl: false,
-          fullscreenControl: true,
-        });
-        if (!cancelled) setReady(true);
-      } catch {
-        if (!cancelled) setMapError("Unable to load Google Maps. Check your API key or network.");
-      }
+      const firstCity = properties[0]?.city ?? "Riyadh";
+      const [clat, clng] = CITY_CENTERS[firstCity] ?? CITY_CENTERS.Riyadh;
+
+      const map = L.map(mapRef.current, {
+        center: [clat, clng],
+        zoom: 12,
+        zoomControl: true,
+        attributionControl: true,
+      });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+      }).addTo(map);
+
+      mapObjRef.current = map;
+      if (!cancelled) setReady(true);
     })();
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    return () => {
+      cancelled = true;
+      if (mapObjRef.current) {
+        mapObjRef.current.remove();
+        mapObjRef.current = null;
+        markersRef.current = [];
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Refresh markers on every filter change
+  // Refresh markers whenever filtered results change
   useEffect(() => {
     const map = mapObjRef.current;
     if (!map || !ready) return;
 
-    // Always clear old markers synchronously so stale pins never linger
-    for (const m of markersRef.current) m.map = null;
+    for (const m of markersRef.current) m.remove();
     markersRef.current = [];
 
     if (properties.length === 0) return;
@@ -135,60 +142,43 @@ export function PropertyMapView({ properties }: { properties: SearchProperty[] }
     let cancelled = false;
 
     (async () => {
-      const { AdvancedMarkerElement } = await importLibrary("marker") as google.maps.MarkerLibrary;
+      const L = (await import("leaflet")).default;
       if (cancelled) return;
+      const currentMap = mapObjRef.current;
+      if (!currentMap) return;
 
-      const bounds = new google.maps.LatLngBounds();
+      const latLngs: [number, number][] = [];
 
       properties.forEach((p, i) => {
         const [baseLat, baseLng] = getCoords(p);
         const lat = jitter(baseLat, Number(p.id) * 3 + i);
         const lng = jitter(baseLng, Number(p.id) * 7 + i + 13);
-        bounds.extend({ lat, lng });
+        latLngs.push([lat, lng]);
 
-        const pin = document.createElement("div");
-        Object.assign(pin.style, {
-          background: "#5B21B6",
-          color: "white",
-          borderRadius: "20px",
-          padding: "4px 10px",
-          fontSize: "11px",
-          fontWeight: "700",
-          whiteSpace: "nowrap",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.28)",
-          cursor: "pointer",
-          border: "2px solid white",
-          fontFamily: "system-ui,sans-serif",
-          transition: "transform 0.1s",
+        const priceLabel = `SAR ${Math.round(p.price / 12).toLocaleString()}/mo`;
+
+        const icon = L.divIcon({
+          className: "",
+          html: `<div style="background:#5B21B6;color:white;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.30);cursor:pointer;border:2px solid white;font-family:system-ui,sans-serif;transition:transform 0.1s;">${priceLabel}</div>`,
+          iconSize: undefined,
+          iconAnchor: [0, 0],
         });
-        pin.textContent = `SAR ${Math.round(p.price / 12).toLocaleString()}/mo`;
-        pin.onmouseenter = () => { pin.style.transform = "scale(1.1)"; };
-        pin.onmouseleave = () => { pin.style.transform = ""; };
 
-        const marker = new AdvancedMarkerElement({ map, position: { lat, lng }, content: pin, title: p.title });
-        marker.addListener("click", () => setSelected(p));
+        const marker = L.marker([lat, lng], { icon });
+        marker.addTo(currentMap);
+        marker.on("click", () => setSelected(p));
         markersRef.current.push(marker);
       });
 
       if (properties.length === 1) {
-        const [lat, lng] = getCoords(properties[0]);
-        map.setCenter({ lat, lng });
-        map.setZoom(14);
+        currentMap.setView(latLngs[0], 14);
       } else {
-        map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
+        currentMap.fitBounds(L.latLngBounds(latLngs), { padding: [60, 60] });
       }
     })();
 
     return () => { cancelled = true; };
   }, [properties, ready]);
-
-  if (mapError) {
-    return (
-      <div className="flex h-[600px] items-center justify-center rounded-2xl border border-dashed border-border bg-card text-sm text-muted-foreground">
-        {mapError}
-      </div>
-    );
-  }
 
   return (
     <div className="relative h-[calc(100vh-220px)] min-h-[520px] overflow-hidden rounded-2xl border border-border shadow-card">
@@ -204,14 +194,14 @@ export function PropertyMapView({ properties }: { properties: SearchProperty[] }
       )}
 
       {ready && (
-        <div className="absolute left-3 top-3 rounded-xl border border-border bg-card/95 px-3 py-1.5 text-xs font-semibold shadow-card backdrop-blur">
+        <div className="absolute left-3 top-3 z-[1000] rounded-xl border border-border bg-card/95 px-3 py-1.5 text-xs font-semibold shadow-card backdrop-blur">
           <MapPin className="mr-1 inline size-3.5 text-primary" />
           {properties.length} {properties.length === 1 ? "property" : "properties"} on map
         </div>
       )}
 
       {selected && (
-        <div className="absolute bottom-4 left-1/2 w-full max-w-sm -translate-x-1/2 px-3">
+        <div className="absolute bottom-4 left-1/2 z-[1000] w-full max-w-sm -translate-x-1/2 px-3">
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-elevated">
             <div className="relative aspect-[16/7] overflow-hidden bg-surface-2">
               <img src={selected.image} alt={selected.title} className="size-full object-cover" />

@@ -512,7 +512,7 @@ function EmptyState({ onSend, propertyCtx }: { onSend: (t: string) => void; prop
           </p>
         </>
       )}
-      <div className="mt-8 grid gap-2 sm:grid-cols-2 w-full max-w-lg">
+      <div className="mt-8 grid grid-cols-1 gap-2 sm:grid-cols-2 w-full max-w-lg">
         {suggested.map((q) => (
           <button
             key={q}

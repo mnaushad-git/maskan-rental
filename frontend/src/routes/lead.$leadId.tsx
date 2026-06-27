@@ -143,7 +143,7 @@ function CustomerLeadPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
           {/* Left panel */}
           <div className="lg:col-span-2 space-y-4">
             {/* Requirements */}

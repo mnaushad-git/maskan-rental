@@ -31,6 +31,7 @@ import {
   MessageSquare,
   Send,
   Sparkles,
+  Star,
   Trash2,
   Upload,
   Users,
@@ -63,6 +64,8 @@ import {
   adminForceCloseLead,
   adminSendMessage,
   adminFetchMessages,
+  fetchAllReviews,
+  moderateReview,
   login,
   mapApiProperty,
   patchMediatorAdmin,
@@ -76,6 +79,7 @@ import {
   type ApiUser,
   type ApiLeadDetail,
   type ApiLeadMessage,
+  type ApiReviewAdmin,
   type AuthUser,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
@@ -121,7 +125,7 @@ type Listing = {
 
 // ---------- Page ----------
 
-type AdminView = "listings" | "mediators" | "leads" | "users";
+type AdminView = "listings" | "mediators" | "leads" | "users" | "reviews";
 
 function AdminPage() {
   const { user, authLoading, setAuth } = useAuth();
@@ -135,6 +139,9 @@ function AdminPage() {
   const [users, setUsers] = useState<ApiUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<ApiReviewAdmin[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ListingStatus | "All">("All");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -170,6 +177,12 @@ function AdminPage() {
     return () => { cancelled = true; };
   }, [user, authLoading]);
 
+  // Load pending review count on mount for badge
+  useEffect(() => {
+    if (!user?.is_admin) return;
+    fetchAllReviews("pending").then(r => setPendingReviewCount(r.length)).catch(() => {});
+  }, [user]);
+
   useEffect(() => {
     if (view === "mediators" && mediators.length === 0 && !loadingMediators) {
       setLoadingMediators(true);
@@ -178,6 +191,10 @@ function AdminPage() {
     if (view === "leads" && leads.length === 0 && !loadingLeads) {
       setLoadingLeads(true);
       fetchAdminLeads().then(l => setLeads(l)).catch(err => console.error("fetchAdminLeads failed:", err)).finally(() => setLoadingLeads(false));
+    }
+    if (view === "reviews" && !loadingReviews) {
+      setLoadingReviews(true);
+      fetchAllReviews().then(r => { setReviews(r); setPendingReviewCount(r.filter(x => x.status === "pending").length); }).catch(() => {}).finally(() => setLoadingReviews(false));
     }
   }, [view]);
 
@@ -395,7 +412,7 @@ function AdminPage() {
 
   return (
     <div className="flex min-h-screen bg-surface">
-      <AdminSidebar activeView={view} onViewChange={setView} />
+      <AdminSidebar activeView={view} onViewChange={setView} pendingReviewCount={pendingReviewCount} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar onAiOpen={() => setAiPanelOpen(true)} />
@@ -429,6 +446,19 @@ function AdminPage() {
               onApproveClosure={handleApproveClosure}
               onRejectClosure={handleRejectClosure}
               onForceClose={handleForceCloseLead}
+            />
+          )}
+
+          {/* Reviews moderation view */}
+          {view === "reviews" && (
+            <ReviewsModerationView
+              reviews={reviews}
+              loading={loadingReviews}
+              onModerate={async (id, status) => {
+                const updated = await moderateReview(id, status);
+                setReviews(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r));
+                setPendingReviewCount(c => status === "approved" ? Math.max(0, c - 1) : Math.max(0, c - 1));
+              }}
             />
           )}
 
@@ -648,15 +678,173 @@ function AdminPage() {
   );
 }
 
+// ---------- Reviews moderation ----------
+
+const STATUS_LABELS: Record<string, string> = { pending: "Pending", approved: "Approved", rejected: "Rejected" };
+const STATUS_TONES: Record<string, string> = {
+  pending:  "bg-warning/10 text-warning",
+  approved: "bg-success/10 text-success",
+  rejected: "bg-destructive/10 text-destructive",
+};
+
+function ReviewStaticStars({ score }: { score: number }) {
+  return (
+    <span className="flex items-center gap-0.5">
+      {[1,2,3,4,5].map(i => (
+        <Star key={i} className={cn("size-3.5", i <= score ? "fill-warning text-warning" : "text-muted-foreground/20")} strokeWidth={1.5} />
+      ))}
+    </span>
+  );
+}
+
+function ReviewsModerationView({
+  reviews, loading, onModerate,
+}: {
+  reviews: ApiReviewAdmin[];
+  loading: boolean;
+  onModerate: (id: number, status: "approved" | "rejected") => Promise<void>;
+}) {
+  const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
+  const [acting, setActing] = useState<number | null>(null);
+
+  const visible = filter === "all" ? reviews : reviews.filter(r => r.status === filter);
+  const pendingCount = reviews.filter(r => r.status === "pending").length;
+
+  async function act(id: number, status: "approved" | "rejected") {
+    setActing(id);
+    try { await onModerate(id, status); }
+    finally { setActing(null); }
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Moderation</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">Tenant Reviews</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Approve or reject reviews before they appear on partner profiles.</p>
+      </div>
+
+      {/* Filter bar */}
+      <div className="mb-6 flex gap-2">
+        {(["pending", "approved", "rejected", "all"] as const).map(f => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setFilter(f)}
+            className={cn(
+              "rounded-full px-3 py-1 text-sm font-medium transition-colors",
+              filter === f ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {f === "pending" && pendingCount > 0 ? `Pending (${pendingCount})` : f.charAt(0).toUpperCase() + f.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
+          <div className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          Loading reviews…
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="flex h-40 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+          <CheckCircle2 className="size-8 text-success/60" />
+          {filter === "pending" ? "No reviews pending — all caught up!" : "No reviews in this category."}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {visible.map(review => (
+            <div key={review.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                    {(review.reviewer_name ?? "?").charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-sm">{review.reviewer_name ?? "Anonymous"}</span>
+                      <ReviewStaticStars score={review.rating} />
+                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", STATUS_TONES[review.status])}>
+                        {STATUS_LABELS[review.status]}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      For: <span className="font-medium text-foreground">{review.mediator_agency_name ?? `Partner #${review.mediator_id}`}</span>
+                      {" · "}{new Date(review.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                    </div>
+                  </div>
+                </div>
+
+                {review.status === "pending" && (
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      disabled={acting === review.id}
+                      onClick={() => void act(review.id, "approved")}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-success/10 px-3 py-1.5 text-sm font-semibold text-success hover:bg-success/20 transition-colors disabled:opacity-50"
+                    >
+                      <CheckCircle2 className="size-4" /> Approve
+                    </button>
+                    <button
+                      type="button"
+                      disabled={acting === review.id}
+                      onClick={() => void act(review.id, "rejected")}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-destructive/10 px-3 py-1.5 text-sm font-semibold text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50"
+                    >
+                      <X className="size-4" /> Reject
+                    </button>
+                  </div>
+                )}
+
+                {review.status !== "pending" && (
+                  <div className="flex gap-2 shrink-0">
+                    {review.status === "approved" && (
+                      <button
+                        type="button"
+                        disabled={acting === review.id}
+                        onClick={() => void act(review.id, "rejected")}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-surface-2 px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                      >
+                        <X className="size-4" /> Revoke
+                      </button>
+                    )}
+                    {review.status === "rejected" && (
+                      <button
+                        type="button"
+                        disabled={acting === review.id}
+                        onClick={() => void act(review.id, "approved")}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-surface-2 px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-success hover:bg-success/10 transition-colors disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="size-4" /> Re-approve
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {review.comment && (
+                <blockquote className="mt-3 rounded-xl border-l-4 border-border pl-4 text-sm leading-relaxed text-muted-foreground italic">
+                  "{review.comment}"
+                </blockquote>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- Sidebar ----------
 
-function AdminSidebar({ activeView, onViewChange }: { activeView: AdminView; onViewChange: (v: AdminView) => void }) {
+function AdminSidebar({ activeView, onViewChange, pendingReviewCount }: { activeView: AdminView; onViewChange: (v: AdminView) => void; pendingReviewCount: number }) {
   const { user, clearAuth } = useAuth();
-  const navItems: { view: AdminView; icon: React.ElementType; label: string }[] = [
-    { view: "listings", icon: ListChecks, label: "Listings" },
-    { view: "mediators", icon: Briefcase, label: "Partners" },
-    { view: "leads", icon: Users, label: "Leads" },
-    { view: "users", icon: UserPlus, label: "Users" },
+  const navItems: { view: AdminView; icon: React.ElementType; label: string; badge?: number }[] = [
+    { view: "listings",  icon: ListChecks, label: "Listings"  },
+    { view: "mediators", icon: Briefcase,  label: "Partners"  },
+    { view: "leads",     icon: Users,      label: "Leads"     },
+    { view: "users",     icon: UserPlus,   label: "Users"     },
+    { view: "reviews",   icon: Star,       label: "Reviews", badge: pendingReviewCount },
   ];
 
   return (
@@ -685,7 +873,12 @@ function AdminSidebar({ activeView, onViewChange }: { activeView: AdminView; onV
             )}
           >
             <it.icon className="size-4" />
-            {it.label}
+            <span className="flex-1">{it.label}</span>
+            {!!it.badge && (
+              <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground">
+                {it.badge}
+              </span>
+            )}
           </button>
         ))}
       </nav>
@@ -1450,7 +1643,7 @@ function ListingFormDrawer({
         <div className="flex-1 overflow-y-auto px-6 py-6">
           {/* Property details */}
           <Section icon={<FileText className="size-4" />} title="Property details">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Listing title" className="sm:col-span-2">
                 <Input
                   value={form.title}
@@ -2205,11 +2398,25 @@ function PartnerFormDrawer({
     license_number: "",
     phone: "",
     bio: "",
+    profile_image_url: "",
     is_verified: true,
     subscription_status: "active",
   });
   const [saving, setSaving] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
+  const [imgPreview, setImgPreview] = useState<string | null>(null);
+
+  function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setImgPreview(dataUrl);
+      setForm(f => ({ ...f, profile_image_url: dataUrl }));
+    };
+    reader.readAsDataURL(file);
+  }
 
   async function submit() {
     if (!form.email.trim()) { alert("Email is required."); return; }
@@ -2226,6 +2433,7 @@ function PartnerFormDrawer({
         license_number: form.license_number.trim(),
         phone: form.phone.trim(),
         bio: form.bio.trim() || undefined,
+        profile_image_url: form.profile_image_url.trim() || undefined,
         is_verified: form.is_verified,
         subscription_status: form.subscription_status,
       });
@@ -2255,7 +2463,7 @@ function PartnerFormDrawer({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
           <Section icon={<Users className="size-4" />} title="Account details">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Full name" className="sm:col-span-2">
                 <Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="Abdullah Al-Rashid" />
               </Field>
@@ -2280,7 +2488,42 @@ function PartnerFormDrawer({
           </Section>
 
           <Section icon={<Briefcase className="size-4" />} title="Partner profile">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* Profile photo upload */}
+              <Field label="Profile photo" className="sm:col-span-2">
+                <div className="flex items-center gap-4">
+                  {/* Preview */}
+                  <div className="size-16 shrink-0 overflow-hidden rounded-xl border border-border bg-surface">
+                    {imgPreview ? (
+                      <img src={imgPreview} alt="Preview" className="size-full object-cover" />
+                    ) : (
+                      <div className="flex size-full items-center justify-center text-xs text-muted-foreground">No photo</div>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border bg-surface px-3 py-2 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={handleImagePick}
+                      />
+                      Upload photo
+                    </label>
+                    <p className="text-[11px] text-muted-foreground">Or paste a URL below</p>
+                    <Input
+                      value={form.profile_image_url.startsWith("data:") ? "" : form.profile_image_url}
+                      onChange={e => {
+                        setForm(f => ({ ...f, profile_image_url: e.target.value }));
+                        setImgPreview(e.target.value || null);
+                      }}
+                      placeholder="https://example.com/photo.jpg"
+                      className="text-xs"
+                    />
+                  </div>
+                </div>
+              </Field>
+
               <Field label="Agency / company name" className="sm:col-span-2">
                 <Input value={form.agency_name} onChange={e => setForm({ ...form, agency_name: e.target.value })} placeholder="Al-Rashid Real Estate" />
               </Field>
@@ -2528,7 +2771,7 @@ function NewLeadDrawer({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
           <Section icon={<MapPin className="size-4" />} title="Location">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="City">
                 <select
                   value={form.city}
@@ -2555,7 +2798,7 @@ function NewLeadDrawer({
           </Section>
 
           <Section icon={<Users className="size-4" />} title="Customer details">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Full name *" className="sm:col-span-2">
                 <Input value={form.customer_name} onChange={e => setForm({ ...form, customer_name: e.target.value })} placeholder="Mohammed Al-Ghamdi" />
               </Field>
@@ -2569,7 +2812,7 @@ function NewLeadDrawer({
           </Section>
 
           <Section icon={<Home className="size-4" />} title="Requirements">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Min budget (SAR/mo)">
                 <Input type="number" value={form.min_budget} onChange={e => setForm({ ...form, min_budget: e.target.value })} placeholder="5000" />
               </Field>

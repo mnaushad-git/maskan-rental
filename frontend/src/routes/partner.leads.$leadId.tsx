@@ -138,7 +138,7 @@ function MediatorLeadDetail() {
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-8">
-        <div className="grid gap-6 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
           {/* Lead details */}
           <div className="lg:col-span-2 space-y-4">
             <div className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-4">

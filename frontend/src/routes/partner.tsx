@@ -226,7 +226,7 @@ function PartnerDashboard() {
 
           {/* ══ LEADS VIEW ══ */}
           {view === "leads" && (
-            <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2 space-y-8">
 
                 {/* Available Leads */}
@@ -667,7 +667,7 @@ function PartnerListingForm({
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Left column */}
         <div className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-card">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Property details</h2>

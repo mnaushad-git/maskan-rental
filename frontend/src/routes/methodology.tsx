@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Building2,
+  Calculator,
   CheckCircle2,
   Clock,
   GraduationCap,
@@ -221,7 +222,7 @@ function MethodologyPage() {
         {/* Score guide bands */}
         <section className="mb-12">
           <h2 className="mb-4 text-xl font-bold tracking-tight">What the numbers mean</h2>
-          <div className="grid gap-3 sm:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
             {BANDS.map((b) => (
               <div key={b.label} className="rounded-xl border border-border bg-card p-4 text-center">
                 <div className="mx-auto mb-2">
@@ -250,7 +251,7 @@ function MethodologyPage() {
                     <div className="text-sm text-muted-foreground">{s.tagline}</div>
                   </div>
                 </div>
-                <div className="grid gap-6 px-6 py-5 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 px-6 py-5 md:grid-cols-2">
                   <div>
                     <p className="text-sm text-muted-foreground">{s.description}</p>
                     {s.radius && (
@@ -300,7 +301,7 @@ function MethodologyPage() {
             dominating. Mosque count is intentionally capped low — mosques are present in every
             Riyadh block, so count is not a differentiator.
           </p>
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             {LIFESTYLE_FACTORS.map((f) => (
               <div key={f.label} className="rounded-xl border border-border bg-card p-4 text-center">
                 <div className="mx-auto mb-2 grid size-10 place-items-center rounded-xl bg-surface-2 text-muted-foreground">
@@ -313,6 +314,153 @@ function MethodologyPage() {
                 <div className="mt-1 text-[10px] leading-snug text-muted-foreground">{f.note}</div>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* Rent Calculator methodology */}
+        <section className="mb-12">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+              <Calculator className="size-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Rent Calculator — how we calculate</h2>
+              <p className="text-sm text-muted-foreground">
+                Every number the calculator produces is derived from these rules, applied to the listing's annual rent.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-5">
+
+            {/* Payment frequency */}
+            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+              <div className="border-b border-border bg-surface-2/40 px-6 py-4">
+                <div className="text-base font-bold">Payment frequency</div>
+                <div className="text-sm text-muted-foreground">
+                  Divides the listing's annual rent by the number of payments per year.
+                </div>
+              </div>
+              <div className="overflow-hidden">
+                {[
+                  { label: "Annual",       count: 1,  formula: "Annual rent ÷ 1",  note: "Full year paid in one cheque — most common in KSA"         },
+                  { label: "Semi-annual",  count: 2,  formula: "Annual rent ÷ 2",  note: "Two cheques, 6 months apart"                                 },
+                  { label: "Quarterly",    count: 4,  formula: "Annual rent ÷ 4",  note: "Four cheques, once per quarter"                              },
+                  { label: "Monthly",      count: 12, formula: "Annual rent ÷ 12", note: "Twelve equal payments — less common, requires landlord approval" },
+                ].map((r, i, arr) => (
+                  <div
+                    key={r.label}
+                    className={cn("grid grid-cols-[120px_1fr_1fr] gap-4 px-6 py-3 text-sm", i < arr.length - 1 && "border-b border-border")}
+                  >
+                    <span className="font-semibold">{r.label}</span>
+                    <span className="font-mono text-xs text-primary">{r.formula}</span>
+                    <span className="text-muted-foreground">{r.note}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* First-year cost table */}
+            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+              <div className="border-b border-border bg-surface-2/40 px-6 py-4">
+                <div className="text-base font-bold">First-year cost estimate</div>
+                <div className="text-sm text-muted-foreground">
+                  Three components added to show the real upfront cash required in year one.
+                </div>
+              </div>
+              <div className="overflow-hidden">
+                {[
+                  {
+                    label:   "Annual rent",
+                    formula: "= listing price",
+                    basis:   "The displayed annual rent. No markup or adjustment.",
+                  },
+                  {
+                    label:   "Security deposit",
+                    formula: "Annual rent ÷ 12",
+                    basis:   "Equivalent to 1 month's rent. Standard practice across Saudi Arabia — held by landlord, returned at lease end (less any deductions).",
+                  },
+                  {
+                    label:   "Agency / broker fee",
+                    formula: "Annual rent × 2.5%",
+                    basis:   "The standard brokerage commission in KSA (2.5% of annual rent), paid to the real-estate agent who arranged the lease. Not all landlords charge this; it is shown as an estimate.",
+                  },
+                  {
+                    label:   "VAT",
+                    formula: "0%",
+                    basis:   "Residential rentals in Saudi Arabia are VAT-exempt under ZATCA regulations. The calculator does not add VAT.",
+                  },
+                ].map((r, i, arr) => (
+                  <div
+                    key={r.label}
+                    className={cn("grid gap-1 px-6 py-4 text-sm", i < arr.length - 1 && "border-b border-border")}
+                  >
+                    <div className="flex items-baseline gap-3">
+                      <span className="font-semibold">{r.label}</span>
+                      <span className="font-mono text-xs text-primary">{r.formula}</span>
+                    </div>
+                    <div className="text-muted-foreground">{r.basis}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Affordability thresholds */}
+            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+              <div className="border-b border-border bg-surface-2/40 px-6 py-4">
+                <div className="text-base font-bold">Affordability check</div>
+                <div className="text-sm text-muted-foreground">
+                  Based on the widely used <strong className="text-foreground">30% rule</strong>: housing costs should not exceed 30% of gross monthly income. Maskan refines this into three bands.
+                </div>
+              </div>
+              <div className="px-6 py-4">
+                <div className="mb-4 rounded-xl border border-border bg-surface-2/40 p-4 font-mono text-sm">
+                  <span className="text-muted-foreground">% of income  =  </span>
+                  <span className="text-primary">(annual rent ÷ 12) ÷ monthly salary × 100</span>
+                </div>
+                <div className="space-y-3">
+                  {[
+                    {
+                      range: "≤ 25%",
+                      tone:  "success",
+                      label: "Comfortably affordable",
+                      note:  "Rent is well within the 30% guideline. Significant budget remains for savings and other expenses.",
+                    },
+                    {
+                      range: "25% – 33%",
+                      tone:  "warning",
+                      label: "Borderline",
+                      note:  "Slightly above the recommended 30% but within the upper limit used by many financial advisors and banks in KSA when assessing loan eligibility.",
+                    },
+                    {
+                      range: "> 33%",
+                      tone:  "danger",
+                      label: "Above budget",
+                      note:  "Rent exceeds one-third of income. This is the threshold above which most Saudi banks will not approve personal finance for housing costs.",
+                    },
+                  ].map((b) => (
+                    <div key={b.range} className="flex items-start gap-4">
+                      <span className={cn(
+                        "mt-0.5 shrink-0 rounded-full px-3 py-1 text-xs font-bold",
+                        b.tone === "success" && "bg-success/15 text-success",
+                        b.tone === "warning" && "bg-warning/15 text-warning",
+                        b.tone === "danger"  && "bg-destructive/15 text-destructive",
+                      )}>
+                        {b.range}
+                      </span>
+                      <div>
+                        <div className="text-sm font-semibold">{b.label}</div>
+                        <div className="text-sm text-muted-foreground">{b.note}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-4 text-xs text-muted-foreground">
+                  The calculator uses your <em>gross</em> monthly salary (before deductions). Actual affordability depends on your full financial picture — other debts, dependants, and savings goals.
+                </p>
+              </div>
+            </div>
+
           </div>
         </section>
 

@@ -205,6 +205,15 @@ def list_public_mediators(
     )
 
 
+@router.get("/{mediator_id}/public", response_model=MediatorPublicOut)
+def get_public_mediator(mediator_id: int, db: Session = Depends(get_db)):
+    """Return a single partner's public profile. No auth required."""
+    mediator = db.get(Mediator, mediator_id)
+    if not mediator or mediator.subscription_status != "active":
+        raise HTTPException(status_code=404, detail="Partner not found.")
+    return mediator
+
+
 # ── Admin endpoints ───────────────────────────────────────────────────────────
 
 @router.get("/", response_model=list[MediatorOut])
@@ -264,6 +273,7 @@ def admin_create_partner(
         agency_name=body.agency_name,
         phone=body.phone,
         bio=body.bio,
+        profile_image_url=body.profile_image_url,
         is_verified=body.is_verified,
         subscription_status=body.subscription_status,
         subscription_started_at=now if body.subscription_status == "active" else None,

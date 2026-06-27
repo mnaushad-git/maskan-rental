@@ -27,6 +27,7 @@ import { Route as PropertyIdRouteImport } from './routes/property.$id'
 import { Route as PartnerRegisterRouteImport } from './routes/partner.register'
 import { Route as LeadNewRouteImport } from './routes/lead.new'
 import { Route as LeadLeadIdRouteImport } from './routes/lead.$leadId'
+import { Route as AgentIdRouteImport } from './routes/agent.$id'
 import { Route as PropertyRouteImport } from './routes/property.'
 import { Route as PartnerLeadsLeadIdRouteImport } from './routes/partner.leads.$leadId'
 
@@ -120,6 +121,11 @@ const LeadLeadIdRoute = LeadLeadIdRouteImport.update({
   path: '/lead/$leadId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgentIdRoute = AgentIdRouteImport.update({
+  id: '/agent/$id',
+  path: '/agent/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PropertyRoute = PropertyRouteImport.update({
   id: '/property/',
   path: '/property/',
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/saved': typeof SavedRoute
   '/search': typeof SearchRoute
   '/property/': typeof PropertyRoute
+  '/agent/$id': typeof AgentIdRoute
   '/lead/$leadId': typeof LeadLeadIdRoute
   '/lead/new': typeof LeadNewRoute
   '/partner/register': typeof PartnerRegisterRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/saved': typeof SavedRoute
   '/search': typeof SearchRoute
   '/property': typeof PropertyRoute
+  '/agent/$id': typeof AgentIdRoute
   '/lead/$leadId': typeof LeadLeadIdRoute
   '/lead/new': typeof LeadNewRoute
   '/partner/register': typeof PartnerRegisterRoute
@@ -192,6 +200,7 @@ export interface FileRoutesById {
   '/saved': typeof SavedRoute
   '/search': typeof SearchRoute
   '/property/': typeof PropertyRoute
+  '/agent/$id': typeof AgentIdRoute
   '/lead/$leadId': typeof LeadLeadIdRoute
   '/lead/new': typeof LeadNewRoute
   '/partner/register': typeof PartnerRegisterRoute
@@ -216,6 +225,7 @@ export interface FileRouteTypes {
     | '/saved'
     | '/search'
     | '/property/'
+    | '/agent/$id'
     | '/lead/$leadId'
     | '/lead/new'
     | '/partner/register'
@@ -238,6 +248,7 @@ export interface FileRouteTypes {
     | '/saved'
     | '/search'
     | '/property'
+    | '/agent/$id'
     | '/lead/$leadId'
     | '/lead/new'
     | '/partner/register'
@@ -260,6 +271,7 @@ export interface FileRouteTypes {
     | '/saved'
     | '/search'
     | '/property/'
+    | '/agent/$id'
     | '/lead/$leadId'
     | '/lead/new'
     | '/partner/register'
@@ -283,6 +295,7 @@ export interface RootRouteChildren {
   SavedRoute: typeof SavedRoute
   SearchRoute: typeof SearchRoute
   PropertyRoute: typeof PropertyRoute
+  AgentIdRoute: typeof AgentIdRoute
   LeadLeadIdRoute: typeof LeadLeadIdRoute
   LeadNewRoute: typeof LeadNewRoute
   PropertyIdRoute: typeof PropertyIdRoute
@@ -416,6 +429,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeadLeadIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agent/$id': {
+      id: '/agent/$id'
+      path: '/agent/$id'
+      fullPath: '/agent/$id'
+      preLoaderRoute: typeof AgentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/property/': {
       id: '/property/'
       path: '/property'
@@ -462,6 +482,7 @@ const rootRouteChildren: RootRouteChildren = {
   SavedRoute: SavedRoute,
   SearchRoute: SearchRoute,
   PropertyRoute: PropertyRoute,
+  AgentIdRoute: AgentIdRoute,
   LeadLeadIdRoute: LeadLeadIdRoute,
   LeadNewRoute: LeadNewRoute,
   PropertyIdRoute: PropertyIdRoute,

@@ -22,6 +22,7 @@ export type Property = {
   agent: string;
   agentPhone: string | null;
   agentProfileImage: string | null;
+  mediatorId: number | null;
 };
 
 export const properties: Property[] = [
@@ -44,6 +45,7 @@ export const properties: Property[] = [
     agent: "Faisal Al-Harbi",
     agentPhone: null,
     agentProfileImage: null,
+    mediatorId: null,
   },
   {
     id: "MSK-2210",
@@ -64,6 +66,7 @@ export const properties: Property[] = [
     agent: "Noura Al-Qahtani",
     agentPhone: null,
     agentProfileImage: null,
+    mediatorId: null,
   },
   {
     id: "MSK-3398",
@@ -84,6 +87,7 @@ export const properties: Property[] = [
     agent: "Omar Bin Saleh",
     agentPhone: null,
     agentProfileImage: null,
+    mediatorId: null,
   },
   {
     id: "MSK-4521",
@@ -104,6 +108,7 @@ export const properties: Property[] = [
     agent: "Layla Al-Subaie",
     agentPhone: null,
     agentProfileImage: null,
+    mediatorId: null,
   },
   {
     id: "MSK-5630",
@@ -124,6 +129,7 @@ export const properties: Property[] = [
     agent: "Saad Al-Dosari",
     agentPhone: null,
     agentProfileImage: null,
+    mediatorId: null,
   },
   {
     id: "MSK-6712",
@@ -144,6 +150,7 @@ export const properties: Property[] = [
     agent: "Hanan Al-Rashid",
     agentPhone: null,
     agentProfileImage: null,
+    mediatorId: null,
   },
 ];
 

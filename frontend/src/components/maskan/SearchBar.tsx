@@ -106,7 +106,7 @@ function LocationPicker({
       </div>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-border bg-card shadow-elevated overflow-hidden">
+        <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-xl border border-border bg-card shadow-elevated overflow-hidden sm:w-72">
           <div className="max-h-64 overflow-y-auto">
             {filtered.length === 0 ? (
               <div className="px-4 py-3 text-sm text-muted-foreground">No locations found</div>
@@ -202,10 +202,10 @@ export function SearchBar() {
         </div>
       </div>
 
-      <div className="mt-2 flex items-center gap-2 rounded-xl bg-ai-soft px-4 py-2.5 text-sm text-ai">
+      <div className="mt-2 flex items-center gap-2 overflow-hidden rounded-xl bg-ai-soft px-4 py-2.5 text-sm text-ai">
         <Sparkles className="size-4 shrink-0" />
-        <span className="font-medium">Try:</span>
-        <span className="truncate text-ai/80">
+        <span className="shrink-0 font-medium">Try:</span>
+        <span className="min-w-0 truncate text-ai/80">
           "3 bedroom family villa in North Riyadh near international schools under SAR 200K"
         </span>
       </div>

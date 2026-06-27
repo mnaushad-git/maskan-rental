@@ -104,6 +104,7 @@ function SearchPage() {
   });
   const [view, setView] = useState<"grid" | "list" | "map">("grid");
   const [sort, setSort] = useState<"match" | "price-asc" | "price-desc" | "value">("match");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [compare, setCompare] = useState<string[]>([]);
   // Maps property id (string) → saved-record id (number) for API delete calls
   const [savedMap, setSavedMap] = useState<Record<string, number>>({});
@@ -211,6 +212,21 @@ function SearchPage() {
     }
   };
 
+  const activeFilterCount = [
+    filters.city !== "Any",
+    filters.district !== "Any",
+    filters.minRent > 0,
+    filters.maxRent < 500000,
+    filters.bedrooms > 0,
+    filters.bathrooms > 0,
+    filters.type !== "Any",
+    filters.furnishing !== "Any",
+    filters.parking,
+    filters.balcony,
+    filters.gym,
+    filters.pool,
+  ].filter(Boolean).length;
+
   return (
     <div className="min-h-screen bg-surface">
       <TopBar />
@@ -227,7 +243,33 @@ function SearchPage() {
         {loading && <p className="mt-3 text-sm text-muted-foreground">Loading live listings...</p>}
         {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+        {/* Mobile-only filter trigger bar */}
+        <div className="mt-4 flex items-center gap-2 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(true)}
+            className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold shadow-sm"
+          >
+            <SlidersHorizontal className="size-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="inline-flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilters(DEFAULTS)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-3.5" /> Clear
+            </button>
+          )}
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
           <FiltersPanel filters={filters} setFilters={setFilters} />
           {view === "map" ? (
             <PropertyMapView properties={results} />
@@ -252,6 +294,14 @@ function SearchPage() {
           onClear={() => setCompare([])}
         />
       )}
+
+      <MobileFilterSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        filters={filters}
+        setFilters={setFilters}
+        resultsCount={results.length}
+      />
     </div>
   );
 }
@@ -386,7 +436,9 @@ function ResultsHeader({
 }
 
 /* -------------------------------- Filters -------------------------------- */
-function FiltersPanel({
+
+// Inner filter fields — shared between desktop sidebar and mobile bottom sheet
+function FilterFields({
   filters,
   setFilters,
 }: {
@@ -403,128 +455,137 @@ function FiltersPanel({
   const furnishings = ["Any", "Furnished", "Semi-furnished", "Unfurnished"];
 
   return (
-    <aside className="h-fit rounded-2xl border border-border bg-card p-5 shadow-card lg:sticky lg:top-20">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      <Field label="City">
+        <Select value={filters.city} onChange={(v) => setFilters({ ...filters, city: v, district: "Any" })}>
+          {cities.map((c) => (<option key={c}>{c}</option>))}
+        </Select>
+      </Field>
+
+      <Field label="District">
+        <Select value={filters.district} onChange={(v) => set("district", v)}>
+          {districts.map((d) => (<option key={d}>{d}</option>))}
+        </Select>
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Min rent (SAR)">
+          <NumberInput value={filters.minRent} onChange={(v) => set("minRent", v)} step={5000} placeholder="0" />
+        </Field>
+        <Field label="Max rent (SAR)">
+          <NumberInput value={filters.maxRent} onChange={(v) => set("maxRent", v)} step={5000} placeholder="500,000" />
+        </Field>
+      </div>
+
+      <Field label="Bedrooms">
+        <SegmentedControl
+          value={String(filters.bedrooms)}
+          options={["0", "1", "2", "3", "4", "5"]}
+          labels={["Any", "1+", "2+", "3+", "4+", "5+"]}
+          onChange={(v) => set("bedrooms", Number(v))}
+        />
+      </Field>
+
+      <Field label="Bathrooms">
+        <SegmentedControl
+          value={String(filters.bathrooms)}
+          options={["0", "1", "2", "3", "4"]}
+          labels={["Any", "1+", "2+", "3+", "4+"]}
+          onChange={(v) => set("bathrooms", Number(v))}
+        />
+      </Field>
+
+      <Field label="Property type">
+        <Select value={filters.type} onChange={(v) => set("type", v)}>
+          {types.map((t) => (<option key={t}>{t}</option>))}
+        </Select>
+      </Field>
+
+      <Field label="Furnishing">
+        <Select value={filters.furnishing} onChange={(v) => set("furnishing", v)}>
+          {furnishings.map((t) => (<option key={t}>{t}</option>))}
+        </Select>
+      </Field>
+
+      <div>
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Amenities</div>
+        <div className="grid grid-cols-2 gap-2">
+          <Toggle label="Parking"  icon={<Car className="size-3.5" />}    active={filters.parking} onToggle={() => set("parking", !filters.parking)} />
+          <Toggle label="Balcony"  icon={<Trees className="size-3.5" />}  active={filters.balcony} onToggle={() => set("balcony", !filters.balcony)} />
+          <Toggle label="Gym"      icon={<Dumbbell className="size-3.5" />} active={filters.gym}   onToggle={() => set("gym", !filters.gym)} />
+          <Toggle label="Pool"     icon={<Waves className="size-3.5" />}  active={filters.pool}   onToggle={() => set("pool", !filters.pool)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Desktop sidebar (hidden on mobile)
+function FiltersPanel({
+  filters,
+  setFilters,
+}: {
+  filters: Filters;
+  setFilters: (f: Filters) => void;
+}) {
+  return (
+    <aside className="hidden h-fit rounded-2xl border border-border bg-card p-5 shadow-card lg:block lg:sticky lg:top-20">
+      <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="size-4 text-primary" />
           <h2 className="text-sm font-semibold">Filters</h2>
         </div>
-        <button
-          type="button"
-          onClick={() => setFilters(DEFAULTS)}
-          className="text-xs font-semibold text-primary hover:underline"
-        >
+        <button type="button" onClick={() => setFilters(DEFAULTS)} className="text-xs font-semibold text-primary hover:underline">
           Reset
         </button>
       </div>
-
-      <div className="mt-5 space-y-5">
-        <Field label="City">
-          <Select value={filters.city} onChange={(v) => setFilters({ ...filters, city: v, district: "Any" })}>
-            {cities.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </Select>
-        </Field>
-
-        <Field label="District">
-          <Select value={filters.district} onChange={(v) => set("district", v)}>
-            {districts.map((d) => (
-              <option key={d}>{d}</option>
-            ))}
-          </Select>
-        </Field>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Min rent (SAR)">
-            <NumberInput
-              value={filters.minRent}
-              onChange={(v) => set("minRent", v)}
-              step={5000}
-              placeholder="0"
-            />
-          </Field>
-          <Field label="Max rent (SAR)">
-            <NumberInput
-              value={filters.maxRent}
-              onChange={(v) => set("maxRent", v)}
-              step={5000}
-              placeholder="500,000"
-            />
-          </Field>
-        </div>
-
-        <Field label="Bedrooms">
-          <SegmentedControl
-            value={String(filters.bedrooms)}
-            options={["0", "1", "2", "3", "4", "5"]}
-            labels={["Any", "1+", "2+", "3+", "4+", "5+"]}
-            onChange={(v) => set("bedrooms", Number(v))}
-          />
-        </Field>
-
-        <Field label="Bathrooms">
-          <SegmentedControl
-            value={String(filters.bathrooms)}
-            options={["0", "1", "2", "3", "4"]}
-            labels={["Any", "1+", "2+", "3+", "4+"]}
-            onChange={(v) => set("bathrooms", Number(v))}
-          />
-        </Field>
-
-        <Field label="Property type">
-          <Select value={filters.type} onChange={(v) => set("type", v)}>
-            {types.map((t) => (
-              <option key={t}>{t}</option>
-            ))}
-          </Select>
-        </Field>
-
-        <Field label="Furnishing">
-          <Select value={filters.furnishing} onChange={(v) => set("furnishing", v)}>
-            {furnishings.map((t) => (
-              <option key={t}>{t}</option>
-            ))}
-          </Select>
-        </Field>
-
-        <div>
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Amenities
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Toggle
-              label="Parking"
-              icon={<Car className="size-3.5" />}
-              active={filters.parking}
-              onToggle={() => set("parking", !filters.parking)}
-            />
-            <Toggle
-              label="Balcony"
-              icon={<Trees className="size-3.5" />}
-              active={filters.balcony}
-              onToggle={() => set("balcony", !filters.balcony)}
-            />
-            <Toggle
-              label="Gym"
-              icon={<Dumbbell className="size-3.5" />}
-              active={filters.gym}
-              onToggle={() => set("gym", !filters.gym)}
-            />
-            <Toggle
-              label="Pool"
-              icon={<Waves className="size-3.5" />}
-              active={filters.pool}
-              onToggle={() => set("pool", !filters.pool)}
-            />
-          </div>
-        </div>
-
-        <Button variant="hero" className="w-full">
-          Apply filters
-        </Button>
-      </div>
+      <FilterFields filters={filters} setFilters={setFilters} />
     </aside>
+  );
+}
+
+// Mobile bottom-sheet for filters
+function MobileFilterSheet({
+  open,
+  onClose,
+  filters,
+  setFilters,
+  resultsCount,
+}: {
+  open: boolean;
+  onClose: () => void;
+  filters: Filters;
+  setFilters: (f: Filters) => void;
+  resultsCount: number;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 lg:hidden">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      {/* Sheet */}
+      <div className="absolute inset-x-0 bottom-0 flex max-h-[90vh] flex-col rounded-t-3xl bg-background shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
+          <div className="text-base font-semibold">Filters</div>
+          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="size-5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          <FilterFields filters={filters} setFilters={setFilters} />
+        </div>
+        <div className="shrink-0 border-t border-border bg-background px-5 py-4">
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setFilters(DEFAULTS)}>
+              Reset
+            </Button>
+            <Button variant="hero" className="flex-[2]" onClick={onClose}>
+              Show {resultsCount} {resultsCount === 1 ? "property" : "properties"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -746,7 +807,7 @@ function ResultCard({
     <div
       className={cn(
         "group overflow-hidden rounded-2xl border border-border bg-card shadow-card transition-all hover:-translate-y-0.5 hover:shadow-elevated",
-        isList ? "grid gap-0 md:grid-cols-[240px_1fr]" : "flex flex-col",
+        isList ? "grid grid-cols-1 gap-0 md:grid-cols-[240px_1fr]" : "flex flex-col",
       )}
     >
       <Link to="/property/$id" params={{ id: p.id }} className={cn("flex flex-col", isList && "contents")}>

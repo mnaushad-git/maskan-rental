@@ -105,7 +105,7 @@ function AuthPage() {
         </div>
       </header>
 
-      <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-[1fr_1.05fr]">
+      <div className="grid grid-cols-1 min-h-[calc(100vh-4rem)] lg:grid-cols-[1fr_1.05fr]">
         {/* Left: marketing panel */}
         <aside className="relative hidden overflow-hidden bg-gradient-to-br from-primary via-primary to-ai p-12 text-primary-foreground lg:flex lg:flex-col lg:justify-between">
           <div className="absolute -right-24 -top-24 size-80 rounded-full bg-primary-foreground/10 blur-3xl" />

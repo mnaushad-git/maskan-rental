@@ -214,7 +214,7 @@ function ComparePage() {
         </header>
 
         {/* Property header strip */}
-        <section className="grid gap-4 lg:grid-cols-[200px_repeat(3,minmax(0,1fr))]">
+        <section className="grid grid-cols-1 gap-4 lg:grid-cols-[200px_repeat(3,minmax(0,1fr))]">
           <div className="hidden lg:block" />
           {selected.map((p) => {
             const isWinner = winner?.p.id === p.id;
@@ -769,7 +769,7 @@ function CategoryTable({
         {rows.map((row) => (
           <div
             key={row.label}
-            className="grid gap-3 px-5 py-4 lg:grid-cols-[200px_repeat(3,minmax(0,1fr))] lg:items-center"
+            className="grid grid-cols-1 gap-3 px-5 py-4 lg:grid-cols-[200px_repeat(3,minmax(0,1fr))] lg:items-center"
           >
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {row.label}
@@ -825,7 +825,7 @@ function ScoreCategory({
           return (
             <div
               key={m.label}
-              className="grid gap-3 px-5 py-4 lg:grid-cols-[200px_repeat(3,minmax(0,1fr))] lg:items-center"
+              className="grid grid-cols-1 gap-3 px-5 py-4 lg:grid-cols-[200px_repeat(3,minmax(0,1fr))] lg:items-center"
             >
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {m.label}
@@ -876,7 +876,7 @@ function AmenitiesCategory({
         {items.map((it) => (
           <div
             key={it.key}
-            className="grid gap-3 px-5 py-4 lg:grid-cols-[200px_repeat(3,minmax(0,1fr))] lg:items-center"
+            className="grid grid-cols-1 gap-3 px-5 py-4 lg:grid-cols-[200px_repeat(3,minmax(0,1fr))] lg:items-center"
           >
             <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <span className="text-foreground">{it.icon}</span>
@@ -930,7 +930,7 @@ function RentalIntelligenceCategory({
           Rental Intelligence
         </h2>
       </header>
-      <div className="grid gap-3 px-5 py-5 lg:grid-cols-[200px_repeat(3,minmax(0,1fr))] lg:items-center">
+      <div className="grid grid-cols-1 gap-3 px-5 py-5 lg:grid-cols-[200px_repeat(3,minmax(0,1fr))] lg:items-center">
         <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Scores
         </div>
@@ -1001,7 +1001,7 @@ function AiRecommendationCard({
             with a {winnerDetails.familyScore}/100 family score and{" "}
             {winnerDetails.areaScore}/100 area quality.
           </p>
-          <ul className="grid gap-2 pt-2 text-sm sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-2 pt-2 text-sm sm:grid-cols-2">
             <li className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
               Cheapest annual rent:{" "}

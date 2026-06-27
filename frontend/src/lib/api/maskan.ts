@@ -159,6 +159,7 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     agent: property.mediator_agent_name ?? property.owner_name ?? "Maskan Agent",
     agentPhone: property.mediator_phone ?? null,
     agentProfileImage: property.mediator_profile_image_url ?? null,
+    mediatorId: property.mediator_id ?? null,
   };
 }
 
@@ -520,6 +521,7 @@ export type ApiPartner = {
 export type ApiPartnerPublic = {
   id: number;
   agency_name: string | null;
+  phone: string;
   bio: string | null;
   profile_image_url: string | null;
   is_verified: boolean;
@@ -531,6 +533,66 @@ export type ApiPartnerPublic = {
 export function fetchPublicPartners(city?: string) {
   const q = city ? `?city=${encodeURIComponent(city)}` : "";
   return requestJson<ApiPartnerPublic[]>(`/mediators/public${q}`);
+}
+
+export function fetchPublicPartner(id: number) {
+  return requestJson<ApiPartnerPublic>(`/mediators/${id}/public`);
+}
+
+export function fetchPropertiesByMediator(mediatorId: number) {
+  return requestJson<ApiProperty[]>(`/properties/?mediator_id=${mediatorId}&limit=50`);
+}
+
+// ── Reviews ───────────────────────────────────────────────────────────────────
+
+export type ApiReview = {
+  id: number;
+  mediator_id: number;
+  user_id: number | null;
+  rating: number;
+  comment: string | null;
+  reviewer_name: string | null;
+  status: string;  // "pending" | "approved" | "rejected"
+  created_at: string;
+};
+
+export type ApiReviewAdmin = ApiReview & {
+  mediator_agency_name: string | null;
+};
+
+export type ApiReviewSummary = {
+  avg_rating: number | null;
+  review_count: number;
+  distribution: Record<string, number>;  // "1"–"5" → count
+};
+
+export function fetchMediatorReviews(mediatorId: number) {
+  return requestJson<ApiReview[]>(`/reviews/mediator/${mediatorId}`);
+}
+
+export function fetchMediatorReviewSummary(mediatorId: number) {
+  return requestJson<ApiReviewSummary>(`/reviews/mediator/${mediatorId}/summary`);
+}
+
+export function fetchMyReview(mediatorId: number) {
+  return requestJson<ApiReview | null>(`/reviews/my/${mediatorId}`);
+}
+
+export function submitReview(payload: { mediator_id: number; rating: number; comment?: string }) {
+  return requestJson<ApiReview>("/reviews/", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function fetchPendingReviews() {
+  return requestJson<ApiReviewAdmin[]>("/reviews/admin/pending");
+}
+
+export function fetchAllReviews(status?: string) {
+  const q = status ? `?status=${status}` : "";
+  return requestJson<ApiReviewAdmin[]>(`/reviews/admin/all${q}`);
+}
+
+export function moderateReview(id: number, status: "approved" | "rejected") {
+  return requestJson<ApiReviewAdmin>(`/reviews/admin/${id}`, { method: "PATCH", body: JSON.stringify({ status }) });
 }
 
 export function fetchMyPartnerProfile() {
@@ -680,6 +742,7 @@ export type AdminPartnerCreatePayload = {
   agency_name?: string;
   phone: string;
   bio?: string;
+  profile_image_url?: string;
   is_verified?: boolean;
   subscription_status?: string;
 };

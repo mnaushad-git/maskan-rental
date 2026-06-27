@@ -35,6 +35,7 @@ class Mediator(Base):
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])  # type: ignore[name-defined]
     areas: Mapped[list["MediatorArea"]] = relationship("MediatorArea", back_populates="mediator", cascade="all, delete-orphan")
     assignments: Mapped[list["LeadAssignment"]] = relationship("LeadAssignment", back_populates="mediator")  # type: ignore[name-defined]
+    reviews: Mapped[list["Review"]] = relationship("Review", back_populates="mediator", cascade="all, delete-orphan")  # type: ignore[name-defined]
 
 
 class MediatorArea(Base):

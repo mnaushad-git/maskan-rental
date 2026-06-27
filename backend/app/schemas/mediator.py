@@ -66,6 +66,7 @@ class AdminPartnerCreate(BaseModel):
     agency_name: str | None = None
     phone: str
     bio: str | None = None
+    profile_image_url: str | None = None
     is_verified: bool = False
     subscription_status: str = "active"
 
@@ -73,6 +74,7 @@ class AdminPartnerCreate(BaseModel):
 class MediatorPublicOut(BaseModel):
     id: int
     agency_name: str | None
+    phone: str
     bio: str | None
     profile_image_url: str | None
     is_verified: bool

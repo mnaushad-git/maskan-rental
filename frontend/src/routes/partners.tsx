@@ -66,7 +66,14 @@ function PartnerCard({ partner }: { partner: ApiPartnerPublic }) {
   const districtCount = partner.areas.length;
 
   return (
-    <div className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-elevated">
+    <div className="relative flex flex-col gap-5 rounded-2xl border border-border bg-card p-6 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-elevated cursor-pointer">
+      {/* Invisible overlay makes the whole card navigate to the agent profile */}
+      <Link
+        to="/agent/$id"
+        params={{ id: String(partner.id) }}
+        className="absolute inset-0 rounded-2xl"
+        aria-label={`View ${displayName}'s profile`}
+      />
       {/* Avatar + verified */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-4">
@@ -147,15 +154,16 @@ function PartnerCard({ partner }: { partner: ApiPartnerPublic }) {
 
       <Button
         size="sm"
-        className="mt-auto w-full"
-        onClick={() =>
+        className="relative z-10 mt-auto w-full"
+        onClick={(e) => {
+          e.preventDefault();
           void navigate({
             to: "/lead/new",
             search: partner.areas[0]
               ? { area: partner.areas[0].area_name, city: partner.areas[0].city }
               : {} as never,
-          })
-        }
+          });
+        }}
       >
         Submit a lead request
       </Button>
@@ -295,7 +303,7 @@ function PartnersPage() {
       {/* Results */}
       <main className="container-page py-10">
         {loading && (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
@@ -333,7 +341,7 @@ function PartnersPage() {
 
         {!loading && filtered.length > 0 && (
           <>
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filtered.map((p) => (
                 <PartnerCard key={p.id} partner={p} />
               ))}
