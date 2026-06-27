@@ -5,7 +5,13 @@ import prop4 from "@/assets/prop-4.jpg";
 import type { Property as UiProperty } from "@/lib/maskan-data";
 import type { SearchProperty as UiSearchProperty } from "@/lib/maskan-search-data";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
+// Browser uses the public VITE_ URL baked at build time.
+// SSR server (inside Docker) uses the internal network URL via INTERNAL_API_URL env var
+// to avoid routing out to the public internet and back on every server-rendered request.
+const API_BASE_URL =
+  typeof window === "undefined"
+    ? (process.env.INTERNAL_API_URL ?? import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api")
+    : (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api");
 const PROPERTY_IMAGES = [prop1, prop2, prop3, prop4] as const;
 
 export class UnauthorizedError extends Error {
