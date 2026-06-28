@@ -4,6 +4,7 @@ import prop3 from "@/assets/prop-3.jpg";
 import prop4 from "@/assets/prop-4.jpg";
 import type { Property as UiProperty } from "@/lib/maskan-data";
 import type { SearchProperty as UiSearchProperty } from "@/lib/maskan-search-data";
+import { currentScope, readStoredToken, clearStoredAuth } from "@/lib/auth-storage";
 
 // Browser uses the public VITE_ URL baked at build time.
 // SSR server (inside Docker) uses the internal network URL via INTERNAL_API_URL env var
@@ -231,7 +232,9 @@ export function enrichPropertiesWithScores(
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("maskan_token") : null;
+  // Send the token for the portal the request originates from, so admin /
+  // partner / user sessions stay isolated even with several tabs open.
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
@@ -254,8 +257,7 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     } catch { /* ignore parse errors */ }
     if (response.status === 401) {
       if (typeof window !== "undefined") {
-        window.localStorage.removeItem("maskan_user");
-        window.localStorage.removeItem("maskan_token");
+        clearStoredAuth(currentScope());
       }
       throw new UnauthorizedError(detail);
     }
