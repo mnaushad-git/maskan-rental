@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { TopNav } from "@/components/maskan/TopNav";
 import { useEffect, useState } from "react";
 import { ArrowLeft, ClipboardList, MapPin, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -53,25 +54,7 @@ function MyLeadsPage() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <header className="border-b border-border bg-background px-6 py-4">
-        <div className="mx-auto flex max-w-3xl items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="size-4" /> Maskan
-            </Link>
-            <span className="text-muted-foreground">/</span>
-            <span className="text-sm font-semibold">My Leads</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <NotificationBell />
-            <Link to="/lead/new" search={{ area: "", city: "Riyadh" }}>
-              <Button size="sm">
-                <Plus className="size-3.5" /> New lead
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <TopNav />
 
       <main className="mx-auto max-w-3xl px-6 py-8">
         {loading && (

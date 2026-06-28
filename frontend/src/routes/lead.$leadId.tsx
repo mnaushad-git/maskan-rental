@@ -1,4 +1,5 @@
 ﻿import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { TopNav } from "@/components/maskan/TopNav";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle, Clock, Home, MessageSquare, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -115,19 +116,7 @@ function CustomerLeadPage() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <header className="border-b border-border bg-background px-6 py-4">
-        <div className="mx-auto flex max-w-4xl items-center gap-3">
-          <Link to="/my-leads" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="size-4" /> My Leads
-          </Link>
-          <span className="text-muted-foreground">/</span>
-          <span className="text-sm font-semibold">Lead #{lead.id}</span>
-          <Badge tone={statusInfo.tone}>{statusInfo.label}</Badge>
-          <div className="ml-auto">
-            <NotificationBell />
-          </div>
-        </div>
-      </header>
+      <TopNav />
 
       <main className="mx-auto max-w-4xl px-6 py-8">
         {/* Status banner */}

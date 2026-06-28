@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { TopNav } from "@/components/maskan/TopNav";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -13,7 +14,6 @@ import {
 } from "lucide-react";
 import { PropertyCard } from "@/components/maskan/PropertyCard";
 import { Badge } from "@/components/maskan/Badges";
-import { NavAuthButton } from "@/components/maskan/NavAuthButton";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import {
@@ -328,19 +328,7 @@ function ReviewsSection({ mediatorId, displayName }: { mediatorId: number; displ
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-const NAV = (
-  <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-xl">
-    <div className="container-page flex h-16 items-center justify-between">
-      <Link to="/" className="inline-flex items-center gap-2">
-        <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-          <Building2 className="size-4" />
-        </span>
-        <span className="font-display text-lg font-bold tracking-tight">Maskan</span>
-      </Link>
-      <NavAuthButton />
-    </div>
-  </header>
-);
+const NAV = <TopNav />;
 
 function AgentProfilePage() {
   const { id } = Route.useParams();

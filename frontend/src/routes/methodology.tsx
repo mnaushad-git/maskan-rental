@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { TopNav } from "@/components/maskan/TopNav";
 import {
   ArrowLeft,
   Building2,
@@ -158,26 +159,7 @@ const BANDS = [
 function MethodologyPage() {
   return (
     <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <Link
-            to="/areas"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" /> Area Intelligence
-          </Link>
-          <Link to="/" className="flex items-center gap-2">
-            <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-              <Home className="size-4" />
-            </span>
-            <span className="text-base font-bold tracking-tight">Maskan</span>
-          </Link>
-          <Button size="sm" variant="outline" asChild>
-            <Link to="/areas">Explore areas</Link>
-          </Button>
-        </div>
-      </header>
+      <TopNav />
 
       <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-10 sm:px-6">
 

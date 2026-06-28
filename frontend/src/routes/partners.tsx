@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { NavAuthButton } from "@/components/maskan/NavAuthButton";
+import { TopNav } from "@/components/maskan/TopNav";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -203,29 +203,7 @@ function PartnersPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
-        <div className="container-page flex h-16 items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link
-              to="/"
-              className="flex items-center gap-2.5"
-            >
-              <div className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-                <Home className="size-4" />
-              </div>
-              <span className="font-display text-xl font-bold tracking-tight">Maskan</span>
-            </Link>
-            <Link
-              to="/"
-              className="hidden items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground md:flex"
-            >
-              <ArrowLeft className="size-4" /> Back to home
-            </Link>
-          </div>
-          <NavAuthButton />
-        </div>
-      </header>
+      <TopNav />
 
       {/* Page header */}
       <section className="border-b border-border bg-surface">

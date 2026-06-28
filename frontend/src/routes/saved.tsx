@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { TopNav } from "@/components/maskan/TopNav";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
@@ -229,7 +230,7 @@ function SavedPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SavedNav />
+      <TopNav />
 
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Title */}
@@ -316,32 +317,6 @@ function SavedPage() {
 }
 
 // ---------- Nav ----------
-
-function SavedNav() {
-  return (
-    <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" /> Back to home
-        </Link>
-        <Link to="/" className="flex items-center gap-2">
-          <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Building2 className="size-4" />
-          </span>
-          <span className="text-base font-bold tracking-tight">Maskan</span>
-        </Link>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/advisor">
-            <Sparkles className="mr-1.5 size-4" /> Ask AI
-          </Link>
-        </Button>
-      </div>
-    </header>
-  );
-}
 
 // ---------- Filter chip ----------
 

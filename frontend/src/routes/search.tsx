@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
-import { NavAuthButton } from "@/components/maskan/NavAuthButton";
+import { TopNav } from "@/components/maskan/TopNav";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpDown,
@@ -13,7 +13,6 @@ import {
   Dumbbell,
   GitCompare,
   Heart,
-  Home,
   LayoutGrid,
   List,
   Map,
@@ -229,7 +228,7 @@ function SearchPage() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <TopBar />
+      <TopNav />
       <div className="container-page py-6">
         <Breadcrumbs city={filters.city} />
         <ResultsHeader
@@ -303,39 +302,6 @@ function SearchPage() {
         resultsCount={results.length}
       />
     </div>
-  );
-}
-
-/* --------------------------------- TopBar -------------------------------- */
-function TopBar() {
-  return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-xl">
-      <div className="container-page flex h-16 items-center justify-between gap-4">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-            <Home className="size-4" />
-          </div>
-          <span className="font-display text-xl font-bold tracking-tight">Maskan</span>
-        </Link>
-
-        <div className="hidden flex-1 max-w-xl md:block">
-          <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3 shadow-sm">
-            <Search className="size-4 text-muted-foreground" />
-            <input
-              defaultValue="Riyadh — 3BR family apartment under SAR 160K"
-              className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-            <Button variant="ai" size="sm" asChild>
-              <Link to="/advisor"><Sparkles className="size-3.5" /> AI</Link>
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <NavAuthButton className="hidden md:inline-flex" />
-        </div>
-      </div>
-    </header>
   );
 }
 

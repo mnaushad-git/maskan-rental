@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { TopNav } from "@/components/maskan/TopNav";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -83,27 +84,7 @@ function AuthPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Top bar */}
-      <header className="border-b border-border/70 bg-background/80 backdrop-blur-xl">
-        <div className="container-page flex h-16 items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <Home className="size-4" />
-            </div>
-            <span className="font-display text-xl font-bold tracking-tight">Maskan</span>
-          </Link>
-          <div className="text-sm text-muted-foreground">
-            {mode === "signin" ? "New to Maskan?" : "Already have an account?"}{" "}
-            <button
-              type="button"
-              onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-              className="font-semibold text-primary hover:underline"
-            >
-              {mode === "signin" ? "Create account" : "Sign in"}
-            </button>
-          </div>
-        </div>
-      </header>
+      <TopNav />
 
       <div className="grid grid-cols-1 min-h-[calc(100vh-4rem)] lg:grid-cols-[1fr_1.05fr]">
         {/* Left: marketing panel */}

@@ -1,4 +1,5 @@
 ﻿import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
+import { TopNav } from "@/components/maskan/TopNav";
 import { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -127,12 +128,10 @@ function NewLeadPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface px-4 py-12">
+    <div className="min-h-screen bg-surface">
+      <TopNav />
+      <div className="px-4 py-12">
       <div className="mx-auto max-w-lg">
-        <button onClick={() => navigate({ to: "/" })} className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" /> Back
-        </button>
-
         <div className="mb-8">
           <Badge tone="ai" className="mb-3"><Lightbulb className="size-3" /> Partner matching</Badge>
           <h1 className="text-2xl font-bold">Tell us what you need</h1>
@@ -222,6 +221,7 @@ function NewLeadPage() {
             A verified partner covering {form.city} will be notified and may reach out within 24 hours.
           </p>
         </form>
+      </div>
       </div>
     </div>
   );

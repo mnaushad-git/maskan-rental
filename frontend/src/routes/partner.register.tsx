@@ -1,4 +1,5 @@
 ﻿import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { TopNav } from "@/components/maskan/TopNav";
 import { useState } from "react";
 import { ArrowLeft, Briefcase, CheckCircle, CreditCard, Eye, EyeOff, ShieldCheck, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -94,15 +95,10 @@ function PartnerRegisterPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-surface px-4 py-12">
+    <div className="min-h-screen bg-surface">
+      <TopNav />
+      <div className="px-4 py-12">
       <div className="mx-auto max-w-lg">
-        <button
-          type="button"
-          onClick={() => navigate({ to: "/" })}
-          className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" /> Back
-        </button>
 
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground">
@@ -350,6 +346,7 @@ function PartnerRegisterPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

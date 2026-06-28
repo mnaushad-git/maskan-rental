@@ -1,4 +1,5 @@
 ﻿import { createFileRoute, Link } from "@tanstack/react-router";
+import { TopNav } from "@/components/maskan/TopNav";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -14,11 +15,9 @@ import {
   GraduationCap,
   Heart,
   Hospital,
-  Languages,
   Lightbulb,
   MapPin,
   Maximize,
-  Menu,
   MessageCircle,
   Phone,
   School,
@@ -41,7 +40,6 @@ import {
   computePropertyScore,
   type ApiAreaIntelligence,
 } from "@/lib/api/maskan";
-import { NavAuthButton } from "@/components/maskan/NavAuthButton";
 import { useAuth } from "@/lib/auth-context";
 import { formatSAR, type Property } from "@/lib/maskan-data";
 import prop1 from "@/assets/prop-1.jpg";
@@ -129,7 +127,7 @@ function PropertyDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      <MiniNav />
+      <TopNav />
       <div className="container-page py-6">
         <Link to="/search" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" /> Back to results
@@ -200,69 +198,6 @@ function PropertyDetail() {
         </div>
       </div>
     </div>
-  );
-}
-
-/* --------------------------------- Nav ----------------------------------- */
-function MiniNav() {
-  const [open, setOpen] = useState(false);
-  return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-xl">
-      <div className="container-page flex h-16 items-center justify-between">
-        <Link to="/" className="inline-flex items-center gap-2">
-          <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Building2 className="size-4" />
-          </span>
-          <span className="font-display text-lg font-bold tracking-tight">Maskan</span>
-        </Link>
-        <nav className="hidden items-center gap-6 md:flex">
-          <Link to="/search" className="text-sm font-medium text-muted-foreground hover:text-foreground">Search</Link>
-          <a href="#ai" className="text-sm font-medium text-muted-foreground hover:text-foreground">AI Advisor</a>
-        </nav>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="hidden md:inline-flex">
-            <Languages className="size-4" /> العربية
-          </Button>
-          <NavAuthButton className="hidden md:inline-flex" />
-          <Button
-            variant="outline"
-            size="icon"
-            className="md:hidden"
-            aria-label={open ? "Close menu" : "Open menu"}
-            onClick={() => setOpen((o) => !o)}
-          >
-            {open ? <X /> : <Menu />}
-          </Button>
-        </div>
-      </div>
-
-      {/* Mobile drawer */}
-      {open && (
-        <div className="absolute inset-x-0 top-full z-50 border-b border-border bg-background shadow-lg md:hidden">
-          <nav className="container-page flex flex-col gap-0.5 py-3">
-            {[
-              { label: "Search listings", to: "/search" },
-              { label: "Explore areas", to: "/areas" },
-              { label: "Partners", to: "/partners" },
-              { label: "AI Advisor", to: "/advisor" },
-              { label: "Saved homes", to: "/saved" },
-            ].map((l) => (
-              <Link
-                key={l.label}
-                to={l.to}
-                onClick={() => setOpen(false)}
-                className="flex items-center rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-surface hover:text-foreground"
-              >
-                {l.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="container-page border-t border-border py-3">
-            <NavAuthButton className="w-full justify-center" />
-          </div>
-        </div>
-      )}
-    </header>
   );
 }
 

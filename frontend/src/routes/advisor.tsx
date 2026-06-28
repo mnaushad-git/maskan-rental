@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { TopNav } from "@/components/maskan/TopNav";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUp,
@@ -253,25 +254,7 @@ function AdvisorPage() {
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      {/* Top bar */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border/60 px-4">
-        <Link to="/" className="inline-flex items-center gap-2">
-          <span className="grid size-7 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Building2 className="size-3.5" />
-          </span>
-          <span className="font-display text-base font-bold tracking-tight">Maskan</span>
-          <span className="hidden text-sm text-muted-foreground sm:inline">/ AI Advisor</span>
-        </Link>
-        <button
-          onClick={() => {
-            setMessages([]);
-            try { localStorage.removeItem(HISTORY_KEY); } catch {}
-          }}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
-        >
-          <Plus className="size-3.5" /> New chat
-        </button>
-      </header>
+      <TopNav />
 
       {/* Property context banner */}
       {propertyCtx && (
@@ -316,6 +299,18 @@ function AdvisorPage() {
 
       {/* Input bar */}
       <div className="shrink-0 border-t border-border/60 bg-background px-4 pb-6 pt-3">
+        <div className="mx-auto mb-2 flex max-w-2xl justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              setMessages([]);
+              try { localStorage.removeItem(HISTORY_KEY); } catch {}
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+          >
+            <Plus className="size-3.5" /> New chat
+          </button>
+        </div>
         <form
           onSubmit={(e) => {
             e.preventDefault();
