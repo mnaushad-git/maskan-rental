@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
+import app.models  # noqa: F401 — registers all models so relationship strings resolve
 from app.models.property import Property
 from app.models.user import User
 from passlib.context import CryptContext

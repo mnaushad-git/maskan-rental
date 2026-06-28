@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+import app.models  # noqa: F401 — registers all SQLAlchemy models before any mapper is configured
 from app.api.routes import properties, search, analytics, areas, auth, users, saved_searches, saved_properties, ai
 from app.api.routes import area_intelligence, mediators, leads, payments, reviews
 
