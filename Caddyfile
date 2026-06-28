@@ -1,0 +1,25 @@
+# Maskan production reverse proxy.
+#
+# Caddy terminates HTTPS (auto-provisioning + renewing a free Let's Encrypt
+# certificate for $DOMAIN) and routes traffic to the two internal services:
+#   /api/*  -> FastAPI backend  (path kept intact; backend mounts under /api)
+#   /*      -> TanStack SSR frontend
+#
+# Because the browser, the app and the API all share one origin in production,
+# there is no cross-origin (CORS) hop for normal requests.
+{
+	# Email used by Let's Encrypt for expiry / problem notifications.
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip zstd
+
+	# API → FastAPI backend. The /api prefix is preserved (not stripped),
+	# matching the router prefixes in backend/app/main.py.
+	@api path /api/*
+	reverse_proxy @api backend:8000
+
+	# Everything else → server-rendered frontend.
+	reverse_proxy frontend:8080
+}

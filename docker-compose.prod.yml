@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
 
   # ── PostgreSQL ──────────────────────────────────────────────────────────────
@@ -60,8 +58,29 @@ services:
     environment:
       PORT: "8080"
       INTERNAL_API_URL: "http://backend:8000/api"
+    # No host port mapping: traffic reaches the frontend only through Caddy.
+    expose:
+      - "8080"
+
+  # ── Caddy reverse proxy + automatic HTTPS ──────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    depends_on:
+      - frontend
+      - backend
     ports:
-      - "8080:8080"
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:
