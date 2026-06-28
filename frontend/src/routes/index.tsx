@@ -8,6 +8,7 @@ import {
   Compass,
   Facebook,
   GitCompare,
+  Home,
   Instagram,
   Linkedin,
   MapPin,
@@ -17,7 +18,7 @@ import {
   Twitter,
   Users,
 } from "lucide-react";
-import { TopNav } from "@/components/maskan/TopNav";
+import { TopNav, Logo } from "@/components/maskan/TopNav";
 import heroImg from "@/assets/hero-villa.jpg";
 import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/maskan/SearchBar";
