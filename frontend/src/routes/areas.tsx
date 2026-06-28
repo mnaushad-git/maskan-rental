@@ -2,26 +2,18 @@ import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDown,
-  ArrowLeft,
   ArrowUp,
   ArrowUpDown,
   Building2,
   Compass,
-  Download,
   GraduationCap,
-  Heart,
   Hospital,
-  LayoutDashboard,
   Map as MapIcon,
   MapPin,
-  Plus,
   Search,
-  Settings,
   Sparkles,
   Stethoscope,
-  TrafficCone,
   TrendingUp,
-  Users,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,15 +24,16 @@ import { StatCard } from "@/components/maskan/Widgets";
 import { formatSAR } from "@/lib/maskan-data";
 import { fetchAreas, fetchAreaIntelligenceList, fetchAreaIntelligence, type ApiAreaSummary, type ApiAreaIntelligence } from "@/lib/api/maskan";
 import { cn } from "@/lib/utils";
+import { TopNav } from "@/components/maskan/TopNav";
 
 export const Route = createFileRoute("/areas")({
   head: () => ({
     meta: [
-      { title: "Area Intelligence Console — Maskan" },
+      { title: "Explore Areas — Maskan" },
       {
         name: "description",
         content:
-          "Manage city and district intelligence: scores, lifestyle tags, rental trends, schools, hospitals and market notes.",
+          "Explore Riyadh, Jeddah and Dammam districts — area scores, rental trends, schools, healthcare and lifestyle tags.",
       },
     ],
   }),
@@ -111,56 +104,6 @@ const TAG_TONES: Record<LifestyleTag, "primary" | "secondary" | "ai" | "success"
   Walkable: "secondary",
   "Business Hub": "primary",
 };
-
-// ---------- Sidebar ----------
-
-function AreaSidebar() {
-  const items = [
-    { icon: LayoutDashboard, label: "Dashboard", href: "/admin", active: false },
-    { icon: MapIcon, label: "Area Intelligence", href: "/areas", active: true },
-    { icon: Building2, label: "Listings", href: "/admin", active: false },
-    { icon: Users, label: "Users", href: "/admin", active: false },
-    { icon: Settings, label: "Settings", href: "/admin", active: false },
-  ];
-  return (
-    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-border bg-card lg:flex lg:flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-        <div className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground">
-          <Compass className="size-4" />
-        </div>
-        <div>
-          <div className="text-sm font-bold tracking-tight">Maskan Console</div>
-          <div className="text-xs text-muted-foreground">Area Intelligence</div>
-        </div>
-      </div>
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {items.map((it) => (
-          <Link
-            key={it.label}
-            to={it.href}
-            className={cn(
-              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              it.active
-                ? "bg-primary-soft text-accent-foreground"
-                : "text-muted-foreground hover:bg-surface hover:text-foreground",
-            )}
-          >
-            <it.icon className="size-4" />
-            {it.label}
-          </Link>
-        ))}
-      </nav>
-      <div className="border-t border-border p-4">
-        <div className="rounded-xl bg-ai-soft p-3 text-xs text-ai">
-          <div className="mb-1 inline-flex items-center gap-1.5 font-semibold">
-            <Sparkles className="size-3.5" /> AI insights
-          </div>
-          District scores refresh nightly from listing + transaction signals.
-        </div>
-      </div>
-    </aside>
-  );
-}
 
 // ---------- Pieces ----------
 
@@ -309,7 +252,7 @@ function TrendChart({ data }: { data: TrendPoint[] }) {
 
 type Tab = "overview" | "trends" | "schools" | "hospitals" | "notes";
 
-function DetailPanel({ d, onClose, onAddNote }: { d: District; onClose: () => void; onAddNote: (note: string) => void }) {
+function DetailPanel({ d, onClose }: { d: District; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("overview");
   const tabs: { id: Tab; label: string; icon: typeof Heart }[] = [
     { id: "overview", label: "Overview", icon: Compass },
@@ -454,7 +397,7 @@ function DetailPanel({ d, onClose, onAddNote }: { d: District; onClose: () => vo
           )}
 
           {tab === "notes" && (
-            <NotesTab notes={d.notes} onAddNote={onAddNote} />
+            <NotesTab notes={d.notes} />
           )}
         </div>
       </aside>
@@ -462,17 +405,7 @@ function DetailPanel({ d, onClose, onAddNote }: { d: District; onClose: () => vo
   );
 }
 
-function NotesTab({ notes, onAddNote }: { notes: string[]; onAddNote: (note: string) => void }) {
-  const [draft, setDraft] = useState("");
-
-  function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    const text = draft.trim();
-    if (!text) return;
-    onAddNote(text);
-    setDraft("");
-  }
-
+function NotesTab({ notes }: { notes: string[] }) {
   return (
     <div className="space-y-3">
       {notes.map((n, i) => (
@@ -484,147 +417,8 @@ function NotesTab({ notes, onAddNote }: { notes: string[]; onAddNote: (note: str
         </div>
       ))}
       {notes.length === 0 && (
-        <p className="text-sm text-muted-foreground">No market notes yet.</p>
+        <p className="text-sm text-muted-foreground">No market notes for this district yet.</p>
       )}
-      <form onSubmit={handleAdd} className="rounded-xl border border-dashed border-border bg-surface p-4 space-y-3">
-        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Add market note</div>
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="e.g. Demand for 4BR villas rising sharply this quarter…"
-          rows={3}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none"
-        />
-        <Button type="submit" size="sm" variant="outline" className="w-full" disabled={!draft.trim()}>
-          <Plus className="size-4" /> Add note
-        </Button>
-      </form>
-    </div>
-  );
-}
-
-function NewDistrictModal({ onAdd, onClose }: { onAdd: (d: District) => void; onClose: () => void }) {
-  const [name, setName] = useState("");
-  const [city, setCity] = useState<"Riyadh" | "Jeddah" | "Dammam">("Riyadh");
-  const [avgRent, setAvgRent] = useState(100000);
-  const [areaScore, setAreaScore] = useState(80);
-  const [familyScore, setFamilyScore] = useState(80);
-  const [overview, setOverview] = useState("");
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
-    const newDistrict: District = {
-      id: `custom-${Date.now()}`,
-      name: name.trim(),
-      city,
-      areaScore,
-      familyScore,
-      schoolScore: 80,
-      healthcareScore: 80,
-      trafficScore: 80,
-      avgRent,
-      yoy: 0,
-      listings: 0,
-      tags: [],
-      overview: overview.trim() || `${name.trim()}, ${city} — newly added district.`,
-      trends: [{ year: "2025", rent: avgRent }],
-      schools: [],
-      hospitals: [],
-      notes: [],
-    };
-    onAdd(newDistrict);
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm px-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-bold">New district</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}><X className="size-4" /></Button>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium">District name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Al Nakheel"
-              required
-              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">City</label>
-            <select
-              value={city}
-              onChange={(e) => setCity(e.target.value as typeof city)}
-              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-            >
-              <option value="Riyadh">Riyadh</option>
-              <option value="Jeddah">Jeddah</option>
-              <option value="Dammam">Dammam</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Avg. rent / year (SAR)</label>
-              <input
-                type="number"
-                value={avgRent}
-                onChange={(e) => setAvgRent(Number(e.target.value))}
-                min={0}
-                step={5000}
-                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Area score (0–100)</label>
-              <input
-                type="number"
-                value={areaScore}
-                onChange={(e) => setAreaScore(Number(e.target.value))}
-                min={0}
-                max={100}
-                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Family score (0–100)</label>
-            <input
-              type="number"
-              value={familyScore}
-              onChange={(e) => setFamilyScore(Number(e.target.value))}
-              min={0}
-              max={100}
-              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Overview (optional)</label>
-            <textarea
-              value={overview}
-              onChange={(e) => setOverview(e.target.value)}
-              placeholder="Brief description of the district…"
-              rows={2}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none"
-            />
-          </div>
-          <div className="flex gap-2 pt-1">
-            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button type="submit" className="flex-1" disabled={!name.trim()}>
-              <Plus className="size-4" /> Add district
-            </Button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }
@@ -675,8 +469,6 @@ function AreasPage() {
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState<LifestyleTag | "All">("All");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [activeIntelligence, setActiveIntelligence] = useState<ApiAreaIntelligence | null>(null);
-  const [showNewDistrict, setShowNewDistrict] = useState(false);
   const [liveAreas, setLiveAreas] = useState<ApiAreaSummary[]>([]);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -728,8 +520,6 @@ function AreasPage() {
     if (match) setActiveId(match.id);
   }, [districts, areaParam]);
 
-  const getLive = (_d: District) => undefined; // live data is already merged into District on load
-
   const cityCounts = useMemo(() => {
     const m: Record<string, number> = { All: districts.length };
     districts.forEach((d) => (m[d.city] = (m[d.city] || 0) + 1));
@@ -761,33 +551,6 @@ function AreasPage() {
     };
   }, [filtered]);
 
-  function addNote(id: string, note: string) {
-    setDistricts((ds) => ds.map((d) => d.id === id ? { ...d, notes: [...d.notes, note] } : d));
-  }
-
-  function addDistrict(d: District) {
-    setDistricts((ds) => [...ds, d]);
-    setShowNewDistrict(false);
-  }
-
-  function exportCSV() {
-    const header = ["Name", "City", "Area Score", "Family Score", "School Score", "Healthcare", "Traffic", "Avg Rent SAR", "YoY %", "Listings"].join(",");
-    const rows = filtered.map((d) => {
-      return [
-        `"${d.name}"`, d.city, d.areaScore, d.familyScore, d.schoolScore, d.healthcareScore, d.trafficScore,
-        d.avgRent, d.yoy, d.listings,
-      ].join(",");
-    });
-    const csv = [header, ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "maskan-districts.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   const active = activeId ? districts.find((d) => d.id === activeId) ?? null : null;
   const tags: (LifestyleTag | "All")[] = [
     "All",
@@ -806,47 +569,22 @@ function AreasPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-surface">
-      <AreaSidebar />
+    <div className="min-h-screen bg-surface">
+      <TopNav />
 
-      <div className="flex-1 min-w-0">
-        {/* Top bar */}
-        <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur">
-          <div className="flex items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6">
-            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <Link
-                to="/"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-surface hover:text-foreground"
-              >
-                <ArrowLeft className="size-3.5" /> Maskan
-              </Link>
-              <span className="text-muted-foreground">/</span>
-              <span className="truncate text-sm font-semibold">Area Intelligence</span>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Button variant="outline" size="sm" onClick={exportCSV}>
-                <Download className="size-4" /> <span className="hidden sm:inline">Export</span>
-              </Button>
-              <Button size="sm" onClick={() => setShowNewDistrict(true)}>
-                <Plus className="size-4" /> <span className="hidden sm:inline">New district</span>
-              </Button>
-            </div>
+      <main className="space-y-6 px-6 py-8">
+        {/* Heading */}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Explore Areas</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              District scores, rental trends, schools and healthcare across Saudi Arabia.
+            </p>
           </div>
-        </header>
-
-        <main className="space-y-6 px-6 py-6">
-          {/* Heading */}
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Area Intelligence Console</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Manage city and district profiles powering Maskan AI recommendations.
-              </p>
-            </div>
-            <Badge tone="ai">
-              <Sparkles className="size-3" /> Updated 6 Jun 2026
-            </Badge>
-          </div>
+          <Badge tone="ai">
+            <Sparkles className="size-3" /> Updated Jun 2026
+          </Badge>
+        </div>
 
           {/* Stat cards */}
           <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1023,16 +761,13 @@ function AreasPage() {
             District intelligence powers Maskan AI Advisor area recommendations.
           </p>
         </main>
-      </div>
 
       {active && (
         <DetailPanel
           d={active}
           onClose={() => setActiveId(null)}
-          onAddNote={(note) => addNote(active.id, note)}
         />
       )}
-      {showNewDistrict && <NewDistrictModal onAdd={addDistrict} onClose={() => setShowNewDistrict(false)} />}
     </div>
   );
 }
