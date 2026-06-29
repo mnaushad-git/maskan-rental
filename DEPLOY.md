@@ -314,14 +314,27 @@ All four services should show **"running"** status.
 
 ## Step 9 — Set up the database (5 minutes)
 
-The database is running but empty. Load the initial data:
+The database is running but empty. Run both seed commands:
+
+### 9a — Properties and admin account
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.production exec backend python seed.py
 ```
 
-*This fills the database with the area intelligence data, demo properties,
-and creates your admin account.*
+*Creates 66 sample properties across Riyadh, Jeddah and Dammam,
+plus your admin account (`mnaushad.aws@gmail.com` / `Admin@1234`).*
+
+### 9b — Area intelligence data
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production exec backend python seed_areas.py
+```
+
+*Loads 16 area profiles (scores, rent trends, school and hospital data)
+across Riyadh, Jeddah and Dammam — powers the AI Advisor and the Explore Areas page.*
+
+Both commands are safe to run again if needed — they update existing records rather than creating duplicates.
 
 ---
 
