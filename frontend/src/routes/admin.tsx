@@ -21,6 +21,7 @@ import {
   ListChecks,
   LogOut,
   MapPin,
+  Menu,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -848,30 +849,58 @@ function adminNavItems(pendingReviewCount: number): { view: AdminView; icon: Rea
   ];
 }
 
-// Mobile tab bar — the sidebar is hidden below lg, so admins navigate with this.
+// Mobile nav dropdown — the sidebar is hidden below lg, so admins navigate with
+// this hamburger drawer (mirrors the customer portal's mobile menu).
 function AdminMobileNav({ activeView, onViewChange, pendingReviewCount }: { activeView: AdminView; onViewChange: (v: AdminView) => void; pendingReviewCount: number }) {
+  const [open, setOpen] = useState(false);
+  const items = adminNavItems(pendingReviewCount);
+  const active = items.find((it) => it.view === activeView);
+
   return (
-    <nav className="flex gap-1.5 overflow-x-auto border-b border-border bg-background px-3 py-2 lg:hidden">
-      {adminNavItems(pendingReviewCount).map((it) => (
-        <button
-          key={it.view}
-          type="button"
-          onClick={() => onViewChange(it.view)}
-          className={cn(
-            "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-            activeView === it.view ? "bg-primary-soft text-accent-foreground" : "text-muted-foreground hover:text-foreground hover:bg-surface-2",
-          )}
-        >
-          <it.icon className="size-4" />
-          <span>{it.label}</span>
-          {!!it.badge && (
+    <div className="relative border-b border-border bg-background lg:hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label={open ? "Close menu" : "Open menu"}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3"
+      >
+        <span className="flex items-center gap-2 text-sm font-semibold">
+          {active && <active.icon className="size-4" />}
+          {active?.label ?? "Menu"}
+          {!!active?.badge && (
             <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold text-destructive-foreground">
-              {it.badge}
+              {active.badge}
             </span>
           )}
-        </button>
-      ))}
-    </nav>
+        </span>
+        {open ? <X className="size-5 text-muted-foreground" /> : <Menu className="size-5 text-muted-foreground" />}
+      </button>
+
+      {open && (
+        <nav className="absolute inset-x-0 top-full z-50 flex flex-col gap-0.5 border-b border-border bg-background p-3 shadow-lg">
+          {items.map((it) => (
+            <button
+              key={it.view}
+              type="button"
+              onClick={() => { onViewChange(it.view); setOpen(false); }}
+              className={cn(
+                "flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium transition-colors",
+                activeView === it.view ? "bg-primary-soft text-accent-foreground" : "text-muted-foreground hover:bg-surface hover:text-foreground",
+              )}
+            >
+              <it.icon className="size-4" />
+              <span className="flex-1 text-start">{it.label}</span>
+              {!!it.badge && (
+                <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground">
+                  {it.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+      )}
+    </div>
   );
 }
 
