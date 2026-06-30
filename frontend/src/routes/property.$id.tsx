@@ -551,7 +551,7 @@ function NearbyPlaces({ areaIntel, district }: { areaIntel: ApiAreaIntelligence 
     {
       title: "Mosques",
       icon: <GraduationCap className="size-4" />,
-      items: (areaIntel.lifestyle.mosques.places ?? []).slice(0, 3).map(m => ({
+      items: (areaIntel.lifestyle.mosques?.places ?? []).slice(0, 3).map(m => ({
         name: m.name,
         distance: `${m.distance_km} km`,
       })),
@@ -559,7 +559,7 @@ function NearbyPlaces({ areaIntel, district }: { areaIntel: ApiAreaIntelligence 
     {
       title: "Shopping Malls",
       icon: <ShoppingBag className="size-4" />,
-      items: (areaIntel.lifestyle.malls.places ?? []).slice(0, 3).map(m => ({
+      items: (areaIntel.lifestyle.malls?.places ?? []).slice(0, 3).map(m => ({
         name: m.name,
         distance: `${m.distance_km} km`,
         rating: m.rating && m.rating > 0 ? m.rating : undefined,

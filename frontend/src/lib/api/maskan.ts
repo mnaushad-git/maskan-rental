@@ -450,12 +450,15 @@ export function adminAiChat(
 export type ApiSchool = { name: string; type: string; rating: number; distance_km: number };
 export type ApiHospital = { name: string; tier: string; rating: number; distance_km: number };
 export type ApiLifestylePlace = { name: string; rating?: number; distance_km: number };
+export type ApiLifestyleCategory = { count: number; avg_rating: number | null; places?: ApiLifestylePlace[] };
 export type ApiLifestyle = {
-  restaurants: { count: number; avg_rating: number | null; places?: ApiLifestylePlace[] };
-  gyms: { count: number; avg_rating: number | null; places?: ApiLifestylePlace[] };
-  mosques: { count: number; avg_rating: number | null; places?: ApiLifestylePlace[] };
-  malls: { count: number; avg_rating: number | null; places?: ApiLifestylePlace[] };
-  parks?: { count: number; avg_rating: number | null; places?: ApiLifestylePlace[] };
+  // All categories are optional — area records may omit any of them (e.g. mosques
+  // is not always present), so consumers must guard with optional chaining.
+  restaurants?: ApiLifestyleCategory;
+  gyms?: ApiLifestyleCategory;
+  mosques?: ApiLifestyleCategory;
+  malls?: ApiLifestyleCategory;
+  parks?: ApiLifestyleCategory;
 };
 export type ApiRentTrendPoint = { year: string; avg_rent_annual: number };
 
