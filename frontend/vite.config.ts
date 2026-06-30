@@ -7,6 +7,11 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  // Force-enable Nitro with the Node server preset. Outside Lovable's cloud the
+  // wrapper skips the nitro deploy plugin (client-only build, no SSR server),
+  // leaving nothing to run on a VPS. node-server emits a self-contained Node
+  // app at .output/server/index.mjs.
+  nitro: { preset: "node-server" },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
