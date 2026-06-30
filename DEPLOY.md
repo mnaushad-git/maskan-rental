@@ -53,7 +53,7 @@ We will pick the **Bahrain** region so the site is fast for Saudi users.
    - This gives you 4 GB RAM — enough for the app, database, and Caddy all together
    - (The $10 plan works too but can be tight during the first build)
 
-7. Under **"Identify your instance"** type a name like `maskan-production`
+7. Under **"Identify your instance"** type a name like `maskanai-production`
 
 8. Click **"Create instance"** — it takes about 2 minutes to start
 
