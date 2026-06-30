@@ -101,7 +101,7 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
             id=user.id,
             email=user.email,
             full_name=user.full_name,
-            is_admin=user.email in settings.ADMIN_EMAILS,
+            is_admin=user.email in settings.admin_emails,
         ),
     )
 
@@ -122,7 +122,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             id=user.id,
             email=user.email,
             full_name=user.full_name,
-            is_admin=user.email in settings.ADMIN_EMAILS,
+            is_admin=user.email in settings.admin_emails,
         ),
     )
 
@@ -133,7 +133,7 @@ def me(current_user: User = Depends(get_current_user)):
         id=current_user.id,
         email=current_user.email,
         full_name=current_user.full_name,
-        is_admin=current_user.email in settings.ADMIN_EMAILS,
+        is_admin=current_user.email in settings.admin_emails,
     )
 
 

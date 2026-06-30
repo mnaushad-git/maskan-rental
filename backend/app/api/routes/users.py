@@ -15,7 +15,7 @@ _pwd = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def _role(user: User, partner_user_ids: set[int]) -> str:
-    if user.is_admin or user.email in settings.ADMIN_EMAILS:
+    if user.is_admin or user.email in settings.admin_emails:
         return "admin"
     if user.id in partner_user_ids:
         return "partner"

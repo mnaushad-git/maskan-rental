@@ -59,7 +59,7 @@ def get_admin_user(
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if user.email not in settings.ADMIN_EMAILS and not user.is_admin:
+    if user.email not in settings.admin_emails and not user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user
 
@@ -71,7 +71,7 @@ def get_optional_admin_user(
     if not token:
         return None
     user = _decode_user(token, db)
-    if user is None or (user.email not in settings.ADMIN_EMAILS and not user.is_admin):
+    if user is None or (user.email not in settings.admin_emails and not user.is_admin):
         return None
     return user
 

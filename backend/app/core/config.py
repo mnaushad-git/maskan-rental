@@ -18,7 +18,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30  # 30 days
     ANTHROPIC_API_KEY: str | None = None
     # Comma-separated admin emails, e.g. ADMIN_EMAILS=admin@example.com,ops@maskan.sa
-    ADMIN_EMAILS: list[str] = []
+    ADMIN_EMAILS: str = ""
+
+    @property
+    def admin_emails(self) -> list[str]:
+        return [e.strip() for e in self.ADMIN_EMAILS.split(",") if e.strip()]
 
     # ── Area Intelligence ─────────────────────────────────────────────────────
     GOOGLE_PLACES_API_KEY: str | None = None   # TODO: add real key when available

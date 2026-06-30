@@ -263,7 +263,7 @@ def get_lead(
     lead = db.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found.")
-    is_admin = current_user.email in settings.ADMIN_EMAILS
+    is_admin = current_user.email in settings.admin_emails
     mediator = db.query(Mediator).filter(Mediator.user_id == current_user.id).first()
     is_assigned_mediator = mediator and any(a.mediator_id == mediator.id and a.status in ("pending", "accepted") for a in lead.assignments)
     if lead.customer_user_id != current_user.id and not is_admin and not is_assigned_mediator:
@@ -690,6 +690,6 @@ def _check_lead_access(lead: Lead, user: User, db: Session) -> str:
     mediator = db.query(Mediator).filter(Mediator.user_id == user.id).first()
     if mediator and any(a.mediator_id == mediator.id and a.status in ("pending", "accepted") for a in lead.assignments):
         return "mediator"
-    if user.email in settings.ADMIN_EMAILS:
+    if user.email in settings.admin_emails:
         return "mediator"  # admin can read/write as mediator side
     raise HTTPException(status_code=403, detail="Access denied.")
