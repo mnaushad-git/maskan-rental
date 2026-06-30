@@ -62,53 +62,44 @@ We will pick the **Bahrain** region so the site is fast for Saudi users.
 
 ---
 
-## Step 2 — Buy a domain name (15 minutes)
+## Step 2 — Domain name
 
-If you already have a domain, skip to Step 3.
+**Done — you have maskanai.com.**
 
-Go to one of these registrars and search for your chosen name:
-- **namecheap.com** — easy to use, good prices
-- **godaddy.com** — very common, slightly pricier
-- For `.sa` domains, you must go through **nic.sa** (Saudi NIC) — requires CR number
-
-**Tip:** If you want to launch quickly without a `.sa` domain,
-buy a `.com` or `.ai` version of your name to start.
-You can always add `.sa` later once the business is registered.
-
-Buy the domain and come back here.
+Nothing to buy. Move straight to Step 3.
 
 ---
 
-## Step 3 — Point your domain at the server (10 minutes + waiting)
+## Step 3 — Point maskanai.com at the server (10 minutes + waiting)
 
-This tells the internet "when someone types my domain, send them to my server."
+This tells the internet "when someone types maskanai.com, send them to my server."
 
-1. Log in to wherever you bought the domain (Namecheap, GoDaddy, etc.)
+1. Log in to wherever you bought maskanai.com (Namecheap, GoDaddy, Hostinger, etc.)
 
-2. Find the **DNS settings** or **Nameservers** section for your domain
+2. Find the **DNS settings** or **DNS Zone** section for maskanai.com
 
-3. Find where it says **"A Record"** and set it like this:
+3. Add (or update) the **A Record** for the root domain:
    ```
    Type:  A
-   Host:  @          (this means the root domain — yoursite.com)
-   Value: 123.456.789.0   (paste YOUR server's public IP from Step 1)
-   TTL:   Automatic or 3600
+   Host:  @          (means maskanai.com itself)
+   Value: (paste your VPS IP from Step 1)
+   TTL:   3600
    ```
 
 4. Add a second A record for `www`:
    ```
    Type:  A
    Host:  www
-   Value: 123.456.789.0   (same IP)
-   TTL:   Automatic or 3600
+   Value: (same VPS IP)
+   TTL:   3600
    ```
 
 5. Save the settings
 
-**Important:** DNS changes can take anywhere from 5 minutes to 48 hours
-to spread across the internet. Usually it is under 30 minutes.
-You can check progress at **dnschecker.org** — type your domain and
-you should start seeing your server IP appear.
+**Important:** DNS changes take 5 minutes to 48 hours to spread across
+the internet — usually under 30 minutes.
+Check progress at **dnschecker.org** — search `maskanai.com` and watch
+for your server IP to appear across the map.
 
 ---
 
@@ -244,9 +235,9 @@ You will see the template file. Use arrow keys to navigate and type
 to edit. Change these values:
 
 ```
-FRONTEND_ORIGIN=https://yourdomain.com     ← your actual domain with https://
-DOMAIN=yourdomain.com                       ← same domain WITHOUT https://
-ACME_EMAIL=your@email.com                   ← your email (for SSL certificate notices)
+FRONTEND_ORIGIN=https://maskanai.com        ← your domain with https://
+DOMAIN=maskanai.com                         ← same domain WITHOUT https://
+ACME_EMAIL=mnaushad.aws@gmail.com           ← your email (for SSL certificate notices)
 
 SECRET_KEY=paste-the-long-string-from-step-7a-here
 
