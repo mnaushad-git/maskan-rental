@@ -47,6 +47,7 @@ def _find_mediator_for_lead(lead: Lead, db: Session, exclude_ids: list[int] | No
             MediatorArea.city.ilike(lead.city),
             Mediator.subscription_status == "active",
             Mediator.is_verified == True,
+            Mediator.approval_status == "approved",
             Mediator.id.notin_(exclude_ids),
         )
         .order_by(

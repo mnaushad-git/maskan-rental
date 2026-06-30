@@ -57,6 +57,8 @@ import {
   fetchAdminLeads,
   fetchAdminMediators,
   adminCreatePartner,
+  approvePartner,
+  rejectPartner,
   fetchAreas,
   adminApproveLead,
   adminRejectLead,
@@ -357,6 +359,16 @@ function AdminPage() {
     setMediators(m => m.map(med => med.id === updated.id ? updated : med));
   }
 
+  async function handleApprovePartner(id: number) {
+    const updated = await approvePartner(id);
+    setMediators(m => m.map(med => med.id === updated.id ? updated : med));
+  }
+
+  async function handleRejectPartner(id: number) {
+    const updated = await rejectPartner(id);
+    setMediators(m => m.map(med => med.id === updated.id ? updated : med));
+  }
+
   async function handleAddPartner(payload: Parameters<typeof adminCreatePartner>[0]) {
     const created = await adminCreatePartner(payload);
     setMediators(m => [created, ...m]);
@@ -434,7 +446,7 @@ function AdminPage() {
 
           {/* Mediators view */}
           {view === "mediators" && (
-            <MediatorsView mediators={mediators} loading={loadingMediators} onVerify={handleVerifyMediator} onAdd={handleAddPartner} />
+            <MediatorsView mediators={mediators} loading={loadingMediators} onVerify={handleVerifyMediator} onApprove={handleApprovePartner} onReject={handleRejectPartner} onAdd={handleAddPartner} />
           )}
 
           {/* Leads view */}
@@ -2663,14 +2675,26 @@ function MediatorsView({
   mediators,
   loading,
   onVerify,
+  onApprove,
+  onReject,
   onAdd,
 }: {
   mediators: ApiPartner[];
   loading: boolean;
   onVerify: (id: number, verified: boolean) => void;
+  onApprove: (id: number) => Promise<void>;
+  onReject: (id: number) => Promise<void>;
   onAdd: (payload: Parameters<typeof adminCreatePartner>[0]) => Promise<void>;
 }) {
   const [formOpen, setFormOpen] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  async function run(id: number, fn: (id: number) => Promise<void>) {
+    setBusyId(id);
+    try { await fn(id); } finally { setBusyId(null); }
+  }
+
+  const pendingCount = mediators.filter(m => m.approval_status === "pending").length;
 
   return (
     <div>
@@ -2678,7 +2702,12 @@ function MediatorsView({
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Partner platform</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Partners</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Verify partner profiles and manage subscriptions.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Approve or reject partner accounts, verify profiles and manage subscriptions.
+            {pendingCount > 0 && (
+              <span className="ml-1 font-semibold text-warning">{pendingCount} pending approval.</span>
+            )}
+          </p>
         </div>
         <Button onClick={() => setFormOpen(true)} className="shrink-0">
           <UserPlus className="size-4" /> Add Partner
@@ -2699,19 +2728,20 @@ function MediatorsView({
               <tr>
                 <th className="px-4 py-3 text-start font-semibold">Partner</th>
                 <th className="px-4 py-3 text-start font-semibold">License</th>
+                <th className="px-4 py-3 text-start font-semibold">Approval</th>
                 <th className="px-4 py-3 text-start font-semibold">Subscription</th>
                 <th className="px-4 py-3 text-start font-semibold">Areas</th>
                 <th className="px-4 py-3 text-end font-semibold">Leads</th>
                 <th className="px-4 py-3 text-start font-semibold">Verified</th>
-                <th className="w-24 px-4 py-3"></th>
+                <th className="w-44 px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {loading && (
-                <tr><td colSpan={7} className="px-4 py-16 text-center text-sm text-muted-foreground">Loading partners…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">Loading partners…</td></tr>
               )}
               {!loading && mediators.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-16 text-center text-sm text-muted-foreground">No partners registered yet.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">No partners registered yet.</td></tr>
               )}
               {mediators.map(m => (
                 <tr key={m.id} className="hover:bg-surface-2/40">
@@ -2720,6 +2750,11 @@ function MediatorsView({
                     <div className="text-xs text-muted-foreground">{m.phone}</div>
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{m.license_number}</td>
+                  <td className="px-4 py-3">
+                    <Badge tone={m.approval_status === "approved" ? "success" : m.approval_status === "rejected" ? "destructive" : "warning"}>
+                      {m.approval_status === "approved" ? "Approved" : m.approval_status === "rejected" ? "Rejected" : "Pending"}
+                    </Badge>
+                  </td>
                   <td className="px-4 py-3">
                     <Badge tone={m.subscription_status === "active" ? "success" : "warning"}>
                       {m.subscription_status}
@@ -2749,14 +2784,38 @@ function MediatorsView({
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <Button
-                      size="sm"
-                      variant={m.is_verified ? "outline" : "default"}
-                      className="text-xs"
-                      onClick={() => onVerify(m.id, !m.is_verified)}
-                    >
-                      {m.is_verified ? "Unverify" : "Verify"}
-                    </Button>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      {m.approval_status !== "approved" && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="text-xs"
+                          disabled={busyId === m.id}
+                          onClick={() => void run(m.id, onApprove)}
+                        >
+                          <CheckCircle2 className="size-3.5" /> Approve
+                        </Button>
+                      )}
+                      {m.approval_status !== "rejected" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs text-destructive hover:bg-destructive/10"
+                          disabled={busyId === m.id}
+                          onClick={() => void run(m.id, onReject)}
+                        >
+                          <X className="size-3.5" /> Reject
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant={m.is_verified ? "outline" : "default"}
+                        className="text-xs"
+                        onClick={() => onVerify(m.id, !m.is_verified)}
+                      >
+                        {m.is_verified ? "Unverify" : "Verify"}
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}

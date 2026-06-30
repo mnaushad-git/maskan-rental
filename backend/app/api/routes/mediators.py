@@ -45,6 +45,7 @@ def register_mediator(
         bio=body.bio,
         profile_image_url=body.profile_image_url,
         subscription_status="pending_payment",
+        approval_status="pending",  # blocked until an admin approves
     )
     db.add(mediator)
     db.commit()
@@ -247,6 +248,40 @@ def admin_update_mediator(
     return mediator
 
 
+@router.post("/{mediator_id}/approve", response_model=MediatorOut)
+def admin_approve_mediator(
+    mediator_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_admin_user),
+):
+    """Approve a partner: grants portal access and marks them verified for leads."""
+    mediator = db.get(Mediator, mediator_id)
+    if not mediator:
+        raise HTTPException(status_code=404, detail="Mediator not found.")
+    mediator.approval_status = "approved"
+    mediator.is_verified = True
+    db.commit()
+    db.refresh(mediator)
+    return mediator
+
+
+@router.post("/{mediator_id}/reject", response_model=MediatorOut)
+def admin_reject_mediator(
+    mediator_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_admin_user),
+):
+    """Reject a partner: blocks portal access and removes lead eligibility."""
+    mediator = db.get(Mediator, mediator_id)
+    if not mediator:
+        raise HTTPException(status_code=404, detail="Mediator not found.")
+    mediator.approval_status = "rejected"
+    mediator.is_verified = False
+    db.commit()
+    db.refresh(mediator)
+    return mediator
+
+
 @router.post("/admin/create", response_model=MediatorOut, status_code=201)
 def admin_create_partner(
     body: AdminPartnerCreate,
@@ -275,6 +310,7 @@ def admin_create_partner(
         bio=body.bio,
         profile_image_url=body.profile_image_url,
         is_verified=body.is_verified,
+        approval_status=body.approval_status,
         subscription_status=body.subscription_status,
         subscription_started_at=now if body.subscription_status == "active" else None,
         subscription_expires_at=now + timedelta(days=365) if body.subscription_status == "active" else None,

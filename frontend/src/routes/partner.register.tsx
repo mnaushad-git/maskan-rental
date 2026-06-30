@@ -333,15 +333,16 @@ function PartnerRegisterPage() {
 
           {step === "done" && (
             <div className="flex flex-col items-center gap-4 py-6 text-center">
-              <div className="grid size-16 place-items-center rounded-full bg-success/10 text-success">
+              <div className="grid size-16 place-items-center rounded-full bg-warning/10 text-warning">
                 <ShieldCheck className="size-8" />
               </div>
-              <h2 className="text-xl font-bold">You're a Maskan Partner!</h2>
+              <h2 className="text-xl font-bold">Registration submitted!</h2>
               <p className="text-sm text-muted-foreground">
-                Your profile is active. Add the areas you cover and start receiving leads.
+                Your partner account is now <span className="font-semibold text-foreground">pending Maskanai Admin approval</span>.
+                You'll get full access to your dashboard and leads once an admin approves your account.
               </p>
               <Button className="w-full" onClick={() => navigate({ to: "/partner" })}>
-                Go to my dashboard
+                Check approval status
               </Button>
             </div>
           )}

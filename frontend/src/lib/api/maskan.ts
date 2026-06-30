@@ -525,6 +525,7 @@ export type ApiPartner = {
   subscription_expires_at: string | null;
   total_leads_accepted: number;
   is_verified: boolean;
+  approval_status: string; // "pending" | "approved" | "rejected"
   created_at: string;
   areas: ApiPartnerArea[];
 };
@@ -741,8 +742,16 @@ export function fetchAdminMediators() {
   return requestJson<ApiPartner[]>("/mediators/");
 }
 
-export function patchMediatorAdmin(mediator_id: number, payload: { is_verified?: boolean; subscription_status?: string }) {
+export function patchMediatorAdmin(mediator_id: number, payload: { is_verified?: boolean; subscription_status?: string; approval_status?: string }) {
   return requestJson<ApiPartner>(`/mediators/${mediator_id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function approvePartner(mediator_id: number) {
+  return requestJson<ApiPartner>(`/mediators/${mediator_id}/approve`, { method: "POST" });
+}
+
+export function rejectPartner(mediator_id: number) {
+  return requestJson<ApiPartner>(`/mediators/${mediator_id}/reject`, { method: "POST" });
 }
 
 export type AdminPartnerCreatePayload = {

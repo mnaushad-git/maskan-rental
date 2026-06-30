@@ -31,6 +31,7 @@ class MediatorOut(BaseModel):
     subscription_expires_at: datetime | None
     total_leads_accepted: int
     is_verified: bool
+    approval_status: str
     created_at: datetime
     areas: list[MediatorAreaOut] = []
 
@@ -55,6 +56,7 @@ class MediatorUpdate(BaseModel):
 class MediatorAdminUpdate(BaseModel):
     subscription_status: str | None = None
     is_verified: bool | None = None
+    approval_status: str | None = None
     subscription_expires_at: datetime | None = None
 
 
@@ -68,6 +70,7 @@ class AdminPartnerCreate(BaseModel):
     bio: str | None = None
     profile_image_url: str | None = None
     is_verified: bool = False
+    approval_status: str = "approved"
     subscription_status: str = "active"
 
 

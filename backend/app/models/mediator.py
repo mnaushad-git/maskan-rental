@@ -25,6 +25,11 @@ class Mediator(Base):
     # Moyasar card token — saved after first subscription payment, used for per-lead charges
     moyasar_card_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Admin approval gate — "pending" | "approved" | "rejected".
+    # New self-registrations start "pending" and cannot access the portal until
+    # an admin approves. Admin-created partners are "approved" on creation.
+    approval_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", server_default="pending")
+
     # Stats
     total_leads_accepted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

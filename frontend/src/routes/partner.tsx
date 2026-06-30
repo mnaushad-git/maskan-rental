@@ -166,6 +166,9 @@ function PartnerDashboard() {
     </div>
   );
 
+  if (partner && partner.approval_status === "pending") return <PartnerApprovalGate state="pending" email={user?.email} onSignOut={clearAuth} />;
+  if (partner && partner.approval_status === "rejected") return <PartnerApprovalGate state="rejected" email={user?.email} onSignOut={clearAuth} />;
+
   const acceptedLeads = leads.filter(l => l.assignments.some(a => a.status === "accepted") && (l.status === "in_progress" || l.status === "pending_closure"));
   const closedLeads   = leads.filter(l => l.status === "closed_won" || l.status === "closed_lost");
 
@@ -898,6 +901,40 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
 }
 
 // ── Partner login gate ───────────────────────────────────────────────────────
+
+function PartnerApprovalGate({ state, email, onSignOut }: { state: "pending" | "rejected"; email?: string; onSignOut: () => void }) {
+  const pending = state === "pending";
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
+      <div className={cn(
+        "grid size-16 place-items-center rounded-2xl",
+        pending ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive",
+      )}>
+        {pending ? <Clock className="size-8" /> : <X className="size-8" />}
+      </div>
+      <div className="max-w-md text-center">
+        <h1 className="text-2xl font-bold">
+          {pending ? "Approval in progress" : "Access rejected"}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {pending ? (
+            <>Your partner account is awaiting review. Please wait for Maskanai Admin approval — you'll get full access once your account is approved.</>
+          ) : (
+            <>Your partner account access has been rejected. Please contact Maskanai Admin for assistance.</>
+          )}
+        </p>
+        {email && (
+          <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1 text-xs text-muted-foreground">
+            <Mail className="size-3.5" /> {email}
+          </p>
+        )}
+      </div>
+      <Button variant="outline" onClick={onSignOut}>
+        <LogOut className="size-4" /> Sign out
+      </Button>
+    </div>
+  );
+}
 
 function PartnerLoginGate() {
   const { setAuth } = useAuth();
