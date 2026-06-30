@@ -416,6 +416,7 @@ function AdminPage() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar onAiOpen={() => setAiPanelOpen(true)} />
+        <AdminMobileNav activeView={view} onViewChange={setView} pendingReviewCount={pendingReviewCount} />
 
         <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
           {/* Users view */}
@@ -837,15 +838,46 @@ function ReviewsModerationView({
 
 // ---------- Sidebar ----------
 
-function AdminSidebar({ activeView, onViewChange, pendingReviewCount }: { activeView: AdminView; onViewChange: (v: AdminView) => void; pendingReviewCount: number }) {
-  const { user, clearAuth } = useAuth();
-  const navItems: { view: AdminView; icon: React.ElementType; label: string; badge?: number }[] = [
+function adminNavItems(pendingReviewCount: number): { view: AdminView; icon: React.ElementType; label: string; badge?: number }[] {
+  return [
     { view: "listings",  icon: ListChecks, label: "Listings"  },
     { view: "mediators", icon: Briefcase,  label: "Partners"  },
     { view: "leads",     icon: Users,      label: "Leads"     },
     { view: "users",     icon: UserPlus,   label: "Users"     },
     { view: "reviews",   icon: Star,       label: "Reviews", badge: pendingReviewCount },
   ];
+}
+
+// Mobile tab bar — the sidebar is hidden below lg, so admins navigate with this.
+function AdminMobileNav({ activeView, onViewChange, pendingReviewCount }: { activeView: AdminView; onViewChange: (v: AdminView) => void; pendingReviewCount: number }) {
+  return (
+    <nav className="flex gap-1.5 overflow-x-auto border-b border-border bg-background px-3 py-2 lg:hidden">
+      {adminNavItems(pendingReviewCount).map((it) => (
+        <button
+          key={it.view}
+          type="button"
+          onClick={() => onViewChange(it.view)}
+          className={cn(
+            "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+            activeView === it.view ? "bg-primary-soft text-accent-foreground" : "text-muted-foreground hover:text-foreground hover:bg-surface-2",
+          )}
+        >
+          <it.icon className="size-4" />
+          <span>{it.label}</span>
+          {!!it.badge && (
+            <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold text-destructive-foreground">
+              {it.badge}
+            </span>
+          )}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function AdminSidebar({ activeView, onViewChange, pendingReviewCount }: { activeView: AdminView; onViewChange: (v: AdminView) => void; pendingReviewCount: number }) {
+  const { user, clearAuth } = useAuth();
+  const navItems = adminNavItems(pendingReviewCount);
 
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-e border-border bg-background lg:flex">
@@ -1115,6 +1147,7 @@ function AdminAIPanel({
 // ---------- Topbar ----------
 
 function AdminTopbar({ onAiOpen }: { onAiOpen: () => void }) {
+  const { clearAuth } = useAuth();
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur">
       <div className="flex items-center justify-between gap-3 px-6 py-3">
@@ -1123,6 +1156,14 @@ function AdminTopbar({ onAiOpen }: { onAiOpen: () => void }) {
             <Sparkles className="size-4" /> AI assistant
           </Button>
         </div>
+        {/* Sign out — sidebar (which holds the desktop sign-out) is hidden below lg */}
+        <button
+          type="button"
+          onClick={clearAuth}
+          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors lg:hidden"
+        >
+          <LogOut className="size-4" /> Sign out
+        </button>
       </div>
     </header>
   );

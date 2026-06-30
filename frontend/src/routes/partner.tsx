@@ -222,6 +222,46 @@ function PartnerDashboard() {
 
       {/* ── Main content ── */}
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile top nav — sidebar is hidden below lg, so provide tab switching here */}
+        <div className="sticky top-0 z-20 border-b border-border bg-background lg:hidden">
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
+                <Briefcase className="size-4" />
+              </div>
+              <span className="truncate text-sm font-bold">Maskan Partner</span>
+            </div>
+            <button
+              type="button"
+              onClick={clearAuth}
+              className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+            >
+              <LogOut className="size-4" /> Sign out
+            </button>
+          </div>
+          <nav className="flex gap-1 px-3 pb-2">
+            {([
+              { v: "leads" as const,    icon: ListChecks, label: "Leads" },
+              { v: "listings" as const, icon: Home,       label: "My Listings" },
+            ]).map(({ v, icon: Icon, label }) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                  view === v
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                {label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
         <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-8">
 
           {/* ══ LEADS VIEW ══ */}
