@@ -18,10 +18,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "properties",
-        sa.Column("mediator_id", sa.Integer(), nullable=True),
-    )
+    op.add_column("properties", sa.Column("mediator_id", sa.Integer(), nullable=True))
     op.create_index("ix_properties_mediator_id", "properties", ["mediator_id"])
     op.create_foreign_key(
         "fk_properties_mediator_id",
