@@ -627,6 +627,45 @@ function MarkdownBlock({ text }: { text: string }) {
       continue;
     }
 
+    // Markdown table: header row `| a | b |`, separator row `|---|---|`, then data rows
+    if (line.trim().startsWith("|") && lines[i + 1]?.match(/^\s*\|?[\s:-]+\|[\s:|-]*$/)) {
+      const parseRow = (row: string): string[] =>
+        row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+
+      const header = parseRow(line);
+      i += 2; // skip header + separator rows
+      const rows: string[][] = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        rows.push(parseRow(lines[i]));
+        i++;
+      }
+      nodes.push(
+        <div key={`table-${i}`} className="my-3 overflow-x-auto rounded-xl border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-2/60">
+              <tr>
+                {header.map((h, j) => (
+                  <th key={j} className="whitespace-nowrap px-3 py-2 text-start text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {inlineFormat(h)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {rows.map((r, ri) => (
+                <tr key={ri} className="hover:bg-surface/60">
+                  {r.map((c, ci) => (
+                    <td key={ci} className="whitespace-nowrap px-3 py-2 text-foreground">{inlineFormat(c)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      );
+      continue;
+    }
+
     // Collect consecutive bullet lines into a list
     if (line.match(/^[-*•]\s/)) {
       const items: string[] = [];
