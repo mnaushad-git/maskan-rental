@@ -1,9 +1,7 @@
 """reconcile users and leads model drift
 
-Adds columns that exist in the models but were never created by a migration,
-so a fresh migrate-from-scratch deploy matches the models:
-- users.phone, users.is_active, users.is_admin
-- leads closure columns (outcome, note, requested_at, requested_by_mediator_id)
+Idempotent: adds columns only where missing, so it works on both fresh
+databases and long-lived dev DBs that already have these columns.
 
 Revision ID: a7b8c9d0e1f2
 Revises: f6a7b8c9d0e1
@@ -22,34 +20,51 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-def upgrade() -> None:
-    # ── users: auth/profile columns added to the model after initial migration ──
-    op.add_column("users", sa.Column("phone", sa.String(length=30), nullable=True))
-    op.add_column("users", sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"))
-    op.add_column("users", sa.Column("is_admin", sa.Boolean(), nullable=False, server_default="false"))
+def _has_column(table: str, column: str) -> bool:
+    insp = sa.inspect(op.get_bind())
+    return column in {c["name"] for c in insp.get_columns(table)}
 
-    # ── leads: closure workflow columns ────────────────────────────────────────
-    op.add_column("leads", sa.Column("closure_outcome", sa.String(length=30), nullable=True))
-    op.add_column("leads", sa.Column("closure_note", sa.Text(), nullable=True))
-    op.add_column("leads", sa.Column("closure_requested_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("leads", sa.Column("closure_requested_by_mediator_id", sa.Integer(), nullable=True))
-    op.create_foreign_key(
-        "fk_leads_closure_requested_by_mediator_id",
-        "leads",
-        "mediators",
-        ["closure_requested_by_mediator_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
+
+def upgrade() -> None:
+    if not _has_column("users", "phone"):
+        op.add_column("users", sa.Column("phone", sa.String(length=30), nullable=True))
+    if not _has_column("users", "is_active"):
+        op.add_column("users", sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"))
+    if not _has_column("users", "is_admin"):
+        op.add_column("users", sa.Column("is_admin", sa.Boolean(), nullable=False, server_default="false"))
+
+    if not _has_column("leads", "closure_outcome"):
+        op.add_column("leads", sa.Column("closure_outcome", sa.String(length=30), nullable=True))
+    if not _has_column("leads", "closure_note"):
+        op.add_column("leads", sa.Column("closure_note", sa.Text(), nullable=True))
+    if not _has_column("leads", "closure_requested_at"):
+        op.add_column("leads", sa.Column("closure_requested_at", sa.DateTime(timezone=True), nullable=True))
+    if not _has_column("leads", "closure_requested_by_mediator_id"):
+        op.add_column("leads", sa.Column("closure_requested_by_mediator_id", sa.Integer(), nullable=True))
+        op.create_foreign_key(
+            "fk_leads_closure_requested_by_mediator_id",
+            "leads",
+            "mediators",
+            ["closure_requested_by_mediator_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_leads_closure_requested_by_mediator_id", "leads", type_="foreignkey")
-    op.drop_column("leads", "closure_requested_by_mediator_id")
-    op.drop_column("leads", "closure_requested_at")
-    op.drop_column("leads", "closure_note")
-    op.drop_column("leads", "closure_outcome")
+    if _has_column("leads", "closure_requested_by_mediator_id"):
+        op.drop_constraint("fk_leads_closure_requested_by_mediator_id", "leads", type_="foreignkey")
+        op.drop_column("leads", "closure_requested_by_mediator_id")
+    if _has_column("leads", "closure_requested_at"):
+        op.drop_column("leads", "closure_requested_at")
+    if _has_column("leads", "closure_note"):
+        op.drop_column("leads", "closure_note")
+    if _has_column("leads", "closure_outcome"):
+        op.drop_column("leads", "closure_outcome")
 
-    op.drop_column("users", "is_admin")
-    op.drop_column("users", "is_active")
-    op.drop_column("users", "phone")
+    if _has_column("users", "is_admin"):
+        op.drop_column("users", "is_admin")
+    if _has_column("users", "is_active"):
+        op.drop_column("users", "is_active")
+    if _has_column("users", "phone"):
+        op.drop_column("users", "phone")

@@ -21,14 +21,21 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _has_column(table: str, column: str) -> bool:
+    insp = sa.inspect(op.get_bind())
+    return column in {c["name"] for c in insp.get_columns(table)}
+
+
 def upgrade() -> None:
-    op.add_column(
-        "mediators",
-        sa.Column("approval_status", sa.String(length=20), nullable=False, server_default="pending"),
-    )
-    # Existing partners predate the approval gate — treat them as already approved.
-    op.execute("UPDATE mediators SET approval_status = 'approved'")
+    if not _has_column("mediators", "approval_status"):
+        op.add_column(
+            "mediators",
+            sa.Column("approval_status", sa.String(length=20), nullable=False, server_default="pending"),
+        )
+        # Existing partners predate the approval gate — treat them as already approved.
+        op.execute("UPDATE mediators SET approval_status = 'approved'")
 
 
 def downgrade() -> None:
-    op.drop_column("mediators", "approval_status")
+    if _has_column("mediators", "approval_status"):
+        op.drop_column("mediators", "approval_status")
