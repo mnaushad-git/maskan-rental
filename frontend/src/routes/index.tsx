@@ -488,8 +488,15 @@ function FeaturedPartners({ partners }: { partners: ApiPartnerPublic[] }) {
           return (
             <div
               key={p.id}
-              className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-elevated"
+              className="relative flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-elevated cursor-pointer"
             >
+              {/* Invisible overlay makes the whole card navigate to the agent profile */}
+              <Link
+                to="/agent/$id"
+                params={{ id: String(p.id) }}
+                className="absolute inset-0 rounded-2xl"
+                aria-label={`View ${displayName}'s profile`}
+              />
               <div className="flex items-center gap-3">
                 {p.profile_image_url ? (
                   <img
