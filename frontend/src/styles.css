@@ -187,12 +187,17 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    overflow-x: hidden;
   }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+    /* Clip horizontal overflow here only (not also on html) — setting it on
+       both forces the browser to compute overflow-y: auto on each (per the
+       CSS overflow spec's "auto substitution" rule), which creates two
+       separate nested scroll containers and breaks position: sticky for any
+       descendant (e.g. the sticky top nav) since it sticks relative to a box
+       that never actually scrolls. */
     overflow-x: hidden;
   }
   h1, h2, h3, h4, h5, h6 {
