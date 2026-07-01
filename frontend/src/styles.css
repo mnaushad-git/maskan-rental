@@ -199,6 +199,33 @@
     font-family: var(--font-display);
     letter-spacing: -0.02em;
   }
+  /* Native interactive elements don't get a pointer cursor by default in most
+     browsers (notably <button>). Apply it everywhere clickable, and show the
+     not-allowed cursor when disabled. */
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="switch"],
+  [role="option"],
+  [role="menuitem"],
+  summary,
+  label[for],
+  select,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="file"],
+  input[type="range"],
+  input[type="submit"],
+  input[type="button"] {
+    cursor: pointer;
+  }
+  button:disabled,
+  button[disabled],
+  [aria-disabled="true"],
+  input:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
 }
 
 @utility container-page {
