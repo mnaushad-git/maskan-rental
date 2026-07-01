@@ -46,6 +46,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -53,6 +54,11 @@ function AuthPage() {
 
     if (mode === "signup" && password.length < 6) {
       setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (mode === "signup" && !agreedToTerms) {
+      setError("Please agree to the Terms and Privacy Policy to continue.");
       return;
     }
 
@@ -229,7 +235,12 @@ function AuthPage() {
                 </div>
               ) : (
                 <label className="flex items-start gap-2 text-xs text-muted-foreground">
-                  <input type="checkbox" className="mt-0.5 size-4 rounded border-border" />
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    className="mt-0.5 size-4 rounded border-border"
+                  />
                   <span>
                     I agree to the{" "}
                     <a href="#" className="font-semibold text-foreground hover:underline">
@@ -246,7 +257,7 @@ function AuthPage() {
 
               {error && <p className="text-sm text-destructive">{error}</p>}
 
-              <Button type="submit" variant="hero" size="lg" className="w-full" disabled={loading || !email || !password || (mode === "signup" && !fullName)}>
+              <Button type="submit" variant="hero" size="lg" className="w-full" disabled={loading || !email || !password || (mode === "signup" && (!fullName || !agreedToTerms))}>
                 {mode === "signin" ? "Sign in" : "Create account"} <ArrowRight />
               </Button>
             </form>

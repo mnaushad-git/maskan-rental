@@ -23,6 +23,7 @@ function PartnerRegisterPage() {
   const [account, setAccount] = useState({ full_name: "", email: "", password: "", confirmPassword: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ license_number: "", agency_name: "", phone: "", bio: "" });
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -42,6 +43,10 @@ function PartnerRegisterPage() {
         }
         if (account.password !== account.confirmPassword) {
           setError("Passwords do not match.");
+          return;
+        }
+        if (!agreedToTerms) {
+          setError("Please agree to the Terms and Privacy Policy to continue.");
           return;
         }
         const authResp = await signup({
@@ -205,6 +210,20 @@ function PartnerRegisterPage() {
                       placeholder="Re-enter password"
                     />
                   </div>
+                  <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={agreedToTerms}
+                      onChange={e => setAgreedToTerms(e.target.checked)}
+                      className="mt-0.5 size-4 rounded border-border"
+                    />
+                    <span>
+                      I agree to the{" "}
+                      <a href="#" className="font-semibold text-foreground hover:underline">Terms</a>{" "}
+                      and{" "}
+                      <a href="#" className="font-semibold text-foreground hover:underline">Privacy Policy</a>.
+                    </span>
+                  </label>
                 </div>
               )}
 
@@ -285,7 +304,7 @@ function PartnerRegisterPage() {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={submitting || authLoading}>
+              <Button type="submit" className="w-full" disabled={submitting || authLoading || (!user && !agreedToTerms)}>
                 {submitting ? "Registering…" : "Continue to payment"}
               </Button>
             </form>
