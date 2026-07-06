@@ -1,14 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { TopNav } from "@/components/maskan/TopNav";
 import {
-  ArrowLeft,
   Building2,
   Calculator,
   CheckCircle2,
   Clock,
   GraduationCap,
   Heart,
-  Home,
   Hospital,
   Info,
   MapPin,
@@ -25,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/maskan/Badges";
 import { ScoreRing } from "@/components/maskan/ScoreIndicator";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/methodology")({
   head: () => ({
@@ -40,141 +39,189 @@ export const Route = createFileRoute("/methodology")({
   component: MethodologyPage,
 });
 
+// Small helper so call sites can write tMethod("heading") instead of t("methodology.heading").
+function useMethodT() {
+  const { t } = useLanguage();
+  return (key: string, vars?: Record<string, string | number>) => t(`methodology.${key}`, vars);
+}
+
 // ── Score definitions ──────────────────────────────────────────────────────
 
-const SCORES = [
-  {
-    key: "area",
-    label: "Area Score",
-    icon: MapPin,
-    color: "bg-primary/10 text-primary",
-    tagline: "Overall neighbourhood quality",
-    description:
-      "A composite of the four individual scores below, weighted to reflect what renters value most in a Saudi neighbourhood.",
-    weights: [
-      { label: "School quality & availability", pct: 30 },
-      { label: "Healthcare access", pct: 25 },
-      { label: "Commute to city centre", pct: 25 },
-      { label: "Amenities & lifestyle", pct: 20 },
-    ],
-    sources: ["Maskan area intelligence: schools, hospitals, restaurants, gyms, mosques, malls, parks"],
-    radius: null,
-  },
-  {
-    key: "school",
-    label: "School Score",
-    icon: School,
-    color: "bg-secondary/10 text-secondary",
-    tagline: "Education access for families",
-    description:
-      "Measures how many quality schools are within a short drive, and whether the area has international / bilingual options — critical for expat and mixed families.",
-    weights: [
-      { label: "Average community rating of nearby schools (rescaled from 3–5 → 45–95)", pct: 75 },
-      { label: "Number of schools within 3 km (up to +18 pts)", pct: 18 },
-      { label: "Presence of international / bilingual schools (bonus up to +10 pts)", pct: 10 },
-    ],
-    sources: [
-      "Maskan platform data: schools",
-      "Keyword detection for: International, American, British, French, German, Pakistani, Indian",
-    ],
-    radius: "3 km radius",
-  },
-  {
-    key: "healthcare",
-    label: "Healthcare Score",
-    icon: Hospital,
-    color: "bg-success/10 text-success",
-    tagline: "Medical access & quality",
-    description:
-      "Reflects how well-served the area is for health emergencies and routine care — number of hospitals and clinics nearby, their ratings, and whether major specialty centres are present.",
-    weights: [
-      { label: "Average community rating of nearby hospitals/clinics (rescaled)", pct: 75 },
-      { label: "Number of hospitals/clinics within 3 km (up to +15 pts)", pct: 15 },
-      { label: "Specialty / named hospital bonus (King Fahad, Saudi German, etc.)", pct: 15 },
-    ],
-    sources: [
-      "Maskan platform data: hospitals & clinics",
-      "Keyword detection for: Specialist, Medical Center, King, National, Saudi German",
-    ],
-    radius: "3 km radius",
-  },
-  {
-    key: "traffic",
-    label: "Traffic Score",
-    icon: TrafficCone,
-    color: "bg-warning/10 text-warning",
-    tagline: "Commute ease to city centre",
-    description:
-      "Measures estimated peak-hour driving time from the district centre to the main business hub (KAFD / Olaya for Riyadh, Al Corniche for Jeddah, Al Khobar road for Dammam). Riyadh-tuned thresholds acknowledge the city's car-centric layout.",
-    weights: [
-      { label: "≤ 15 min", pct: 95 },
-      { label: "≤ 20 min", pct: 88 },
-      { label: "≤ 30 min", pct: 78 },
-      { label: "≤ 40 min", pct: 65 },
-      { label: "≤ 50 min", pct: 50 },
-      { label: "≤ 60 min", pct: 35 },
-      { label: "> 60 min", pct: 20 },
-    ],
-    sources: ["Maskan commute intelligence (peak-hour estimates, updated nightly)"],
-    radius: "Point-to-point to city centre",
-    weightsLabel: "Score by commute time",
-  },
-  {
-    key: "family",
-    label: "Family Score",
-    icon: Users,
-    color: "bg-ai-soft text-ai",
-    tagline: "How well the area suits families",
-    description:
-      "A family-specific composite that weighs schools and healthcare more heavily than commute, and counts parks and green spaces as a meaningful factor alongside malls and restaurants.",
-    weights: [
-      { label: "School Score", pct: 35 },
-      { label: "Healthcare Score", pct: 30 },
-      { label: "Lifestyle score (amenities + parks)", pct: 20 },
-      { label: "Traffic Score", pct: 15 },
-    ],
-    sources: ["Derived from the four individual scores above"],
-    radius: null,
-  },
-];
+function useScores(tM: (key: string, vars?: Record<string, string | number>) => string) {
+  return [
+    {
+      key: "area",
+      label: tM("scores.area.label"),
+      icon: MapPin,
+      color: "bg-primary/10 text-primary",
+      tagline: tM("scores.area.tagline"),
+      description: tM("scores.area.description"),
+      weights: [
+        { label: tM("scores.area.w1"), pct: 30 },
+        { label: tM("scores.area.w2"), pct: 25 },
+        { label: tM("scores.area.w3"), pct: 25 },
+        { label: tM("scores.area.w4"), pct: 20 },
+      ],
+      sources: [tM("scores.area.src1")],
+      radius: null as string | null,
+    },
+    {
+      key: "school",
+      label: tM("scores.school.label"),
+      icon: School,
+      color: "bg-secondary/10 text-secondary",
+      tagline: tM("scores.school.tagline"),
+      description: tM("scores.school.description"),
+      weights: [
+        { label: tM("scores.school.w1"), pct: 75 },
+        { label: tM("scores.school.w2"), pct: 18 },
+        { label: tM("scores.school.w3"), pct: 10 },
+      ],
+      sources: [tM("scores.school.src1"), tM("scores.school.src2")],
+      radius: tM("scores.school.radius") as string | null,
+    },
+    {
+      key: "healthcare",
+      label: tM("scores.healthcare.label"),
+      icon: Hospital,
+      color: "bg-success/10 text-success",
+      tagline: tM("scores.healthcare.tagline"),
+      description: tM("scores.healthcare.description"),
+      weights: [
+        { label: tM("scores.healthcare.w1"), pct: 75 },
+        { label: tM("scores.healthcare.w2"), pct: 15 },
+        { label: tM("scores.healthcare.w3"), pct: 15 },
+      ],
+      sources: [tM("scores.healthcare.src1"), tM("scores.healthcare.src2")],
+      radius: tM("scores.healthcare.radius") as string | null,
+    },
+    {
+      key: "traffic",
+      label: tM("scores.traffic.label"),
+      icon: TrafficCone,
+      color: "bg-warning/10 text-warning",
+      tagline: tM("scores.traffic.tagline"),
+      description: tM("scores.traffic.description"),
+      weights: [
+        { label: "≤ 15 min", pct: 95 },
+        { label: "≤ 20 min", pct: 88 },
+        { label: "≤ 30 min", pct: 78 },
+        { label: "≤ 40 min", pct: 65 },
+        { label: "≤ 50 min", pct: 50 },
+        { label: "≤ 60 min", pct: 35 },
+        { label: "> 60 min", pct: 20 },
+      ],
+      sources: [tM("scores.traffic.src1")],
+      radius: tM("scores.traffic.radius") as string | null,
+      weightsLabel: tM("scoreByCommuteTime"),
+    },
+    {
+      key: "family",
+      label: tM("scores.family.label"),
+      icon: Users,
+      color: "bg-ai-soft text-ai",
+      tagline: tM("scores.family.tagline"),
+      description: tM("scores.family.description"),
+      weights: [
+        { label: tM("scores.family.w1"), pct: 35 },
+        { label: tM("scores.family.w2"), pct: 30 },
+        { label: tM("scores.family.w3"), pct: 20 },
+        { label: tM("scores.family.w4"), pct: 15 },
+      ],
+      sources: [tM("scores.family.src1")],
+      radius: null as string | null,
+    },
+  ];
+}
 
-const LIFESTYLE_FACTORS = [
-  { icon: ShoppingBag, label: "Restaurants",       cap: "22 pts", note: "2 km, up to 22 pts"       },
-  { icon: Heart,       label: "Gyms",              cap: "15 pts", note: "2 km, up to 15 pts"       },
-  { icon: GraduationCap, label: "Mosques",         cap: "8 pts",  note: "1.5 km, capped low — present everywhere in Riyadh" },
-  { icon: ShoppingBag, label: "Shopping Malls",    cap: "25 pts", note: "5 km, up to 25 pts"       },
-  { icon: Trees,       label: "Parks & Green Spaces", cap: "15 pts", note: "3 km, up to 15 pts"   },
-];
+function useLifestyleFactors(tM: (key: string, vars?: Record<string, string | number>) => string) {
+  return [
+    {
+      icon: ShoppingBag,
+      label: tM("lifestyle.restaurants"),
+      cap: "22 pts",
+      note: tM("lifestyle.restaurantsNote"),
+    },
+    { icon: Heart, label: tM("lifestyle.gyms"), cap: "15 pts", note: tM("lifestyle.gymsNote") },
+    {
+      icon: GraduationCap,
+      label: tM("lifestyle.mosques"),
+      cap: "8 pts",
+      note: tM("lifestyle.mosquesNote"),
+    },
+    {
+      icon: ShoppingBag,
+      label: tM("lifestyle.malls"),
+      cap: "25 pts",
+      note: tM("lifestyle.mallsNote"),
+    },
+    { icon: Trees, label: tM("lifestyle.parks"), cap: "15 pts", note: tM("lifestyle.parksNote") },
+  ];
+}
 
-const BANDS = [
-  { min: 85, max: 100, label: "Excellent",      color: "bg-success text-success-foreground",  note: "Premium district, top-tier services" },
-  { min: 75, max: 84,  label: "Strong",          color: "bg-primary text-primary-foreground",  note: "Well-served area, strong fundamentals" },
-  { min: 65, max: 74,  label: "Good",            color: "bg-info text-info-foreground",         note: "Solid neighbourhood, may lack some premium facilities" },
-  { min: 50, max: 64,  label: "Below average",   color: "bg-warning text-warning-foreground",  note: "Fewer nearby services or longer commute" },
-  { min: 0,  max: 49,  label: "Limited data",    color: "bg-muted text-muted-foreground",      note: "New development or limited platform coverage" },
-];
+function useBands(tM: (key: string, vars?: Record<string, string | number>) => string) {
+  return [
+    {
+      min: 85,
+      max: 100,
+      label: tM("bands.excellent"),
+      color: "bg-success text-success-foreground",
+      note: tM("bands.excellentNote"),
+    },
+    {
+      min: 75,
+      max: 84,
+      label: tM("bands.strong"),
+      color: "bg-primary text-primary-foreground",
+      note: tM("bands.strongNote"),
+    },
+    {
+      min: 65,
+      max: 74,
+      label: tM("bands.good"),
+      color: "bg-info text-info-foreground",
+      note: tM("bands.goodNote"),
+    },
+    {
+      min: 50,
+      max: 64,
+      label: tM("bands.belowAverage"),
+      color: "bg-warning text-warning-foreground",
+      note: tM("bands.belowAverageNote"),
+    },
+    {
+      min: 0,
+      max: 49,
+      label: tM("bands.limitedData"),
+      color: "bg-muted text-muted-foreground",
+      note: tM("bands.limitedDataNote"),
+    },
+  ];
+}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 function MethodologyPage() {
+  const tM = useMethodT();
+  const SCORES = useScores(tM);
+  const LIFESTYLE_FACTORS = useLifestyleFactors(tM);
+  const BANDS = useBands(tM);
+
   return (
     <div className="min-h-screen bg-background">
       <TopNav />
 
       <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-10 sm:px-6">
-
         {/* Hero */}
         <div className="mb-12 text-center">
           <Badge tone="ai" className="mb-4">
-            <Sparkles className="size-3.5" /> Score methodology
+            <Sparkles className="size-3.5" /> {tM("badge")}
           </Badge>
           <h1 className="font-display text-4xl font-bold tracking-tight md:text-5xl">
-            How Maskan scores areas
+            {tM("heading")}
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground">
-            Every score you see is calculated from live data collected and maintained by the{" "}
-            <strong className="text-foreground">Maskan platform intelligence</strong> engine. No editorial
-            guesses. No sponsorships. Refreshed every night at midnight.
+            {tM("heroDesc", { engine: tM("heroEngine") })}
           </p>
         </div>
 
@@ -184,34 +231,39 @@ function MethodologyPage() {
             <RefreshCw className="size-5" />
           </div>
           <div className="flex-1 space-y-1">
-            <div className="text-sm font-semibold">Data freshness</div>
+            <div className="text-sm font-semibold">{tM("dataFreshness")}</div>
             <p className="text-sm text-muted-foreground">
-              Scores are recalculated every night at <strong className="text-foreground">00:00 AST (Arabia Standard Time)</strong> by
-              refreshing Maskan's area intelligence for each district. The "Last refreshed" date
-              on every property and area page shows exactly when the data was last updated.
+              {tM("dataFreshnessDesc", { time: tM("dataFreshnessTime") })}
             </p>
           </div>
           <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1">
-              <Clock className="size-3.5" /> Refreshed nightly
+              <Clock className="size-3.5" /> {tM("refreshedNightly")}
             </span>
             <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1">
-              <Building2 className="size-3.5" /> 16 districts covered
+              <Building2 className="size-3.5" /> {tM("districtsCovered")}
             </span>
           </div>
         </div>
 
         {/* Score guide bands */}
         <section className="mb-12">
-          <h2 className="mb-4 text-xl font-bold tracking-tight">What the numbers mean</h2>
+          <h2 className="mb-4 text-xl font-bold tracking-tight">{tM("whatNumbersMean")}</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
             {BANDS.map((b) => (
-              <div key={b.label} className="rounded-xl border border-border bg-card p-4 text-center">
+              <div
+                key={b.label}
+                className="rounded-xl border border-border bg-card p-4 text-center"
+              >
                 <div className="mx-auto mb-2">
                   <ScoreRing score={Math.round((b.min + b.max) / 2)} size={52} />
                 </div>
-                <div className={cn("mb-1 rounded-full px-2 py-0.5 text-[11px] font-bold", b.color)}>{b.label}</div>
-                <div className="text-[11px] text-muted-foreground">{b.min}–{b.max === 100 ? "100" : b.max}</div>
+                <div className={cn("mb-1 rounded-full px-2 py-0.5 text-[11px] font-bold", b.color)}>
+                  {b.label}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  {b.min}–{b.max === 100 ? "100" : b.max}
+                </div>
                 <div className="mt-1 text-[10px] leading-snug text-muted-foreground">{b.note}</div>
               </div>
             ))}
@@ -220,12 +272,17 @@ function MethodologyPage() {
 
         {/* Individual score cards */}
         <section className="mb-12">
-          <h2 className="mb-6 text-xl font-bold tracking-tight">Score breakdown</h2>
+          <h2 className="mb-6 text-xl font-bold tracking-tight">{tM("scoreBreakdown")}</h2>
           <div className="space-y-5">
             {SCORES.map((s) => (
-              <div key={s.key} className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+              <div
+                key={s.key}
+                className="overflow-hidden rounded-2xl border border-border bg-card shadow-card"
+              >
                 <div className="flex items-start gap-4 border-b border-border bg-surface-2/40 px-6 py-5">
-                  <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", s.color)}>
+                  <span
+                    className={cn("grid size-10 shrink-0 place-items-center rounded-xl", s.color)}
+                  >
                     <s.icon className="size-5" />
                   </span>
                   <div>
@@ -238,15 +295,19 @@ function MethodologyPage() {
                     <p className="text-sm text-muted-foreground">{s.description}</p>
                     {s.radius && (
                       <p className="mt-3 text-xs text-muted-foreground">
-                        <span className="font-semibold text-foreground">Search radius:</span> {s.radius}
+                        <span className="font-semibold text-foreground">{tM("searchRadius")}</span>{" "}
+                        {s.radius}
                       </p>
                     )}
                     <div className="mt-4 space-y-1">
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Data sources
+                        {tM("dataSources")}
                       </div>
                       {s.sources.map((src) => (
-                        <div key={src} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <div
+                          key={src}
+                          className="flex items-start gap-2 text-xs text-muted-foreground"
+                        >
                           <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
                           {src}
                         </div>
@@ -255,7 +316,7 @@ function MethodologyPage() {
                   </div>
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {s.weightsLabel ?? "Composition / weights"}
+                      {s.weightsLabel ?? tM("compositionWeights")}
                     </div>
                     <ul className="mt-3 space-y-2">
                       {s.weights.map((w) => (
@@ -276,22 +337,20 @@ function MethodologyPage() {
 
         {/* Lifestyle / amenities sub-breakdown */}
         <section className="mb-12">
-          <h2 className="mb-2 text-xl font-bold tracking-tight">Lifestyle score — what's included</h2>
-          <p className="mb-5 text-sm text-muted-foreground">
-            The lifestyle score feeds into both Area Score (20%) and Family Score (20%). It is built
-            from five place categories tracked by Maskan's area intelligence, each capped to prevent a single factor from
-            dominating. Mosque count is intentionally capped low — mosques are present in every
-            Riyadh block, so count is not a differentiator.
-          </p>
+          <h2 className="mb-2 text-xl font-bold tracking-tight">{tM("lifestyle.heading")}</h2>
+          <p className="mb-5 text-sm text-muted-foreground">{tM("lifestyle.desc")}</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             {LIFESTYLE_FACTORS.map((f) => (
-              <div key={f.label} className="rounded-xl border border-border bg-card p-4 text-center">
+              <div
+                key={f.label}
+                className="rounded-xl border border-border bg-card p-4 text-center"
+              >
                 <div className="mx-auto mb-2 grid size-10 place-items-center rounded-xl bg-surface-2 text-muted-foreground">
                   <f.icon className="size-5" />
                 </div>
                 <div className="text-sm font-semibold">{f.label}</div>
                 <div className="mt-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
-                  max {f.cap}
+                  {tM("lifestyle.max", { cap: f.cap })}
                 </div>
                 <div className="mt-1 text-[10px] leading-snug text-muted-foreground">{f.note}</div>
               </div>
@@ -306,33 +365,49 @@ function MethodologyPage() {
               <Calculator className="size-5" />
             </div>
             <div>
-              <h2 className="text-xl font-bold tracking-tight">Rent Calculator — how we calculate</h2>
-              <p className="text-sm text-muted-foreground">
-                Every number the calculator produces is derived from these rules, applied to the listing's annual rent.
-              </p>
+              <h2 className="text-xl font-bold tracking-tight">{tM("rentCalc.heading")}</h2>
+              <p className="text-sm text-muted-foreground">{tM("rentCalc.desc")}</p>
             </div>
           </div>
 
           <div className="space-y-5">
-
             {/* Payment frequency */}
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
               <div className="border-b border-border bg-surface-2/40 px-6 py-4">
-                <div className="text-base font-bold">Payment frequency</div>
+                <div className="text-base font-bold">{tM("rentCalc.paymentFrequency")}</div>
                 <div className="text-sm text-muted-foreground">
-                  Divides the listing's annual rent by the number of payments per year.
+                  {tM("rentCalc.paymentFrequencyDesc")}
                 </div>
               </div>
               <div className="overflow-hidden">
                 {[
-                  { label: "Annual",       count: 1,  formula: "Annual rent ÷ 1",  note: "Full year paid in one cheque — most common in KSA"         },
-                  { label: "Semi-annual",  count: 2,  formula: "Annual rent ÷ 2",  note: "Two cheques, 6 months apart"                                 },
-                  { label: "Quarterly",    count: 4,  formula: "Annual rent ÷ 4",  note: "Four cheques, once per quarter"                              },
-                  { label: "Monthly",      count: 12, formula: "Annual rent ÷ 12", note: "Twelve equal payments — less common, requires landlord approval" },
+                  {
+                    label: tM("rentCalc.annual"),
+                    formula: "Annual rent ÷ 1",
+                    note: tM("rentCalc.annualNote"),
+                  },
+                  {
+                    label: tM("rentCalc.semiAnnual"),
+                    formula: "Annual rent ÷ 2",
+                    note: tM("rentCalc.semiAnnualNote"),
+                  },
+                  {
+                    label: tM("rentCalc.quarterly"),
+                    formula: "Annual rent ÷ 4",
+                    note: tM("rentCalc.quarterlyNote"),
+                  },
+                  {
+                    label: tM("rentCalc.monthly"),
+                    formula: "Annual rent ÷ 12",
+                    note: tM("rentCalc.monthlyNote"),
+                  },
                 ].map((r, i, arr) => (
                   <div
                     key={r.label}
-                    className={cn("grid grid-cols-[120px_1fr_1fr] gap-4 px-6 py-3 text-sm", i < arr.length - 1 && "border-b border-border")}
+                    className={cn(
+                      "grid grid-cols-[120px_1fr_1fr] gap-4 px-6 py-3 text-sm",
+                      i < arr.length - 1 && "border-b border-border",
+                    )}
                   >
                     <span className="font-semibold">{r.label}</span>
                     <span className="font-mono text-xs text-primary">{r.formula}</span>
@@ -345,37 +420,40 @@ function MethodologyPage() {
             {/* First-year cost table */}
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
               <div className="border-b border-border bg-surface-2/40 px-6 py-4">
-                <div className="text-base font-bold">First-year cost estimate</div>
+                <div className="text-base font-bold">{tM("rentCalc.firstYearCost")}</div>
                 <div className="text-sm text-muted-foreground">
-                  Three components added to show the real upfront cash required in year one.
+                  {tM("rentCalc.firstYearCostDesc")}
                 </div>
               </div>
               <div className="overflow-hidden">
                 {[
                   {
-                    label:   "Annual rent",
+                    label: tM("rentCalc.annualRent"),
                     formula: "= listing price",
-                    basis:   "The displayed annual rent. No markup or adjustment.",
+                    basis: tM("rentCalc.annualRentBasis"),
                   },
                   {
-                    label:   "Security deposit",
+                    label: tM("rentCalc.securityDeposit"),
                     formula: "Annual rent ÷ 12",
-                    basis:   "Equivalent to 1 month's rent. Standard practice across Saudi Arabia — held by landlord, returned at lease end (less any deductions).",
+                    basis: tM("rentCalc.securityDepositBasis"),
                   },
                   {
-                    label:   "Agency / broker fee",
+                    label: tM("rentCalc.agencyFee"),
                     formula: "Annual rent × 2.5%",
-                    basis:   "The standard brokerage commission in KSA (2.5% of annual rent), paid to the real-estate agent who arranged the lease. Not all landlords charge this; it is shown as an estimate.",
+                    basis: tM("rentCalc.agencyFeeBasis"),
                   },
                   {
-                    label:   "VAT",
+                    label: tM("rentCalc.vat"),
                     formula: "0%",
-                    basis:   "Residential rentals in Saudi Arabia are VAT-exempt under ZATCA regulations. The calculator does not add VAT.",
+                    basis: tM("rentCalc.vatBasis"),
                   },
                 ].map((r, i, arr) => (
                   <div
                     key={r.label}
-                    className={cn("grid gap-1 px-6 py-4 text-sm", i < arr.length - 1 && "border-b border-border")}
+                    className={cn(
+                      "grid gap-1 px-6 py-4 text-sm",
+                      i < arr.length - 1 && "border-b border-border",
+                    )}
                   >
                     <div className="flex items-baseline gap-3">
                       <span className="font-semibold">{r.label}</span>
@@ -390,44 +468,46 @@ function MethodologyPage() {
             {/* Affordability thresholds */}
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
               <div className="border-b border-border bg-surface-2/40 px-6 py-4">
-                <div className="text-base font-bold">Affordability check</div>
+                <div className="text-base font-bold">{tM("rentCalc.affordabilityCheck")}</div>
                 <div className="text-sm text-muted-foreground">
-                  Based on the widely used <strong className="text-foreground">30% rule</strong>: housing costs should not exceed 30% of gross monthly income. Maskan refines this into three bands.
+                  {tM("rentCalc.affordabilityDesc", { rule: tM("rentCalc.thirtyPercentRule") })}
                 </div>
               </div>
               <div className="px-6 py-4">
                 <div className="mb-4 rounded-xl border border-border bg-surface-2/40 p-4 font-mono text-sm">
-                  <span className="text-muted-foreground">% of income  =  </span>
-                  <span className="text-primary">(annual rent ÷ 12) ÷ monthly salary × 100</span>
+                  <span className="text-muted-foreground">{tM("rentCalc.pctFormula")}</span>
+                  <span className="text-primary">{tM("rentCalc.pctFormulaCalc")}</span>
                 </div>
                 <div className="space-y-3">
                   {[
                     {
                       range: "≤ 25%",
-                      tone:  "success",
-                      label: "Comfortably affordable",
-                      note:  "Rent is well within the 30% guideline. Significant budget remains for savings and other expenses.",
+                      tone: "success",
+                      label: tM("rentCalc.comfortablyAffordable"),
+                      note: tM("rentCalc.comfortablyAffordableNote"),
                     },
                     {
                       range: "25% – 33%",
-                      tone:  "warning",
-                      label: "Borderline",
-                      note:  "Slightly above the recommended 30% but within the upper limit used by many financial advisors and banks in KSA when assessing loan eligibility.",
+                      tone: "warning",
+                      label: tM("rentCalc.borderline"),
+                      note: tM("rentCalc.borderlineNote"),
                     },
                     {
                       range: "> 33%",
-                      tone:  "danger",
-                      label: "Above budget",
-                      note:  "Rent exceeds one-third of income. This is the threshold above which most Saudi banks will not approve personal finance for housing costs.",
+                      tone: "danger",
+                      label: tM("rentCalc.aboveBudget"),
+                      note: tM("rentCalc.aboveBudgetNote"),
                     },
                   ].map((b) => (
                     <div key={b.range} className="flex items-start gap-4">
-                      <span className={cn(
-                        "mt-0.5 shrink-0 rounded-full px-3 py-1 text-xs font-bold",
-                        b.tone === "success" && "bg-success/15 text-success",
-                        b.tone === "warning" && "bg-warning/15 text-warning",
-                        b.tone === "danger"  && "bg-destructive/15 text-destructive",
-                      )}>
+                      <span
+                        className={cn(
+                          "mt-0.5 shrink-0 rounded-full px-3 py-1 text-xs font-bold",
+                          b.tone === "success" && "bg-success/15 text-success",
+                          b.tone === "warning" && "bg-warning/15 text-warning",
+                          b.tone === "danger" && "bg-destructive/15 text-destructive",
+                        )}
+                      >
                         {b.range}
                       </span>
                       <div>
@@ -438,11 +518,10 @@ function MethodologyPage() {
                   ))}
                 </div>
                 <p className="mt-4 text-xs text-muted-foreground">
-                  The calculator uses your <em>gross</em> monthly salary (before deductions). Actual affordability depends on your full financial picture — other debts, dependants, and savings goals.
+                  {tM("rentCalc.grossSalaryNote")}
                 </p>
               </div>
             </div>
-
           </div>
         </section>
 
@@ -451,30 +530,34 @@ function MethodologyPage() {
           <div className="flex items-start gap-3">
             <TriangleAlert className="mt-0.5 size-5 shrink-0 text-warning" />
             <div>
-              <h2 className="mb-3 text-lg font-bold tracking-tight">Known limitations</h2>
+              <h2 className="mb-3 text-lg font-bold tracking-tight">{tM("limitations.heading")}</h2>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                   <span>
-                    <strong className="text-foreground">Gated compounds &amp; diplomatic enclaves</strong> — places like Diplomatic Quarter (DQ) have limited publicly listed places because most facilities are private and inside the walls. Scores may understate the actual quality of living.
+                    <strong className="text-foreground">{tM("limitations.gated")}</strong> —{" "}
+                    {tM("limitations.gatedDesc")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                   <span>
-                    <strong className="text-foreground">New developments</strong> — recently built districts may have fewer listed places until businesses are added to the platform. Scores will improve automatically as coverage grows.
+                    <strong className="text-foreground">{tM("limitations.newDev")}</strong> —{" "}
+                    {tM("limitations.newDevDesc")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                   <span>
-                    <strong className="text-foreground">Rating data</strong> — community ratings reflect public reviews and may not capture the full quality of a facility. We rescale ratings from the typical [3.0–5.0] cluster to a [45–95] range to avoid compressing all areas into a narrow band.
+                    <strong className="text-foreground">{tM("limitations.ratingData")}</strong> —{" "}
+                    {tM("limitations.ratingDataDesc")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                   <span>
-                    <strong className="text-foreground">Commute time</strong> — calculated at the time the nightly refresh runs (midnight). Rush-hour times may differ. Estimates are based on typical peak-hour conditions for each district.
+                    <strong className="text-foreground">{tM("limitations.commuteTime")}</strong> —{" "}
+                    {tM("limitations.commuteTimeDesc")}
                   </span>
                 </li>
               </ul>
@@ -486,12 +569,12 @@ function MethodologyPage() {
         <div className="flex flex-wrap items-center justify-center gap-3 text-center">
           <Button asChild size="lg">
             <Link to="/areas">
-              <MapPin className="mr-1.5 size-4" /> Explore area scores
+              <MapPin className="me-1.5 size-4" /> {tM("exploreAreaScores")}
             </Link>
           </Button>
           <Button variant="outline" size="lg" asChild>
             <Link to="/search">
-              <Building2 className="mr-1.5 size-4" /> Browse properties
+              <Building2 className="me-1.5 size-4" /> {tM("browseProperties")}
             </Link>
           </Button>
         </div>

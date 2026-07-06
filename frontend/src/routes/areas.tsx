@@ -25,6 +25,7 @@ import { formatSAR } from "@/lib/maskan-data";
 import { fetchAreas, fetchAreaIntelligenceList, fetchAreaIntelligence, type ApiAreaSummary, type ApiAreaIntelligence } from "@/lib/api/maskan";
 import { cn } from "@/lib/utils";
 import { TopNav } from "@/components/maskan/TopNav";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/areas")({
   head: () => ({
@@ -105,6 +106,12 @@ const TAG_TONES: Record<LifestyleTag, "primary" | "secondary" | "ai" | "success"
   "Business Hub": "primary",
 };
 
+// Small helper so call sites can write tAreas("heading") instead of t("areas.heading").
+function useAreasT() {
+  const { t } = useLanguage();
+  return (key: string, vars?: Record<string, string | number>) => t(`areas.${key}`, vars);
+}
+
 // ---------- Pieces ----------
 
 function CityChip({
@@ -118,6 +125,8 @@ function CityChip({
   count: number;
   onClick: () => void;
 }) {
+  const { t } = useLanguage();
+  const tAreas = useAreasT();
   return (
     <button
       type="button"
@@ -130,7 +139,7 @@ function CityChip({
       )}
     >
       <MapPin className="size-3.5" />
-      {city}
+      {city === "All" ? tAreas("allCities") : t(`cities.${city}`)}
       <span
         className={cn(
           "rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums",
@@ -253,13 +262,15 @@ function TrendChart({ data }: { data: TrendPoint[] }) {
 type Tab = "overview" | "trends" | "schools" | "hospitals" | "notes";
 
 function DetailPanel({ d, onClose }: { d: District; onClose: () => void }) {
+  const { t } = useLanguage();
+  const tAreas = useAreasT();
   const [tab, setTab] = useState<Tab>("overview");
   const tabs: { id: Tab; label: string; icon: typeof Heart }[] = [
-    { id: "overview", label: "Overview", icon: Compass },
-    { id: "trends", label: "Rental Trends", icon: TrendingUp },
-    { id: "schools", label: "Schools", icon: GraduationCap },
-    { id: "hospitals", label: "Hospitals", icon: Hospital },
-    { id: "notes", label: "Market Notes", icon: Sparkles },
+    { id: "overview", label: tAreas("detail.tabOverview"), icon: Compass },
+    { id: "trends", label: tAreas("detail.tabTrends"), icon: TrendingUp },
+    { id: "schools", label: tAreas("detail.tabSchools"), icon: GraduationCap },
+    { id: "hospitals", label: tAreas("detail.tabHospitals"), icon: Hospital },
+    { id: "notes", label: tAreas("detail.tabNotes"), icon: Sparkles },
   ];
 
   return (
@@ -269,37 +280,37 @@ function DetailPanel({ d, onClose }: { d: District; onClose: () => void }) {
         <header className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-              <MapPin className="size-3.5" /> {d.city}
+              <MapPin className="size-3.5" /> {t(`cities.${d.city}`)}
             </div>
             <h2 className="mt-1 text-2xl font-bold tracking-tight">{d.name}</h2>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {d.tags.map((t) => (
-                <Badge key={t} tone={TAG_TONES[t]}>
-                  {t}
+              {d.tags.map((tag) => (
+                <Badge key={tag} tone={TAG_TONES[tag]}>
+                  {t(`lifestyleTags.${tag}`)}
                 </Badge>
               ))}
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close detail">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label={tAreas("detail.closeDetail")}>
             <X className="size-4" />
           </Button>
         </header>
 
         <div className="flex items-center gap-1 border-b border-border px-3">
-          {tabs.map((t) => (
+          {tabs.map((tb) => (
             <button
-              key={t.id}
+              key={tb.id}
               type="button"
-              onClick={() => setTab(t.id)}
+              onClick={() => setTab(tb.id)}
               className={cn(
                 "flex items-center gap-1.5 border-b-2 px-3 py-3 text-sm font-medium transition-colors",
-                tab === t.id
+                tab === tb.id
                   ? "border-primary text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground",
               )}
             >
-              <t.icon className="size-3.5" />
-              {t.label}
+              <tb.icon className="size-3.5" />
+              {tb.label}
             </button>
           ))}
         </div>
@@ -309,21 +320,21 @@ function DetailPanel({ d, onClose }: { d: District; onClose: () => void }) {
             <>
               <p className="text-sm leading-relaxed text-muted-foreground">{d.overview}</p>
               <div className="grid grid-cols-2 gap-3">
-                <StatCard label="Avg. Rent" value={`SAR ${formatSAR(d.avgRent)}`} delta={`${d.yoy > 0 ? "+" : ""}${d.yoy}% YoY`} trend={d.yoy >= 0 ? "up" : "down"} />
-                <StatCard label="Active Listings" value={String(d.listings)} icon={<Building2 className="size-4" />} />
+                <StatCard label={tAreas("detail.avgRentLabel")} value={`SAR ${formatSAR(d.avgRent)}`} delta={tAreas("detail.yoy", { sign: d.yoy > 0 ? "+" : "", pct: d.yoy })} trend={d.yoy >= 0 ? "up" : "down"} />
+                <StatCard label={tAreas("detail.activeListings")} value={String(d.listings)} icon={<Building2 className="size-4" />} />
               </div>
               <div className="space-y-3 rounded-2xl border border-border bg-card p-5">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold">District scores</div>
+                  <div className="text-sm font-semibold">{tAreas("detail.districtScores")}</div>
                   <Link to="/methodology" className="text-xs text-muted-foreground hover:text-primary hover:underline">
-                    How scores work →
+                    {tAreas("detail.howScoresWork")}
                   </Link>
                 </div>
-                <ScoreBar label="Area Quality" value={d.areaScore} />
-                <ScoreBar label="Family Suitability" value={d.familyScore} />
-                <ScoreBar label="Schools" value={d.schoolScore} />
-                <ScoreBar label="Healthcare" value={d.healthcareScore} />
-                <ScoreBar label="Traffic Flow" value={d.trafficScore} />
+                <ScoreBar label={tAreas("detail.areaQuality")} value={d.areaScore} />
+                <ScoreBar label={tAreas("detail.familySuitability")} value={d.familyScore} />
+                <ScoreBar label={tAreas("detail.schools")} value={d.schoolScore} />
+                <ScoreBar label={tAreas("detail.healthcare")} value={d.healthcareScore} />
+                <ScoreBar label={tAreas("detail.trafficFlow")} value={d.trafficScore} />
               </div>
             </>
           )}
@@ -333,13 +344,12 @@ function DetailPanel({ d, onClose }: { d: District; onClose: () => void }) {
               <div className="rounded-2xl border border-border bg-card p-5">
                 <div className="mb-1 flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-semibold">Average annual rent</div>
-                    <div className="text-xs text-muted-foreground">5-year trajectory</div>
+                    <div className="text-sm font-semibold">{tAreas("detail.avgAnnualRent")}</div>
+                    <div className="text-xs text-muted-foreground">{tAreas("detail.fiveYearTrajectory")}</div>
                   </div>
                   <Badge tone={d.yoy >= 0 ? "success" : "info"}>
                     <TrendingUp className="size-3" />
-                    {d.yoy > 0 ? "+" : ""}
-                    {d.yoy}% YoY
+                    {tAreas("detail.yoy", { sign: d.yoy > 0 ? "+" : "", pct: d.yoy })}
                   </Badge>
                 </div>
                 <TrendChart data={d.trends} />
@@ -365,7 +375,7 @@ function DetailPanel({ d, onClose }: { d: District; onClose: () => void }) {
                     </div>
                     <div>
                       <div className="text-sm font-semibold">{s.name}</div>
-                      <div className="text-xs text-muted-foreground">{s.type}</div>
+                      <div className="text-xs text-muted-foreground">{t(`schoolTypes.${s.type}`)}</div>
                     </div>
                   </div>
                   <Badge tone={s.rating >= 9 ? "success" : "primary"}>{s.rating.toFixed(1)} / 10</Badge>
@@ -387,7 +397,7 @@ function DetailPanel({ d, onClose }: { d: District; onClose: () => void }) {
                     </div>
                     <div>
                       <div className="text-sm font-semibold">{h.name}</div>
-                      <div className="text-xs text-muted-foreground">{h.tier}</div>
+                      <div className="text-xs text-muted-foreground">{t(`hospitalTiers.${h.tier}`)}</div>
                     </div>
                   </div>
                   <Badge tone={h.rating >= 9 ? "success" : "primary"}>{h.rating.toFixed(1)} / 10</Badge>
@@ -406,18 +416,19 @@ function DetailPanel({ d, onClose }: { d: District; onClose: () => void }) {
 }
 
 function NotesTab({ notes }: { notes: string[] }) {
+  const tAreas = useAreasT();
   return (
     <div className="space-y-3">
       {notes.map((n, i) => (
         <div key={i} className="rounded-xl border border-border bg-card p-4">
           <div className="mb-1 inline-flex items-center gap-1.5 text-xs font-semibold text-ai">
-            <Sparkles className="size-3.5" /> Market note
+            <Sparkles className="size-3.5" /> {tAreas("detail.marketNote")}
           </div>
           <p className="text-sm text-foreground">{n}</p>
         </div>
       ))}
       {notes.length === 0 && (
-        <p className="text-sm text-muted-foreground">No market notes for this district yet.</p>
+        <p className="text-sm text-muted-foreground">{tAreas("detail.noMarketNotes")}</p>
       )}
     </div>
   );
@@ -460,6 +471,8 @@ function SortableHeader({
 // ---------- Page ----------
 
 function AreasPage() {
+  const { t } = useLanguage();
+  const tAreas = useAreasT();
   const rawSearch = useRouterState({ select: s => s.location.searchStr });
   const areaParam = new URLSearchParams(rawSearch).get("area") ?? null;
 
@@ -563,7 +576,7 @@ function AreasPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface">
-        <div className="text-sm text-muted-foreground">Loading area intelligence…</div>
+        <div className="text-sm text-muted-foreground">{tAreas("loading")}</div>
       </div>
     );
   }
@@ -576,39 +589,39 @@ function AreasPage() {
         {/* Heading */}
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Explore Areas</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{tAreas("heading")}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              District scores, rental trends, schools and healthcare across Saudi Arabia.
+              {tAreas("subtitle")}
             </p>
           </div>
           <Badge tone="ai">
-            <Sparkles className="size-3" /> Updated Jun 2026
+            <Sparkles className="size-3" /> {tAreas("updatedBadge")}
           </Badge>
         </div>
 
           {/* Stat cards */}
           <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              label="Districts tracked"
+              label={tAreas("districtsTracked")}
               value={String(stats.districts)}
               icon={<MapIcon className="size-4" />}
             />
             <StatCard
-              label="Avg. area score"
+              label={tAreas("avgAreaScore")}
               value={`${stats.avgArea}/100`}
-              delta="+2 pts"
+              delta={tAreas("ptsUp2")}
               trend="up"
             />
             <StatCard
-              label="Avg. family score"
+              label={tAreas("avgFamilyScore")}
               value={`${stats.avgFamily}/100`}
-              delta="+1 pt"
+              delta={tAreas("ptUp1")}
               trend="up"
             />
             <StatCard
-              label="Avg. rent"
+              label={tAreas("avgRent")}
               value={`SAR ${formatSAR(stats.avgRent)}`}
-              delta="+3.8% YoY"
+              delta={tAreas("yoyUp")}
               trend="up"
             />
           </section>
@@ -630,29 +643,29 @@ function AreasPage() {
           {/* Filters */}
           <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3">
             <div className="relative w-full max-w-sm">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search districts"
-                className="pl-9"
+                placeholder={tAreas("searchPlaceholder")}
+                className="ps-9"
               />
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 text-xs font-semibold text-muted-foreground">Lifestyle</span>
-              {tags.map((t) => (
+              <span className="me-1 text-xs font-semibold text-muted-foreground">{tAreas("lifestyle")}</span>
+              {tags.map((tag) => (
                 <button
-                  key={t}
+                  key={tag}
                   type="button"
-                  onClick={() => setTagFilter(t)}
+                  onClick={() => setTagFilter(tag)}
                   className={cn(
                     "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                    tagFilter === t
+                    tagFilter === tag
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-border bg-background text-foreground hover:bg-surface",
                   )}
                 >
-                  {t}
+                  {tag === "All" ? tAreas("allCities") : t(`lifestyleTags.${tag}`)}
                 </button>
               ))}
             </div>
@@ -664,27 +677,27 @@ function AreasPage() {
               <table className="w-full text-sm">
                 <thead className="border-b border-border bg-surface text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold">District</th>
+                    <th className="px-4 py-3 text-start font-semibold">{tAreas("table.district")}</th>
                     <th className="px-3 py-3 text-center font-semibold">
-                      <SortableHeader label="Area" sortKey="areaScore" active={sortKey} dir={sortDir} onSort={handleSort} />
-                    </th>
-                    <th className="px-3 py-3 text-center font-semibold">
-                      <SortableHeader label="Family" sortKey="familyScore" active={sortKey} dir={sortDir} onSort={handleSort} />
+                      <SortableHeader label={tAreas("table.area")} sortKey="areaScore" active={sortKey} dir={sortDir} onSort={handleSort} />
                     </th>
                     <th className="px-3 py-3 text-center font-semibold">
-                      <SortableHeader label="Schools" sortKey="schoolScore" active={sortKey} dir={sortDir} onSort={handleSort} />
+                      <SortableHeader label={tAreas("table.family")} sortKey="familyScore" active={sortKey} dir={sortDir} onSort={handleSort} />
                     </th>
                     <th className="px-3 py-3 text-center font-semibold">
-                      <SortableHeader label="Healthcare" sortKey="healthcareScore" active={sortKey} dir={sortDir} onSort={handleSort} />
+                      <SortableHeader label={tAreas("table.schools")} sortKey="schoolScore" active={sortKey} dir={sortDir} onSort={handleSort} />
                     </th>
                     <th className="px-3 py-3 text-center font-semibold">
-                      <SortableHeader label="Traffic" sortKey="trafficScore" active={sortKey} dir={sortDir} onSort={handleSort} />
+                      <SortableHeader label={tAreas("table.healthcare")} sortKey="healthcareScore" active={sortKey} dir={sortDir} onSort={handleSort} />
                     </th>
-                    <th className="px-3 py-3 text-left font-semibold">Lifestyle</th>
-                    <th className="px-3 py-3 text-left font-semibold">
-                      <SortableHeader label="Avg. rent" sortKey="avgRent" active={sortKey} dir={sortDir} onSort={handleSort} />
+                    <th className="px-3 py-3 text-center font-semibold">
+                      <SortableHeader label={tAreas("table.traffic")} sortKey="trafficScore" active={sortKey} dir={sortDir} onSort={handleSort} />
                     </th>
-                    <th className="px-3 py-3 text-left font-semibold">Trend</th>
+                    <th className="px-3 py-3 text-start font-semibold">{tAreas("table.lifestyle")}</th>
+                    <th className="px-3 py-3 text-start font-semibold">
+                      <SortableHeader label={tAreas("table.avgRent")} sortKey="avgRent" active={sortKey} dir={sortDir} onSort={handleSort} />
+                    </th>
+                    <th className="px-3 py-3 text-start font-semibold">{tAreas("table.trend")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -695,14 +708,14 @@ function AreasPage() {
                       className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-surface/60"
                     >
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-3 text-left">
+                        <div className="flex items-center gap-3 text-start">
                           <div className="grid size-9 place-items-center rounded-lg bg-primary-soft text-accent-foreground">
                             <MapPin className="size-4" />
                           </div>
                           <div>
                             <div className="font-semibold">{d.name}</div>
                             <div className="text-xs text-muted-foreground">
-                              {d.city} · {d.listings} listings
+                              {tAreas("table.listingsCount", { city: t(`cities.${d.city}`), count: d.listings })}
                             </div>
                           </div>
                         </div>
@@ -724,9 +737,9 @@ function AreasPage() {
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex flex-wrap gap-1">
-                          {d.tags.map((t) => (
-                            <Badge key={t} tone={TAG_TONES[t]}>
-                              {t}
+                          {d.tags.map((tag) => (
+                            <Badge key={tag} tone={TAG_TONES[tag]}>
+                              {t(`lifestyleTags.${tag}`)}
                             </Badge>
                           ))}
                         </div>
@@ -736,8 +749,7 @@ function AreasPage() {
                           SAR {formatSAR(d.avgRent)}
                         </div>
                         <div className={cn("text-xs font-medium", d.yoy >= 0 ? "text-success" : "text-info")}>
-                          {d.yoy > 0 ? "+" : ""}
-                          {d.yoy}% YoY
+                          {tAreas("table.yoy", { sign: d.yoy > 0 ? "+" : "", pct: d.yoy })}
                         </div>
                       </td>
                       <td className="px-3 py-3">
@@ -748,7 +760,7 @@ function AreasPage() {
                   {filtered.length === 0 && (
                     <tr>
                       <td colSpan={9} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                        No districts match the current filters.
+                        {tAreas("table.noMatches")}
                       </td>
                     </tr>
                   )}
@@ -758,7 +770,7 @@ function AreasPage() {
           </section>
 
           <p className="text-center text-xs text-muted-foreground">
-            District intelligence powers Maskan AI Advisor area recommendations.
+            {tAreas("footerNote")}
           </p>
         </main>
 

@@ -1303,6 +1303,10 @@ FastAPI's hot-reload (restarts server on file save) works by spawning a child pr
 
 The database stores `monthly_rent` (SAR per month). The UI `Property` type has a `price` field that holds this same monthly value. However, some parts of the UI display it multiplied by 12 and labelled "Annual rent." This is a known naming inconsistency — `price` is actually monthly, not annual, in the underlying data.
 
+### How Arabic/English translation (i18n) works
+
+`frontend/src/lib/i18n/` holds the translation system: `en.ts` is the canonical English dictionary (a big nested `as const` object), `ar.ts` is the Arabic mirror with an identical key structure, and `context.tsx` provides a `LanguageProvider` + `useLanguage()` hook exposing `{ lang, setLang, dir, t }`. Components call `t("section.key", { vars })` to look up strings; `t()` falls back to the English string (and warns in dev) if a key is missing, so a typo never crashes the page — it just silently shows English. Switching language flips `document.documentElement.dir` between `ltr`/`rtl` and persists the choice to `localStorage`. The renter-facing pages, partner dashboard/registration/lead chat, and shared nav components are fully wired to `t()`. The internal admin tools (`admin.tsx`, `analytics.tsx`, `import.tsx`) are intentionally left English-only since they're staff-facing, not customer-facing.
+
 ### Why separate schemas from models?
 
 The SQLAlchemy model defines exactly what is stored in the database. The Pydantic schema defines what is acceptable to receive from a user or send back to them. They are often similar but not identical:

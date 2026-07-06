@@ -11,26 +11,28 @@ import {
   type ApiLeadDetail, type ApiLeadMessage,
 } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/lead/$leadId")({
   head: () => ({ meta: [{ title: "My Lead — Maskan" }] }),
   component: CustomerLeadPage,
 });
 
-const STATUS_INFO: Record<string, { label: string; description: string; tone: "info" | "warning" | "success" | "neutral" }> = {
-  pending_review:  { label: "Under review", description: "Our team is reviewing your lead before sharing it with partners.", tone: "neutral" },
-  rejected:        { label: "Not accepted", description: "Your lead was not accepted. Please contact us for more information.", tone: "neutral" },
-  open:            { label: "Searching for partner", description: "We're matching you with a verified partner in your area.", tone: "info" },
-  assigned:        { label: "Partner assigned", description: "A partner has been found and will review your requirements shortly.", tone: "warning" },
-  in_progress:     { label: "In progress", description: "Your partner is actively working on your request.", tone: "warning" },
-  pending_closure: { label: "Closing in progress", description: "Your partner has requested to close this lead. Our team is reviewing it.", tone: "warning" },
-  closed_won:      { label: "Closed — found!", description: "Congratulations! Your rental has been arranged.", tone: "success" },
-  closed_lost:     { label: "Closed", description: "This lead was closed without a match.", tone: "neutral" },
+const STATUS_TONE: Record<string, "info" | "warning" | "success" | "neutral"> = {
+  pending_review: "neutral",
+  rejected: "neutral",
+  open: "info",
+  assigned: "warning",
+  in_progress: "warning",
+  pending_closure: "warning",
+  closed_won: "success",
+  closed_lost: "neutral",
 };
 
 function CustomerLeadPage() {
   const { leadId } = Route.useParams();
   const { user } = useAuth();
+  const { t, lang } = useLanguage();
   const navigate = useNavigate();
   const [lead, setLead] = useState<ApiLeadDetail | null>(null);
   const [messages, setMessages] = useState<ApiLeadMessage[]>([]);
@@ -89,26 +91,28 @@ function CustomerLeadPage() {
   if (!user) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">
-        <h1 className="text-xl font-bold">Sign in to view your lead</h1>
-        <Button onClick={() => navigate({ to: "/auth" })}>Sign in</Button>
+        <h1 className="text-xl font-bold">{t("leadDetail.signInToView")}</h1>
+        <Button onClick={() => navigate({ to: "/auth" })}>{t("leadDetail.signIn")}</Button>
       </div>
     );
   }
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">Loading…</p></div>;
+    return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">{t("leadDetail.loading")}</p></div>;
   }
 
   if (!lead) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-4">
-        <p className="text-sm text-muted-foreground">Lead not found or you don't have access.</p>
-        <Button variant="outline" onClick={() => navigate({ to: "/" })}>Go home</Button>
+        <p className="text-sm text-muted-foreground">{t("leadDetail.notFound")}</p>
+        <Button variant="outline" onClick={() => navigate({ to: "/" })}>{t("leadDetail.goHome")}</Button>
       </div>
     );
   }
 
-  const statusInfo = STATUS_INFO[lead.status] ?? STATUS_INFO.open;
+  const statusInfoKey = lead.status in STATUS_TONE ? lead.status : "open";
+  const statusLabel = t(`leadDetail.statusInfo.${statusInfoKey}.label`);
+  const statusDescription = t(`leadDetail.statusInfo.${statusInfoKey}.description`);
   const hasMediator = ["in_progress", "pending_closure", "closed_won", "closed_lost"].includes(lead.status);
   // Allow chat when admin has sent a question (pending_review) or mediator is active
   const canChat = hasMediator || ["pending_review"].includes(lead.status);
@@ -126,8 +130,8 @@ function CustomerLeadPage() {
               {lead.status === "closed_won" ? <CheckCircle className="size-5" /> : <Clock className="size-5" />}
             </div>
             <div>
-              <h2 className="font-semibold">{statusInfo.label}</h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">{statusInfo.description}</p>
+              <h2 className="font-semibold">{statusLabel}</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">{statusDescription}</p>
             </div>
           </div>
         </div>
@@ -137,21 +141,21 @@ function CustomerLeadPage() {
           <div className="lg:col-span-2 space-y-4">
             {/* Requirements */}
             <div className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-3">
-              <h2 className="font-semibold">Your requirements</h2>
+              <h2 className="font-semibold">{t("leadDetail.yourRequirements")}</h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Location</span>
+                  <span className="text-muted-foreground">{t("leadDetail.location")}</span>
                   <span className="font-medium">{lead.area_name}, {lead.city}</span>
                 </div>
                 {lead.bedrooms_needed && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Bedrooms</span>
-                    <span className="font-medium">{lead.bedrooms_needed} BR</span>
+                    <span className="text-muted-foreground">{t("leadDetail.bedrooms")}</span>
+                    <span className="font-medium">{t("leadDetail.bedroomsValue", { count: lead.bedrooms_needed })}</span>
                   </div>
                 )}
                 {(lead.min_budget || lead.max_budget) && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Budget</span>
+                    <span className="text-muted-foreground">{t("leadDetail.budget")}</span>
                     <span className="font-medium">
                       {lead.min_budget ? `SAR ${formatSAR(lead.min_budget)}` : ""}
                       {lead.min_budget && lead.max_budget ? " – " : ""}
@@ -161,7 +165,7 @@ function CustomerLeadPage() {
                 )}
                 {lead.move_in_date && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Move-in</span>
+                    <span className="text-muted-foreground">{t("leadDetail.moveIn")}</span>
                     <span className="font-medium">{lead.move_in_date}</span>
                   </div>
                 )}
@@ -177,23 +181,23 @@ function CustomerLeadPage() {
             {hasMediator ? (
               <div className="rounded-2xl border border-success/30 bg-success/5 p-5 shadow-card space-y-2">
                 <h2 className="font-semibold flex items-center gap-2">
-                  <CheckCircle className="size-4 text-success" /> Partner assigned
+                  <CheckCircle className="size-4 text-success" /> {t("leadDetail.partnerAssigned")}
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  A verified partner covering {lead.area_name} is working on your request. Use the chat to discuss your needs.
+                  {t("leadDetail.partnerAssignedDesc", { area: lead.area_name })}
                 </p>
                 {acceptedAssignment && (
                   <p className="text-xs text-muted-foreground">
-                    Assignment #{acceptedAssignment.id} · accepted
+                    {t("leadDetail.assignmentAccepted", { id: acceptedAssignment.id })}
                   </p>
                 )}
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-border p-5 text-center space-y-2">
                 <Sparkles className="size-6 text-primary mx-auto" />
-                <p className="text-sm font-medium">Matching in progress</p>
+                <p className="text-sm font-medium">{t("leadDetail.matchingInProgress")}</p>
                 <p className="text-xs text-muted-foreground">
-                  We're finding the best partner for {lead.area_name}. This usually takes under 24 hours.
+                  {t("leadDetail.matchingInProgressDesc", { area: lead.area_name })}
                 </p>
               </div>
             )}
@@ -202,7 +206,7 @@ function CustomerLeadPage() {
             {lead.suggestions.length > 0 && (
               <div className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-3">
                 <h2 className="font-semibold flex items-center gap-2">
-                  <Home className="size-4 text-muted-foreground" /> Suggested properties
+                  <Home className="size-4 text-muted-foreground" /> {t("leadDetail.suggestedProperties")}
                 </h2>
                 {lead.suggestions.map(s => (
                   s.property_id ? (
@@ -214,10 +218,10 @@ function CustomerLeadPage() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-medium truncate">{s.property_title ?? `Property #${s.property_id}`}</p>
+                          <p className="font-medium truncate">{s.property_title ?? t("leadDetail.propertyFallback", { id: s.property_id })}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {s.bedrooms ? `${s.bedrooms} BR · ` : ""}
-                            {s.monthly_rent ? `SAR ${formatSAR(s.monthly_rent)}/mo` : ""}
+                            {s.bedrooms ? t("leadDetail.bedroomsPrefix", { count: s.bedrooms }) : ""}
+                            {s.monthly_rent ? t("leadDetail.perMonth", { amount: formatSAR(s.monthly_rent) }) : ""}
                           </p>
                         </div>
                         <Badge tone="primary" className="shrink-0">{Math.round(s.match_score)}%</Badge>
@@ -237,32 +241,32 @@ function CustomerLeadPage() {
           <div className="lg:col-span-3 flex flex-col rounded-2xl border border-border bg-card shadow-card" style={{ minHeight: 480 }}>
             <div className="flex items-center gap-2 border-b border-border px-5 py-3">
               <MessageSquare className="size-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">{hasMediator ? "Chat with your partner" : "Messages from Maskan"}</span>
-              {!canChat && <Badge tone="neutral">Available once partner is assigned</Badge>}
+              <span className="text-sm font-semibold">{hasMediator ? t("leadDetail.chatWithPartner") : t("leadDetail.messagesFromMaskan")}</span>
+              {!canChat && <Badge tone="neutral">{t("leadDetail.availableOncePartnerAssigned")}</Badge>}
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
               {messages.length === 0 && canChat && (
                 <p className="text-center text-sm text-muted-foreground pt-8">
-                  {hasMediator ? "Your partner will message you here. You can also start the conversation." : "Our team may send you questions here before matching you with a partner."}
+                  {hasMediator ? t("leadDetail.partnerWillMessage") : t("leadDetail.teamMayMessage")}
                 </p>
               )}
               {messages.length === 0 && !canChat && (
                 <p className="text-center text-sm text-muted-foreground pt-8">
-                  Chat will open once a partner accepts your lead.
+                  {t("leadDetail.chatOpensOnceAccepted")}
                 </p>
               )}
               {messages.map(msg => (
                 <div key={msg.id} className={`flex ${msg.sender_role === "customer" ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-xs rounded-2xl px-4 py-2 text-sm ${msg.sender_role === "customer" ? "bg-primary text-primary-foreground" : "bg-surface border border-border"}`}>
                     {msg.sender_role === "mediator" && (
-                      <div className="mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Partner</div>
+                      <div className="mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{t("leadDetail.partnerLabel")}</div>
                     )}
                     {msg.sender_role === "admin" && (
-                      <div className="mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Maskan Team</div>
+                      <div className="mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{t("leadDetail.maskanTeamLabel")}</div>
                     )}
                     {msg.content}
                     <div className={`mt-1 text-[10px] ${msg.sender_role === "customer" ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                      {new Date(msg.created_at).toLocaleTimeString("en-SA", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(msg.created_at).toLocaleTimeString(lang === "ar" ? "ar-SA" : "en-SA", { hour: "2-digit", minute: "2-digit" })}
                     </div>
                   </div>
                 </div>
@@ -274,7 +278,7 @@ function CustomerLeadPage() {
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(e); } }}
-                placeholder={canChat ? (hasMediator ? "Type a message to your partner…" : "Reply to Maskan team…") : "Waiting for partner assignment…"}
+                placeholder={canChat ? (hasMediator ? t("leadDetail.messagePlaceholderPartner") : t("leadDetail.messagePlaceholderTeam")) : t("leadDetail.messagePlaceholderWaiting")}
                 disabled={!canChat}
                 rows={2}
                 className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none disabled:opacity-50"
@@ -288,10 +292,10 @@ function CustomerLeadPage() {
 
         <div className="mt-6 flex items-center justify-between">
           <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/search" })}>
-            Browse properties
+            {t("leadDetail.browseProperties")}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/lead/new", search: { area: "", city: "Riyadh" } })}>
-            Submit another lead
+            {t("leadDetail.submitAnotherLead")}
           </Button>
         </div>
       </main>

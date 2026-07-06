@@ -36,6 +36,7 @@ import {
 import { formatSAR, type Property } from "@/lib/maskan-data";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/saved")({
   head: () => ({
@@ -86,6 +87,7 @@ function toSavedItem(item: ApiSavedProperty): SavedItem {
 
 function SavedPage() {
   const { user, authLoading, clearAuth } = useAuth();
+  const { t, lang } = useLanguage();
   const navigate = useNavigate();
   const [items, setItems] = useState<SavedItem[]>([]);
   const [filter, setFilter] = useState<"all" | InquiryStatus>("all");
@@ -113,7 +115,7 @@ function SavedPage() {
         }
       } catch {
         if (!cancelled) {
-          setError("Unable to load saved properties.");
+          setError(t("saved.unableToLoad"));
         }
       } finally {
         if (!cancelled) {
@@ -184,7 +186,7 @@ function SavedPage() {
       } else {
         setCardErrors((prev) => ({
           ...prev,
-          [id]: e instanceof Error ? e.message : "Failed to save. Please try again.",
+          [id]: e instanceof Error ? e.message : t("saved.failedToSave"),
         }));
       }
     } finally {
@@ -210,7 +212,7 @@ function SavedPage() {
           const data = await fetchSavedProperties(user.id).catch(() => []);
           setItems(data.map(toSavedItem));
         }
-        setError(e instanceof Error ? e.message : "Failed to remove property.");
+        setError(e instanceof Error ? e.message : t("saved.failedToRemove"));
       }
     }
   }
@@ -237,31 +239,30 @@ function SavedPage() {
         <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-accent-foreground">
-              <Bookmark className="size-3.5" /> Shortlist
+              <Bookmark className="size-3.5" /> {t("saved.badge")}
             </div>
             <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-              Saved properties
+              {t("saved.heading")}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {items.length} {items.length === 1 ? "property" : "properties"} shortlisted ·
-              keep notes, track inquiries, and compare anytime.
+              {t(items.length === 1 ? "saved.subtitleSingular" : "saved.subtitlePlural", { count: items.length })}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" asChild>
               <Link to="/compare">
-                <Scale className="mr-1.5 size-4" /> Compare all
+                <Scale className="mr-1.5 size-4" /> {t("saved.compareAll")}
               </Link>
             </Button>
             <Button variant="ai" size="sm" asChild>
               <Link to="/advisor">
-                <Sparkles className="mr-1.5 size-4" /> Ask AI advisor
+                <Sparkles className="mr-1.5 size-4" /> {t("saved.askAiAdvisor")}
               </Link>
             </Button>
           </div>
         </header>
 
-        {loading && <p className="mb-4 text-sm text-muted-foreground">Loading saved properties...</p>}
+        {loading && <p className="mb-4 text-sm text-muted-foreground">{t("saved.loading")}</p>}
         {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
         {/* Filter chips */}
@@ -269,24 +270,24 @@ function SavedPage() {
           <FilterChip
             active={filter === "all"}
             onClick={() => setFilter("all")}
-            label={`All · ${counts.all}`}
+            label={t("saved.filters.all", { count: counts.all })}
           />
           <FilterChip
             active={filter === "sent"}
             onClick={() => setFilter("sent")}
-            label={`Inquiry sent · ${counts.sent}`}
+            label={t("saved.filters.sent", { count: counts.sent })}
             tone="info"
           />
           <FilterChip
             active={filter === "contacted"}
             onClick={() => setFilter("contacted")}
-            label={`Contacted · ${counts.contacted}`}
+            label={t("saved.filters.contacted", { count: counts.contacted })}
             tone="warning"
           />
           <FilterChip
             active={filter === "scheduled"}
             onClick={() => setFilter("scheduled")}
-            label={`Viewing scheduled · ${counts.scheduled}`}
+            label={t("saved.filters.scheduled", { count: counts.scheduled })}
             tone="success"
           />
         </div>
@@ -381,6 +382,7 @@ function SavedCard({
     item.viewingAt ? item.viewingAt.slice(0, 16) : "",
   );
   const navigate = useNavigate();
+  const { t, lang } = useLanguage();
   const p = item.property;
 
   function handleCardClick(e: React.MouseEvent<HTMLElement>) {
@@ -406,7 +408,7 @@ function SavedCard({
           <StatusPill status={item.status} viewingAt={item.viewingAt} />
           <button
             type="button"
-            aria-label="Remove from saved"
+            aria-label={t("saved.removeFromSaved")}
             onClick={onRemove}
             className="grid size-9 place-items-center rounded-full bg-background/95 text-foreground shadow-card backdrop-blur hover:bg-background"
           >
@@ -414,7 +416,7 @@ function SavedCard({
           </button>
         </div>
         <div className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-background/95 px-2.5 py-1 text-[11px] font-semibold text-foreground shadow-card backdrop-blur">
-          <Calendar className="size-3.5" /> Saved {formatDate(item.savedAt)}
+          <Calendar className="size-3.5" /> {t("saved.savedOn", { date: formatDate(item.savedAt, lang) })}
         </div>
       </div>
 
@@ -431,19 +433,19 @@ function SavedCard({
 
       {/* Stats grid */}
       <div className="mx-5 mt-4 grid grid-cols-3 gap-3 rounded-xl border border-border bg-surface/50 p-3 text-center">
-        <Stat label="Rent / yr" value={`SAR ${formatSAR(p.price)}`} />
-        <Stat label="Area" value={`${p.area} m²`} />
-        <Stat label="Rental score" value={`${item.rentalScore}/100`} />
+        <Stat label={t("saved.rentPerYear")} value={`SAR ${formatSAR(p.price)}`} />
+        <Stat label={t("saved.area")} value={`${p.area} m²`} />
+        <Stat label={t("saved.rentalScore")} value={`${item.rentalScore}/100`} />
       </div>
 
       {/* Notes */}
       <section className="px-5 pt-5">
         <div className="mb-2 flex items-center justify-between">
           <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <StickyNote className="size-3.5" /> Your notes
+            <StickyNote className="size-3.5" /> {t("saved.yourNotes")}
           </div>
           <span className="text-[11px] text-muted-foreground">
-            {item.notes.length} {item.notes.length === 1 ? "note" : "notes"}
+            {t(item.notes.length === 1 ? "saved.notesCountSingular" : "saved.notesCountPlural", { count: item.notes.length })}
           </span>
         </div>
         <ul className="space-y-1.5">
@@ -456,7 +458,7 @@ function SavedCard({
               <button
                 type="button"
                 onClick={() => onRemoveNote(idx)}
-                aria-label="Remove note"
+                aria-label={t("saved.removeNote")}
                 className="opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
               >
                 <X className="size-3.5" />
@@ -476,7 +478,7 @@ function SavedCard({
             rows={1}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Add a note (e.g. Schedule viewing on Friday)"
+            placeholder={t("saved.addNotePlaceholder")}
             className="min-h-[40px] resize-none text-sm"
           />
           <Button type="submit" size="sm" variant="soft" disabled={!draft.trim()}>
@@ -488,7 +490,7 @@ function SavedCard({
       {/* Inquiry status tracker */}
       <section className="px-5 pt-5">
         <div className="mb-2 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          <MessageSquare className="size-3.5" /> Inquiry status
+          <MessageSquare className="size-3.5" /> {t("saved.inquiryStatus")}
         </div>
         <StatusStepper
           status={item.status}
@@ -519,7 +521,7 @@ function SavedCard({
               className="flex-1 rounded-lg border border-border bg-card px-3 py-1.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <Button type="submit" size="sm" variant="default" disabled={!viewingDate}>
-              Confirm
+              {t("saved.confirm")}
             </Button>
           </form>
         )}
@@ -543,7 +545,7 @@ function SavedCard({
             href={`tel:${p.agentPhone}`}
             className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-2 text-xs font-medium text-foreground transition-colors hover:bg-surface"
           >
-            <Phone className="size-3.5" /> Call agent
+            <Phone className="size-3.5" /> {t("saved.callAgent")}
           </a>
           <a
             href={`https://wa.me/${p.agentPhone.replace(/\D/g, "").replace(/^0/, "966")}`}
@@ -554,7 +556,7 @@ function SavedCard({
             <svg viewBox="0 0 24 24" className="size-3.5 fill-current" aria-hidden="true">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
             </svg>
-            WhatsApp
+            {t("saved.whatsapp")}
           </a>
         </div>
       )}
@@ -562,17 +564,17 @@ function SavedCard({
       {/* Actions */}
       <footer className="mt-0 flex items-center gap-2 border-t border-border bg-surface/40 px-5 py-4">
         <Button variant="ghost" size="sm" onClick={onRemove} className="text-muted-foreground hover:text-destructive">
-          <Trash2 className="size-4" /> Remove
+          <Trash2 className="size-4" /> {t("saved.remove")}
         </Button>
         <div className="ms-auto flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link to="/compare">
-              <Scale className="size-4" /> Compare
+              <Scale className="size-4" /> {t("saved.compare")}
             </Link>
           </Button>
           <Button variant="default" size="sm" asChild>
             <Link to="/property/$id" params={{ id: p.id }}>
-              View details
+              {t("saved.viewDetails")}
             </Link>
           </Button>
         </div>
@@ -602,38 +604,42 @@ function StatusPill({
   status: InquiryStatus;
   viewingAt?: string;
 }) {
+  const { t, lang } = useLanguage();
   if (status === "none")
-    return <Badge tone="neutral">Not contacted yet</Badge>;
+    return <Badge tone="neutral">{t("saved.statusPill.notContacted")}</Badge>;
   if (status === "sent")
     return (
       <Badge tone="info" icon={<Send className="size-3.5" />}>
-        Inquiry sent
+        {t("saved.statusPill.inquirySent")}
       </Badge>
     );
   if (status === "contacted")
     return (
       <Badge tone="warning" icon={<Phone className="size-3.5" />}>
-        Agent contacted
+        {t("saved.statusPill.agentContacted")}
       </Badge>
     );
   return (
     <Badge tone="success" icon={<CalendarCheck className="size-3.5" />}>
-      Viewing {viewingAt ? formatDateTime(viewingAt) : "scheduled"}
+      {t("saved.statusPill.viewing", { date: viewingAt ? formatDateTime(viewingAt, lang) : t("saved.statusPill.scheduled") })}
     </Badge>
   );
 }
 
 // ---------- Stepper ----------
 
-const STEPS: { key: InquiryStatus; label: string; icon: React.ReactNode }[] = [
-  { key: "sent", label: "Inquiry Sent", icon: <Send className="size-3.5" /> },
-  { key: "contacted", label: "Contacted", icon: <Phone className="size-3.5" /> },
-  {
-    key: "scheduled",
-    label: "Viewing Scheduled",
-    icon: <CalendarCheck className="size-3.5" />,
-  },
-];
+function useSteps(): { key: InquiryStatus; label: string; icon: React.ReactNode }[] {
+  const { t } = useLanguage();
+  return [
+    { key: "sent", label: t("saved.steps.inquirySent"), icon: <Send className="size-3.5" /> },
+    { key: "contacted", label: t("saved.steps.contacted"), icon: <Phone className="size-3.5" /> },
+    {
+      key: "scheduled",
+      label: t("saved.steps.viewingScheduled"),
+      icon: <CalendarCheck className="size-3.5" />,
+    },
+  ];
+}
 
 function StatusStepper({
   status,
@@ -644,6 +650,7 @@ function StatusStepper({
 }) {
   const order: InquiryStatus[] = ["none", "sent", "contacted", "scheduled"];
   const activeIdx = order.indexOf(status);
+  const STEPS = useSteps();
 
   return (
     <div className="flex items-center gap-1">
@@ -683,17 +690,18 @@ function StatusStepper({
 // ---------- Empty state ----------
 
 function EmptyState() {
+  const { t } = useLanguage();
   return (
     <div className="grid place-items-center rounded-2xl border border-dashed border-border bg-card px-6 py-20 text-center">
       <div className="grid size-12 place-items-center rounded-full bg-primary-soft text-accent-foreground">
         <Bookmark className="size-5" />
       </div>
-      <h2 className="mt-4 text-lg font-semibold">No properties match that filter</h2>
+      <h2 className="mt-4 text-lg font-semibold">{t("saved.empty.heading")}</h2>
       <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-        Try a different inquiry status, or head back to search to shortlist more homes.
+        {t("saved.empty.desc")}
       </p>
       <Button className="mt-5" asChild>
-        <Link to="/search">Browse properties</Link>
+        <Link to="/search">{t("saved.empty.browseProperties")}</Link>
       </Button>
     </div>
   );
@@ -701,15 +709,15 @@ function EmptyState() {
 
 // ---------- utils ----------
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+function formatDate(iso: string, lang: "en" | "ar") {
+  return new Date(iso).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
 }
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("en-US", {
+function formatDateTime(iso: string, lang: "en" | "ar") {
+  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA" : "en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",

@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
 import { fetchNotifications, type ApiNotification } from "@/lib/api/maskan";
+import { useLanguage } from "@/lib/i18n/context";
 
 export function NotificationBell() {
   const { user } = useAuth();
+  const { t, lang } = useLanguage();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -38,11 +40,11 @@ export function NotificationBell() {
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffMins < 1) return t("notifications.justNow");
+    if (diffMins < 60) return t("notifications.minutesAgo", { count: diffMins });
     const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return d.toLocaleDateString("en-SA", { day: "numeric", month: "short" });
+    if (diffHours < 24) return t("notifications.hoursAgo", { count: diffHours });
+    return d.toLocaleDateString(lang === "ar" ? "ar-SA" : "en-SA", { day: "numeric", month: "short" });
   }
 
   return (
@@ -50,7 +52,7 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={handleOpen}
-        aria-label="Notifications"
+        aria-label={t("notifications.ariaLabel")}
         className="relative grid size-9 place-items-center rounded-full border border-border bg-card text-muted-foreground hover:bg-surface hover:text-foreground transition-colors"
       >
         <Bell className="size-4" />
@@ -67,14 +69,14 @@ export function NotificationBell() {
             type="button"
             className="fixed inset-0 z-30 cursor-default"
             onClick={() => setOpen(false)}
-            aria-label="Close notifications"
+            aria-label={t("notifications.closeAria")}
           />
           <div className="absolute end-0 z-40 mt-2 w-80 overflow-hidden rounded-2xl border border-border bg-popover shadow-elevated">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h3 className="font-semibold text-sm">Notifications</h3>
+              <h3 className="font-semibold text-sm">{t("notifications.heading")}</h3>
               {totalUnread > 0 && (
                 <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-white">
-                  {totalUnread} unread
+                  {t("notifications.unread", { count: totalUnread })}
                 </span>
               )}
             </div>
@@ -82,7 +84,7 @@ export function NotificationBell() {
             {notifications.length === 0 ? (
               <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
                 <Bell className="size-8 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">No new messages</p>
+                <p className="text-sm text-muted-foreground">{t("notifications.empty")}</p>
               </div>
             ) : (
               <div className="max-h-96 divide-y divide-border overflow-y-auto">
@@ -111,7 +113,7 @@ export function NotificationBell() {
                       </div>
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         <span className="font-medium text-foreground">
-                          {n.sender_role === "admin" ? "Maskan Team" : "Partner"}:
+                          {n.sender_role === "admin" ? t("notifications.maskanTeam") : t("notifications.partner")}:
                         </span>{" "}
                         <span className="line-clamp-2">{n.latest_message}</span>
                       </p>
@@ -127,7 +129,7 @@ export function NotificationBell() {
                 onClick={() => setOpen(false)}
                 className="text-xs font-medium text-primary hover:underline"
               >
-                View all leads →
+                {t("notifications.viewAllLeads")}
               </Link>
             </div>
           </div>

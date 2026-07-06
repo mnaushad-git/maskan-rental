@@ -8,25 +8,27 @@ import { NotificationBell } from "@/components/maskan/NotificationBell";
 import { useAuth } from "@/lib/auth-context";
 import { fetchMyLeads, type ApiLeadSummary } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/my-leads")({
   head: () => ({ meta: [{ title: "My Leads — Maskan" }] }),
   component: MyLeadsPage,
 });
 
-const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neutral"; label: string }> = {
-  pending_review:  { tone: "neutral", label: "Under review" },
-  rejected:        { tone: "neutral", label: "Not accepted" },
-  open:            { tone: "info",    label: "Searching for partner" },
-  assigned:        { tone: "warning", label: "Partner assigned" },
-  in_progress:     { tone: "warning", label: "In progress" },
-  pending_closure: { tone: "warning", label: "Closing…" },
-  closed_won:      { tone: "success", label: "Closed — found!" },
-  closed_lost:     { tone: "neutral", label: "Closed" },
+const STATUS_TONE: Record<string, "success" | "warning" | "info" | "neutral"> = {
+  pending_review: "neutral",
+  rejected: "neutral",
+  open: "info",
+  assigned: "warning",
+  in_progress: "warning",
+  pending_closure: "warning",
+  closed_won: "success",
+  closed_lost: "neutral",
 };
 
 function MyLeadsPage() {
   const { user, authLoading } = useAuth();
+  const { t, lang } = useLanguage();
   const navigate = useNavigate();
   const [leads, setLeads] = useState<ApiLeadSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,14 +42,14 @@ function MyLeadsPage() {
   }, [user]);
 
   if (authLoading) {
-    return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">Loading…</p></div>;
+    return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">{t("myLeads.loading")}</p></div>;
   }
 
   if (!user) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">
-        <h1 className="text-xl font-bold">Sign in to view your leads</h1>
-        <Button onClick={() => navigate({ to: "/auth" })}>Sign in</Button>
+        <h1 className="text-xl font-bold">{t("myLeads.signInToView")}</h1>
+        <Button onClick={() => navigate({ to: "/auth" })}>{t("myLeads.signIn")}</Button>
       </div>
     );
   }
@@ -58,7 +60,7 @@ function MyLeadsPage() {
 
       <main className="mx-auto max-w-3xl px-6 py-8">
         {loading && (
-          <p className="text-sm text-muted-foreground">Loading your leads…</p>
+          <p className="text-sm text-muted-foreground">{t("myLeads.loadingLeads")}</p>
         )}
 
         {!loading && leads.length === 0 && (
@@ -67,13 +69,13 @@ function MyLeadsPage() {
               <ClipboardList className="size-7" />
             </div>
             <div>
-              <h2 className="text-lg font-bold">No leads yet</h2>
+              <h2 className="text-lg font-bold">{t("myLeads.empty.heading")}</h2>
               <p className="mt-1 text-sm text-muted-foreground max-w-sm">
-                Submit a lead and we'll match you with a verified partner in your target area.
+                {t("myLeads.empty.desc")}
               </p>
             </div>
             <Link to="/lead/new" search={{ area: "", city: "Riyadh" }}>
-              <Button>Submit your first lead</Button>
+              <Button>{t("myLeads.empty.submitFirstLead")}</Button>
             </Link>
           </div>
         )}
@@ -81,7 +83,10 @@ function MyLeadsPage() {
         {!loading && leads.length > 0 && (
           <div className="space-y-3">
             {leads.map(lead => {
-              const badge = STATUS_BADGE[lead.status] ?? { tone: "neutral" as const, label: lead.status };
+              const tone = STATUS_TONE[lead.status] ?? "neutral";
+              const label = t(`myLeads.statusBadges.${lead.status}`) === `myLeads.statusBadges.${lead.status}`
+                ? lead.status
+                : t(`myLeads.statusBadges.${lead.status}`);
               return (
                 <Link
                   key={lead.id}
@@ -94,15 +99,15 @@ function MyLeadsPage() {
                       <div className="flex items-center gap-2">
                         <MapPin className="size-4 text-muted-foreground" />
                         <span className="font-semibold">{lead.area_name}, {lead.city}</span>
-                        <Badge tone={badge.tone}>{badge.label}</Badge>
+                        <Badge tone={tone}>{label}</Badge>
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {lead.bedrooms_needed ? `${lead.bedrooms_needed} BR · ` : ""}
-                        {lead.max_budget ? `Up to SAR ${formatSAR(lead.max_budget)}/mo` : "Budget flexible"}
+                        {lead.bedrooms_needed ? t("myLeads.bedroomsPrefix", { count: lead.bedrooms_needed }) : ""}
+                        {lead.max_budget ? t("myLeads.budgetUpTo", { amount: formatSAR(lead.max_budget) }) : t("myLeads.budgetFlexible")}
                       </div>
                     </div>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {new Date(lead.created_at).toLocaleDateString("en-SA", { day: "numeric", month: "short", year: "numeric" })}
+                      {new Date(lead.created_at).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-SA", { day: "numeric", month: "short", year: "numeric" })}
                     </span>
                   </div>
                 </Link>

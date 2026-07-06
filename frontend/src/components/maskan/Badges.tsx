@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Sparkles, ShieldCheck, Flame, TrendingDown, Star } from "lucide-react";
 import type { ReactNode } from "react";
+import { useLanguage } from "@/lib/i18n/context";
 
 type Tone = "primary" | "secondary" | "ai" | "success" | "warning" | "info" | "neutral";
 
@@ -40,6 +41,7 @@ export function Badge({
 }
 
 export function RecommendationBadge({ label }: { label: string }) {
+  const { t } = useLanguage();
   const map: Record<string, { tone: Tone; icon: ReactNode }> = {
     "Best Match": { tone: "ai", icon: <Sparkles className="size-3.5" /> },
     Verified: { tone: "success", icon: <ShieldCheck className="size-3.5" /> },
@@ -50,18 +52,19 @@ export function RecommendationBadge({ label }: { label: string }) {
   const cfg = map[label] ?? { tone: "neutral" as Tone, icon: null };
   return (
     <Badge tone={cfg.tone} icon={cfg.icon}>
-      {label}
+      {t(`badges.${label}`)}
     </Badge>
   );
 }
 
 export function StatusBadge({ status }: { status: "Available" | "Reserved" | "Rented" }) {
+  const { t } = useLanguage();
   const tone: Tone = status === "Available" ? "success" : status === "Reserved" ? "warning" : "neutral";
   return (
     <Badge tone={tone}>
       <span className={cn("size-1.5 rounded-full",
         status === "Available" ? "bg-success" : status === "Reserved" ? "bg-warning" : "bg-muted-foreground")} />
-      {status}
+      {t(`badges.${status}`)}
     </Badge>
   );
 }

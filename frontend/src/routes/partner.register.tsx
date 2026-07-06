@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { registerPartner, signup, subscribePartnerMock } from "@/lib/api/maskan";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/partner/register")({
   head: () => ({ meta: [{ title: "Become a Partner — Maskan" }] }),
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/partner/register")({
 
 function PartnerRegisterPage() {
   const { user, authLoading, setAuth } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [step, setStep] = useState<"form" | "payment" | "done">("form");
   const [error, setError] = useState("");
@@ -34,19 +36,19 @@ function PartnerRegisterPage() {
       // Step 1 — create account if not already signed in
       if (!user) {
         if (!account.email.trim() || !account.password.trim()) {
-          setError("Email and password are required.");
+          setError(t("partnerRegister.emailPasswordRequired"));
           return;
         }
         if (account.password.length < 6) {
-          setError("Password must be at least 6 characters.");
+          setError(t("partnerRegister.passwordTooShort"));
           return;
         }
         if (account.password !== account.confirmPassword) {
-          setError("Passwords do not match.");
+          setError(t("partnerRegister.passwordsNoMatch"));
           return;
         }
         if (!agreedToTerms) {
-          setError("Please agree to the Terms and Privacy Policy to continue.");
+          setError(t("partnerRegister.mustAgreeTerms"));
           return;
         }
         const authResp = await signup({
@@ -67,7 +69,7 @@ function PartnerRegisterPage() {
 
       setStep("payment");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Registration failed";
+      const msg = err instanceof Error ? err.message : t("partnerRegister.registrationFailed");
       if (msg.toLowerCase().includes("already registered") || msg.includes("already have a partner")) {
         setError("already-registered");
       } else if (msg.toLowerCase().includes("already exists") || msg.toLowerCase().includes("email")) {
@@ -87,16 +89,16 @@ function PartnerRegisterPage() {
       await subscribePartnerMock();
       setStep("done");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Payment failed. Please try again.");
+      setError(err instanceof Error ? err.message : t("partnerRegister.paymentFailed"));
     } finally {
       setSubmitting(false);
     }
   }
 
   const steps = [
-    { id: "form", label: "Profile" },
-    { id: "payment", label: "Subscribe" },
-    { id: "done", label: "Active" },
+    { id: "form", label: t("partnerRegister.steps.profile") },
+    { id: "payment", label: t("partnerRegister.steps.subscribe") },
+    { id: "done", label: t("partnerRegister.steps.active") },
   ];
 
   return (
@@ -109,9 +111,9 @@ function PartnerRegisterPage() {
           <div className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground">
             <Briefcase className="size-7" />
           </div>
-          <h1 className="text-2xl font-bold">Become a Maskan Partner</h1>
+          <h1 className="text-2xl font-bold">{t("partnerRegister.heading")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Connect tenants with the right properties and earn from every closed deal.
+            {t("partnerRegister.subtitle")}
           </p>
         </div>
 
@@ -142,31 +144,31 @@ function PartnerRegisterPage() {
         <div className="rounded-2xl border border-border bg-card p-8 shadow-card">
           {step === "form" && (
             <form onSubmit={handleRegister} className="space-y-5">
-              <h2 className="text-lg font-semibold">Your partner profile</h2>
+              <h2 className="text-lg font-semibold">{t("partnerRegister.form.heading")}</h2>
 
               {/* Account section — shown only when not logged in */}
               {!authLoading && !user && (
                 <div className="space-y-4 rounded-xl border border-border bg-surface/60 p-4">
                   <p className="text-sm font-medium text-foreground">
-                    Create your Maskan account
+                    {t("partnerRegister.form.createAccount")}
                     <span className="ml-2 text-xs font-normal text-muted-foreground">
-                      Already have one?{" "}
+                      {t("partnerRegister.form.alreadyHaveOne")}{" "}
                       <Link to="/auth" className="text-primary underline underline-offset-2">
-                        Sign in →
+                        {t("partnerRegister.form.signIn")}
                       </Link>
                     </span>
                   </p>
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">Full name</label>
+                    <label className="mb-1.5 block text-sm font-medium">{t("partnerRegister.form.fullName")}</label>
                     <Input
                       value={account.full_name}
                       onChange={e => setAccount(a => ({ ...a, full_name: e.target.value }))}
-                      placeholder="Ahmed Al-Saud"
+                      placeholder={t("partnerRegister.form.fullNamePlaceholder")}
                     />
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
-                      Email <span className="text-destructive">*</span>
+                      {t("partnerRegister.form.email")} <span className="text-destructive">*</span>
                     </label>
                     <Input
                       required
@@ -178,7 +180,7 @@ function PartnerRegisterPage() {
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
-                      Password <span className="text-destructive">*</span>
+                      {t("partnerRegister.form.password")} <span className="text-destructive">*</span>
                     </label>
                     <div className="relative">
                       <Input
@@ -186,7 +188,7 @@ function PartnerRegisterPage() {
                         type={showPassword ? "text" : "password"}
                         value={account.password}
                         onChange={e => setAccount(a => ({ ...a, password: e.target.value }))}
-                        placeholder="Min. 6 characters"
+                        placeholder={t("partnerRegister.form.passwordPlaceholder")}
                         className="pr-10"
                       />
                       <button
@@ -200,14 +202,14 @@ function PartnerRegisterPage() {
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">
-                      Confirm password <span className="text-destructive">*</span>
+                      {t("partnerRegister.form.confirmPassword")} <span className="text-destructive">*</span>
                     </label>
                     <Input
                       required
                       type={showPassword ? "text" : "password"}
                       value={account.confirmPassword}
                       onChange={e => setAccount(a => ({ ...a, confirmPassword: e.target.value }))}
-                      placeholder="Re-enter password"
+                      placeholder={t("partnerRegister.form.confirmPasswordPlaceholder")}
                     />
                   </div>
                   <label className="flex items-start gap-2 text-xs text-muted-foreground">
@@ -218,10 +220,10 @@ function PartnerRegisterPage() {
                       className="mt-0.5 size-4 rounded border-border"
                     />
                     <span>
-                      I agree to the{" "}
-                      <a href="#" className="font-semibold text-foreground hover:underline">Terms</a>{" "}
-                      and{" "}
-                      <a href="#" className="font-semibold text-foreground hover:underline">Privacy Policy</a>.
+                      {t("partnerRegister.form.agreeToTerms")}
+                      <a href="#" className="font-semibold text-foreground hover:underline">{t("partnerRegister.form.terms")}</a>
+                      {t("partnerRegister.form.and")}
+                      <a href="#" className="font-semibold text-foreground hover:underline">{t("partnerRegister.form.privacyPolicy")}</a>.
                     </span>
                   </label>
                 </div>
@@ -231,39 +233,39 @@ function PartnerRegisterPage() {
               {!authLoading && user && (
                 <div className="flex items-center gap-2 rounded-xl border border-success/30 bg-success/8 px-3 py-2.5 text-sm text-success">
                   <UserCheck className="size-4 shrink-0" />
-                  Signed in as <span className="font-semibold">{user.email}</span>
+                  {t("partnerRegister.form.signedInAs")} <span className="font-semibold">{user.email}</span>
                 </div>
               )}
 
               {/* Divider */}
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <div className="h-px flex-1 bg-border" />
-                Partner details
+                {t("partnerRegister.form.partnerDetailsDivider")}
                 <div className="h-px flex-1 bg-border" />
               </div>
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium">
-                  REGA License Number <span className="text-destructive">*</span>
+                  {t("partnerRegister.form.regaLicense")} <span className="text-destructive">*</span>
                 </label>
                 <Input
                   required
                   value={form.license_number}
                   onChange={e => setForm(f => ({ ...f, license_number: e.target.value }))}
-                  placeholder="e.g. 1234567890"
+                  placeholder={t("partnerRegister.form.regaLicensePlaceholder")}
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium">Agency / Brokerage Name</label>
+                <label className="mb-1.5 block text-sm font-medium">{t("partnerRegister.form.agencyName")}</label>
                 <Input
                   value={form.agency_name}
                   onChange={e => setForm(f => ({ ...f, agency_name: e.target.value }))}
-                  placeholder="e.g. Al Noor Real Estate"
+                  placeholder={t("partnerRegister.form.agencyNamePlaceholder")}
                 />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">
-                  Phone Number <span className="text-destructive">*</span>
+                  {t("partnerRegister.form.phoneNumber")} <span className="text-destructive">*</span>
                 </label>
                 <Input
                   required
@@ -274,12 +276,12 @@ function PartnerRegisterPage() {
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium">About you</label>
+                <label className="mb-1.5 block text-sm font-medium">{t("partnerRegister.form.aboutYou")}</label>
                 <textarea
                   rows={3}
                   value={form.bio}
                   onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
-                  placeholder="Brief description of your experience and specialties…"
+                  placeholder={t("partnerRegister.form.aboutYouPlaceholder")}
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none"
                 />
               </div>
@@ -287,15 +289,15 @@ function PartnerRegisterPage() {
               {/* Error messages */}
               {error === "email-exists" && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                  An account with this email already exists.{" "}
-                  <Link to="/auth" className="font-semibold underline">Sign in →</Link>
-                  {" "}then come back to complete registration.
+                  {t("partnerRegister.form.emailExistsError")}{" "}
+                  <Link to="/auth" className="font-semibold underline">{t("partnerRegister.form.emailExistsSignIn")}</Link>
+                  {" "}{t("partnerRegister.form.emailExistsSuffix")}
                 </div>
               )}
               {error === "already-registered" && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                  You already have a partner profile.{" "}
-                  <Link to="/partner" className="font-semibold underline">Go to dashboard →</Link>
+                  {t("partnerRegister.form.alreadyRegisteredError")}{" "}
+                  <Link to="/partner" className="font-semibold underline">{t("partnerRegister.form.goToDashboard")}</Link>
                 </div>
               )}
               {error && error !== "email-exists" && error !== "already-registered" && (
@@ -305,37 +307,37 @@ function PartnerRegisterPage() {
               )}
 
               <Button type="submit" className="w-full" disabled={submitting || authLoading || (!user && !agreedToTerms)}>
-                {submitting ? "Registering…" : "Continue to payment"}
+                {submitting ? t("partnerRegister.form.registering") : t("partnerRegister.form.continueToPayment")}
               </Button>
             </form>
           )}
 
           {step === "payment" && (
             <div className="space-y-6">
-              <h2 className="text-lg font-semibold">Subscribe to activate</h2>
+              <h2 className="text-lg font-semibold">{t("partnerRegister.payment.heading")}</h2>
               <div className="rounded-xl border border-border bg-surface p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-semibold">Standard Partner Plan</div>
+                    <div className="font-semibold">{t("partnerRegister.payment.planName")}</div>
                     <div className="text-sm text-muted-foreground">
-                      Unlimited area coverage · Lead notifications · Dashboard access
+                      {t("partnerRegister.payment.planDesc")}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold">SAR 99</div>
-                    <div className="text-xs text-muted-foreground">/month</div>
+                    <div className="text-2xl font-bold">{t("partnerRegister.payment.planPrice")}</div>
+                    <div className="text-xs text-muted-foreground">{t("partnerRegister.payment.perMonth")}</div>
                   </div>
                 </div>
               </div>
               <div className="rounded-xl border border-border bg-surface p-5">
                 <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                  <CreditCard className="size-4" /> Payment details (mock)
+                  <CreditCard className="size-4" /> {t("partnerRegister.payment.paymentDetailsMock")}
                 </div>
                 <div className="space-y-3">
-                  <Input placeholder="Card number" disabled defaultValue="•••• •••• •••• ••••" />
+                  <Input placeholder={t("partnerRegister.payment.cardNumberPlaceholder")} disabled defaultValue="•••• •••• •••• ••••" />
                   <div className="grid grid-cols-2 gap-3">
                     <Input placeholder="MM/YY" disabled defaultValue="••/••" />
-                    <Input placeholder="CVV" disabled defaultValue="•••" />
+                    <Input placeholder={t("partnerRegister.payment.cvvPlaceholder")} disabled defaultValue="•••" />
                   </div>
                 </div>
               </div>
@@ -345,7 +347,7 @@ function PartnerRegisterPage() {
                 </div>
               )}
               <Button className="w-full" onClick={handlePayment} disabled={submitting}>
-                {submitting ? "Processing…" : "Pay SAR 99 and activate"}
+                {submitting ? t("partnerRegister.payment.processing") : t("partnerRegister.payment.payAndActivate")}
               </Button>
             </div>
           )}
@@ -355,13 +357,12 @@ function PartnerRegisterPage() {
               <div className="grid size-16 place-items-center rounded-full bg-warning/10 text-warning">
                 <ShieldCheck className="size-8" />
               </div>
-              <h2 className="text-xl font-bold">Registration submitted!</h2>
+              <h2 className="text-xl font-bold">{t("partnerRegister.done.heading")}</h2>
               <p className="text-sm text-muted-foreground">
-                Your partner account is now <span className="font-semibold text-foreground">pending Maskanai Admin approval</span>.
-                You'll get full access to your dashboard and leads once an admin approves your account.
+                {t("partnerRegister.done.desc")} <span className="font-semibold text-foreground">{t("partnerRegister.done.pendingApproval")}</span>{t("partnerRegister.done.descSuffix")}
               </p>
               <Button className="w-full" onClick={() => navigate({ to: "/partner" })}>
-                Check approval status
+                {t("partnerRegister.done.checkStatus")}
               </Button>
             </div>
           )}

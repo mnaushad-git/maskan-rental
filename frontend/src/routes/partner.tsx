@@ -29,6 +29,7 @@ import {
 } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/partner")({
   head: () => ({ meta: [{ title: "Partner Dashboard — Maskan" }] }),
@@ -39,6 +40,7 @@ type PartnerView = "leads" | "listings";
 
 function PartnerDashboard() {
   const { user, authLoading, clearAuth } = useAuth();
+  const { t, lang } = useLanguage();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: s => s.location.pathname });
 
@@ -104,7 +106,7 @@ function PartnerDashboard() {
       setConfirmingId(null);
       await reloadLeads();
     } catch {
-      setAcceptError("Could not accept lead. Please try again.");
+      setAcceptError(t("partnerDashboard.couldNotAcceptLead"));
     } finally {
       setAcceptingId(null);
     }
@@ -151,18 +153,18 @@ function PartnerDashboard() {
   }
 
   if (pathname !== "/partner") return <Outlet />;
-  if (authLoading) return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">Loading…</p></div>;
+  if (authLoading) return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">{t("common.loading")}</p></div>;
   if (!user) return <PartnerLoginGate />;
-  if (loading) return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">Loading…</p></div>;
+  if (loading) return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">{t("common.loading")}</p></div>;
 
   if (noProfile) return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
       <div className="grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary"><Briefcase className="size-8" /></div>
       <div className="text-center">
-        <h1 className="text-2xl font-bold">Become a Maskan Partner</h1>
-        <p className="mt-1 text-sm text-muted-foreground max-w-sm">Connect tenants with properties in your area and earn per accepted lead.</p>
+        <h1 className="text-2xl font-bold">{t("partnerDashboard.becomePartner.heading")}</h1>
+        <p className="mt-1 text-sm text-muted-foreground max-w-sm">{t("partnerDashboard.becomePartner.desc")}</p>
       </div>
-      <Button onClick={() => navigate({ to: "/partner/register" })}>Register as a partner</Button>
+      <Button onClick={() => navigate({ to: "/partner/register" })}>{t("partnerDashboard.becomePartner.cta")}</Button>
     </div>
   );
 
@@ -181,15 +183,15 @@ function PartnerDashboard() {
             <Briefcase className="size-4" />
           </div>
           <div className="min-w-0">
-            <div className="truncate text-sm font-bold">Maskan Partner</div>
+            <div className="truncate text-sm font-bold">{t("partnerDashboard.sidebar.brand")}</div>
             <div className="truncate text-xs text-muted-foreground">{user?.full_name ?? user?.email}</div>
           </div>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">
           {([
-            { v: "leads" as const,    icon: ListChecks, label: "Leads" },
-            { v: "listings" as const, icon: Home,       label: "My Listings" },
+            { v: "leads" as const,    icon: ListChecks, label: t("partnerDashboard.sidebar.navLeads") },
+            { v: "listings" as const, icon: Home,       label: t("partnerDashboard.sidebar.navListings") },
           ]).map(({ v, icon: Icon, label }) => (
             <button
               key={v}
@@ -218,7 +220,7 @@ function PartnerDashboard() {
             onClick={clearAuth}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
-            <LogOut className="size-4" /> Sign out
+            <LogOut className="size-4" /> {t("partnerDashboard.sidebar.signOut")}
           </button>
         </div>
       </aside>
@@ -232,7 +234,7 @@ function PartnerDashboard() {
               <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
                 <Briefcase className="size-4" />
               </div>
-              <span className="truncate text-sm font-bold">Maskan Partner</span>
+              <span className="truncate text-sm font-bold">{t("partnerDashboard.sidebar.brand")}</span>
             </div>
             <button
               type="button"
@@ -244,8 +246,8 @@ function PartnerDashboard() {
           </div>
           <nav className="flex gap-1 px-3 pb-2">
             {([
-              { v: "leads" as const,    icon: ListChecks, label: "Leads" },
-              { v: "listings" as const, icon: Home,       label: "My Listings" },
+              { v: "leads" as const,    icon: ListChecks, label: t("partnerDashboard.sidebar.navLeads") },
+              { v: "listings" as const, icon: Home,       label: t("partnerDashboard.sidebar.navListings") },
             ]).map(({ v, icon: Icon, label }) => (
               <button
                 key={v}
@@ -275,14 +277,14 @@ function PartnerDashboard() {
                 {/* Available Leads */}
                 <section className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold">Available leads</h2>
+                    <h2 className="text-lg font-bold">{t("partnerDashboard.leads.availableLeads")}</h2>
                     {availableLeads.length > 0 && (
-                      <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-xs font-semibold text-warning">{availableLeads.length} new</span>
+                      <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-xs font-semibold text-warning">{t("partnerDashboard.leads.newCount", { count: availableLeads.length })}</span>
                     )}
                   </div>
                   {availableLeads.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                      No new leads right now. Make sure your covered areas are set up.
+                      {t("partnerDashboard.leads.noNewLeads")}
                     </div>
                   )}
                   {availableLeads.map(lead => {
@@ -295,34 +297,37 @@ function PartnerDashboard() {
                             <div className="flex items-center gap-2">
                               <MapPin className="size-4 text-muted-foreground" />
                               <span className="font-semibold">{lead.area_name}, {lead.city}</span>
-                              <Badge tone="warning">New</Badge>
+                              <Badge tone="warning">{t("partnerDashboard.leads.newBadge")}</Badge>
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {lead.bedrooms_needed ? `${lead.bedrooms_needed} BR · ` : ""}
-                              {lead.max_budget ? `Up to SAR ${formatSAR(lead.max_budget)}/mo` : "Budget flexible"}
-                              {lead.move_in_date ? ` · Move-in ${lead.move_in_date}` : ""}
+                              {lead.bedrooms_needed ? t("partnerDashboard.leads.bedroomsPrefix", { count: lead.bedrooms_needed }) : ""}
+                              {lead.max_budget ? t("partnerDashboard.leads.budgetUpTo", { amount: formatSAR(lead.max_budget) }) : t("partnerDashboard.leads.budgetFlexible")}
+                              {lead.move_in_date ? t("partnerDashboard.leads.moveInSuffix", { date: lead.move_in_date }) : ""}
                             </div>
                             {lead.requirements_note && <p className="text-sm text-foreground line-clamp-2">{lead.requirements_note}</p>}
                           </div>
                         </div>
                         <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-surface px-4 py-3 text-sm text-muted-foreground">
                           <span className="font-mono tracking-widest select-none">●●● ●●●●●●  ·  ●●●@●●●●.●●●</span>
-                          <span className="ml-auto text-xs">Unlocked after payment</span>
+                          <span className="ml-auto text-xs">{t("partnerDashboard.leads.unlockedAfterPayment")}</span>
                         </div>
                         {!isConfirming ? (
                           <Button className="w-full" onClick={() => { setConfirmingId(lead.id); setAcceptError(null); }}>
-                            Accept lead — SAR 25
+                            {t("partnerDashboard.leads.acceptLeadCta")}
                           </Button>
                         ) : (
                           <div className="space-y-2 rounded-xl border border-warning/30 bg-warning/5 p-3">
-                            <p className="text-sm"><strong>SAR 25</strong> will be charged from your saved card.</p>
+                            <p className="text-sm">
+                              <strong>{t("partnerDashboard.leads.confirmChargeAmount")}</strong>{" "}
+                              {t("partnerDashboard.leads.confirmChargeSuffix")}
+                            </p>
                             {acceptError && <p className="text-xs text-destructive">{acceptError}</p>}
                             <div className="flex gap-2">
                               <Button className="flex-1" onClick={() => handleConfirmAccept(lead.id)} disabled={isAccepting}>
-                                {isAccepting ? "Processing…" : "Confirm & pay SAR 25"}
+                                {isAccepting ? t("partnerDashboard.leads.processing") : t("partnerDashboard.leads.confirmAndPay")}
                               </Button>
                               <Button variant="outline" className="flex-1" onClick={() => { setConfirmingId(null); setAcceptError(null); }} disabled={isAccepting}>
-                                Cancel
+                                {t("partnerDashboard.leads.cancel")}
                               </Button>
                             </div>
                           </div>
@@ -334,10 +339,10 @@ function PartnerDashboard() {
 
                 {/* Accepted Leads */}
                 <section className="space-y-3">
-                  <h2 className="text-lg font-bold">Accepted leads</h2>
+                  <h2 className="text-lg font-bold">{t("partnerDashboard.leads.acceptedLeads")}</h2>
                   {acceptedLeads.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                      No accepted leads yet.
+                      {t("partnerDashboard.leads.noAcceptedLeads")}
                     </div>
                   )}
                   {acceptedLeads.map(lead => (
@@ -352,16 +357,16 @@ function PartnerDashboard() {
                             <MapPin className="size-4 text-muted-foreground" />
                             <span className="font-semibold">{lead.area_name}, {lead.city}</span>
                             <Badge tone={lead.status === "pending_closure" ? "warning" : "success"}>
-                              {lead.status === "pending_closure" ? "Closing…" : "In progress"}
+                              {lead.status === "pending_closure" ? t("partnerDashboard.leads.closingBadge") : t("partnerDashboard.leads.inProgressBadge")}
                             </Badge>
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {lead.bedrooms_needed ? `${lead.bedrooms_needed} BR · ` : ""}
-                            {lead.max_budget ? `Up to SAR ${formatSAR(lead.max_budget)}/mo` : "Budget flexible"}
+                            {lead.bedrooms_needed ? t("partnerDashboard.leads.bedroomsPrefix", { count: lead.bedrooms_needed }) : ""}
+                            {lead.max_budget ? t("partnerDashboard.leads.budgetUpTo", { amount: formatSAR(lead.max_budget) }) : t("partnerDashboard.leads.budgetFlexible")}
                           </div>
                         </div>
                         <span className="flex items-center gap-1 text-xs text-primary font-medium">
-                          <MessageSquare className="size-3.5" /> Open
+                          <MessageSquare className="size-3.5" /> {t("partnerDashboard.leads.openLabel")}
                         </span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
@@ -383,12 +388,12 @@ function PartnerDashboard() {
                 {/* Closed Leads */}
                 <section className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold">Closed leads</h2>
-                    <Badge tone="neutral"><History className="size-3" /> History</Badge>
+                    <h2 className="text-lg font-bold">{t("partnerDashboard.leads.closedLeads")}</h2>
+                    <Badge tone="neutral"><History className="size-3" /> {t("partnerDashboard.leads.historyBadge")}</Badge>
                   </div>
                   {closedLeads.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                      Completed leads will appear here once closed.
+                      {t("partnerDashboard.leads.noClosedLeads")}
                     </div>
                   ) : closedLeads.map(lead => (
                     <div
@@ -406,17 +411,17 @@ function PartnerDashboard() {
                           <MapPin className="size-4 text-muted-foreground" />
                           <span className="font-semibold">{lead.area_name}, {lead.city}</span>
                           <Badge tone={lead.status === "closed_won" ? "success" : "neutral"}>
-                            {lead.status === "closed_won" ? "Found" : "No match"}
+                            {lead.status === "closed_won" ? t("partnerDashboard.leads.foundBadge") : t("partnerDashboard.leads.noMatchBadge")}
                           </Badge>
                         </div>
                         {lead.closed_at && (
                           <span className="text-xs text-muted-foreground">
-                            {new Date(lead.closed_at).toLocaleDateString("en-SA", { day: "numeric", month: "short", year: "numeric" })}
+                            {new Date(lead.closed_at).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-SA", { day: "numeric", month: "short", year: "numeric" })}
                           </span>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">{lead.customer_name}</p>
-                      <p className="text-xs text-primary font-medium">View details →</p>
+                      <p className="text-xs text-primary font-medium">{t("partnerDashboard.leads.viewDetails")}</p>
                     </div>
                   ))}
                 </section>
@@ -424,10 +429,10 @@ function PartnerDashboard() {
 
               {/* Covered areas sidebar */}
               <div className="space-y-4">
-                <h2 className="text-lg font-bold">Your covered areas</h2>
+                <h2 className="text-lg font-bold">{t("partnerDashboard.coveredAreas.heading")}</h2>
                 <div className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-3">
                   {partner!.areas.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No areas added yet.</p>
+                    <p className="text-sm text-muted-foreground">{t("partnerDashboard.coveredAreas.noAreasYet")}</p>
                   )}
                   {partner!.areas.map(area => (
                     <div key={area.id} className="flex items-center justify-between gap-2">
@@ -450,14 +455,14 @@ function PartnerDashboard() {
                       }}
                       className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-primary"
                     >
-                      <option value="">— Select a district —</option>
+                      <option value="">{t("partnerDashboard.coveredAreas.selectDistrict")}</option>
                       {Array.from(new Set(availableAreas.map(a => a.city))).sort().map(city => {
                         const taken = new Set(partner!.areas.filter(a => a.city === city).map(a => a.area_name));
                         return (
                           <optgroup key={city} label={city}>
                             {availableAreas.filter(a => a.city === city).sort((a, b) => a.name.localeCompare(b.name)).map(area => (
                               <option key={`${area.name}|${city}`} value={`${area.name}|${city}`} disabled={taken.has(area.name)}>
-                                {area.name}{taken.has(area.name) ? " (added)" : ""}
+                                {area.name}{taken.has(area.name) ? t("partnerDashboard.coveredAreas.addedSuffix") : ""}
                               </option>
                             ))}
                           </optgroup>
@@ -465,14 +470,14 @@ function PartnerDashboard() {
                       })}
                     </select>
                     <Button type="submit" size="sm" variant="outline" className="w-full" disabled={addingArea || !newArea.area_name.trim()}>
-                      <Plus className="size-3.5" /> Add area
+                      <Plus className="size-3.5" /> {t("partnerDashboard.coveredAreas.addArea")}
                     </Button>
                   </form>
                 </div>
                 <div className="rounded-xl border border-border bg-surface p-4 text-xs text-muted-foreground space-y-1">
-                  <div><strong>Subscription:</strong> {partner!.subscription_status}</div>
+                  <div><strong>{t("partnerDashboard.coveredAreas.subscriptionLabel")}</strong> {partner!.subscription_status}</div>
                   {partner!.subscription_expires_at && (
-                    <div>Expires: {new Date(partner!.subscription_expires_at).toLocaleDateString("en-SA")}</div>
+                    <div>{t("partnerDashboard.coveredAreas.expires", { date: new Date(partner!.subscription_expires_at).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-SA") })}</div>
                   )}
                 </div>
               </div>
@@ -513,14 +518,16 @@ function PartnerDashboard() {
 // ── Status badge helper ──────────────────────────────────────────────────────
 
 function ListingStatusBadge({ status }: { status: string }) {
-  const map: Record<string, { tone: "success" | "warning" | "neutral" | "destructive"; label: string }> = {
-    "Published":       { tone: "success",     label: "Published" },
-    "Pending Approval":{ tone: "warning",     label: "Pending Approval" },
-    "Draft":           { tone: "neutral",     label: "Draft" },
-    "Rejected":        { tone: "destructive", label: "Rejected" },
-    "Suspended":       { tone: "destructive", label: "Suspended" },
+  const { t } = useLanguage();
+  const toneMap: Record<string, "success" | "warning" | "neutral" | "destructive"> = {
+    "Published": "success",
+    "Pending Approval": "warning",
+    "Draft": "neutral",
+    "Rejected": "destructive",
+    "Suspended": "destructive",
   };
-  const { tone, label } = map[status] ?? { tone: "neutral", label: status };
+  const tone = toneMap[status] ?? "neutral";
+  const label = status in toneMap ? t(`partnerDashboard.listingsView.statusBadges.${status}`) : status;
   return <Badge tone={tone}>{label}</Badge>;
 }
 
@@ -537,28 +544,29 @@ function PartnerListingsView({
   onAdd: () => void;
   onEdit: (l: ApiProperty) => void;
 }) {
+  const { t } = useLanguage();
   return (
     <div>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">My portfolio</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">My Listings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Properties you've submitted. Approved listings appear on the portal.</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("partnerDashboard.listingsView.myPortfolio")}</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">{t("partnerDashboard.listingsView.heading")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.listingsView.subtitle")}</p>
         </div>
         <Button onClick={onAdd} className="shrink-0">
-          <Plus className="size-4" /> Add Listing
+          <Plus className="size-4" /> {t("partnerDashboard.listingsView.addListing")}
         </Button>
       </div>
 
       {loading && (
-        <div className="py-16 text-center text-sm text-muted-foreground">Loading listings…</div>
+        <div className="py-16 text-center text-sm text-muted-foreground">{t("partnerDashboard.listingsView.loadingListings")}</div>
       )}
 
       {!loading && listings.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border py-16 text-center space-y-3">
           <Home className="mx-auto size-10 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">No listings yet. Add your first property.</p>
-          <Button variant="outline" onClick={onAdd}><Plus className="size-4" /> Add Listing</Button>
+          <p className="text-sm text-muted-foreground">{t("partnerDashboard.listingsView.noListingsYet")}</p>
+          <Button variant="outline" onClick={onAdd}><Plus className="size-4" /> {t("partnerDashboard.listingsView.addListing")}</Button>
         </div>
       )}
 
@@ -582,17 +590,17 @@ function PartnerListingsView({
                     </p>
                     <p className="text-sm font-semibold text-primary">SAR {formatSAR(l.monthly_rent)}/mo</p>
                     {l.status === "Pending Approval" && (
-                      <p className="text-xs text-muted-foreground">Under review by admin — editing is locked until a decision is made.</p>
+                      <p className="text-xs text-muted-foreground">{t("partnerDashboard.listingsView.underReview")}</p>
                     )}
                     {l.status === "Rejected" && (
-                      <p className="text-xs text-destructive">This listing was rejected. Contact admin for details.</p>
+                      <p className="text-xs text-destructive">{t("partnerDashboard.listingsView.rejectedContact")}</p>
                     )}
                   </div>
                   <button
                     type="button"
                     disabled={!canEdit}
                     onClick={() => canEdit && onEdit(l)}
-                    title={canEdit ? "Edit listing" : "Editing locked — not yet approved"}
+                    title={canEdit ? t("partnerDashboard.listingsView.editTitle") : t("partnerDashboard.listingsView.editLockedTitle")}
                     className={cn(
                       "grid size-9 shrink-0 place-items-center rounded-xl border transition-colors",
                       canEdit
@@ -639,6 +647,7 @@ function PartnerListingForm({
   onClose: () => void;
   onSave: (p: PartnerPropertyPayload, imageUrls: string[]) => Promise<void>;
 }) {
+  const { t } = useLanguage();
   const [form, setForm] = useState<ListingFormState>({
     title:         editing?.title         ?? "",
     city:          editing?.city          ?? "",
@@ -665,11 +674,11 @@ function PartnerListingForm({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   async function submit() {
-    if (!form.city.trim())     { setError("Please select a city.");     return; }
-    if (!form.district.trim()) { setError("Please select a district."); return; }
+    if (!form.city.trim())     { setError(t("partnerDashboard.listingForm.errors.selectCity"));     return; }
+    if (!form.district.trim()) { setError(t("partnerDashboard.listingForm.errors.selectDistrict")); return; }
     const rent = parseFloat(form.rent);
-    if (!rent || rent <= 0)    { setError("Please enter a valid monthly rent."); return; }
-    if (!form.title.trim())    { setError("Please enter a listing title."); return; }
+    if (!rent || rent <= 0)    { setError(t("partnerDashboard.listingForm.errors.invalidRent")); return; }
+    if (!form.title.trim())    { setError(t("partnerDashboard.listingForm.errors.enterTitle")); return; }
 
     setSaving(true);
     setError(null);
@@ -688,7 +697,7 @@ function PartnerListingForm({
         furnished:     form.furnished     || undefined,
       }, media);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save listing.");
+      setError(err instanceof Error ? err.message : t("partnerDashboard.listingForm.errors.failedToSave"));
       setSaving(false);
     }
   }
@@ -701,11 +710,11 @@ function PartnerListingForm({
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <button type="button" onClick={onClose} className="mb-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-            ← Back to listings
+            {t("partnerDashboard.listingForm.backToListings")}
           </button>
-          <h1 className="text-2xl font-bold">{isEdit ? "Edit listing" : "New listing"}</h1>
+          <h1 className="text-2xl font-bold">{isEdit ? t("partnerDashboard.listingForm.editHeading") : t("partnerDashboard.listingForm.newHeading")}</h1>
           {isEdit && (
-            <p className="mt-1 text-sm text-muted-foreground">Saving changes will re-submit this listing for admin approval.</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.listingForm.resubmitNote")}</p>
           )}
         </div>
       </div>
@@ -713,36 +722,36 @@ function PartnerListingForm({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Left column */}
         <div className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-card">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Property details</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t("partnerDashboard.listingForm.propertyDetails")}</h2>
 
-          <FormField label="Listing title *">
+          <FormField label={t("partnerDashboard.listingForm.listingTitle")}>
             <Input
               value={form.title}
               onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              placeholder="e.g. Modern 3BR Apartment — Al Olaya"
+              placeholder={t("partnerDashboard.listingForm.listingTitlePlaceholder")}
             />
           </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="City *">
+            <FormField label={t("partnerDashboard.listingForm.city")}>
               <select
                 value={form.city}
                 onChange={e => setForm(f => ({ ...f, city: e.target.value, district: "" }))}
                 className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               >
-                <option value="">— Select city —</option>
-                {CITY_LIST.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                <option value="">{t("partnerDashboard.listingForm.selectCity")}</option>
+                {CITY_LIST.map(c => <option key={c.name} value={c.name}>{t(`cities.${c.name}`)}</option>)}
               </select>
             </FormField>
 
-            <FormField label="District *">
+            <FormField label={t("partnerDashboard.listingForm.district")}>
               <select
                 value={form.district}
                 onChange={e => setForm(f => ({ ...f, district: e.target.value }))}
                 disabled={!form.city}
                 className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
               >
-                <option value="">— Select district —</option>
+                <option value="">{t("partnerDashboard.listingForm.selectDistrict")}</option>
                 {districtOptions.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
                 {form.district && !districtOptions.find(a => a.name === form.district) && (
                   <option value={form.district}>{form.district}</option>
@@ -751,65 +760,65 @@ function PartnerListingForm({
             </FormField>
           </div>
 
-          <FormField label="Monthly rent (SAR) *">
+          <FormField label={t("partnerDashboard.listingForm.monthlyRent")}>
             <Input
               type="number"
               min={1}
               value={form.rent}
               onChange={e => setForm(f => ({ ...f, rent: e.target.value }))}
-              placeholder="e.g. 8000"
+              placeholder={t("partnerDashboard.listingForm.monthlyRentPlaceholder")}
             />
           </FormField>
 
           <div className="grid grid-cols-3 gap-3">
-            <FormField label="Bedrooms">
+            <FormField label={t("partnerDashboard.listingForm.bedrooms")}>
               <Input type="number" min={0} value={form.bedrooms} onChange={e => setForm(f => ({ ...f, bedrooms: e.target.value }))} />
             </FormField>
-            <FormField label="Bathrooms">
+            <FormField label={t("partnerDashboard.listingForm.bathrooms")}>
               <Input type="number" min={0} value={form.bathrooms} onChange={e => setForm(f => ({ ...f, bathrooms: e.target.value }))} />
             </FormField>
-            <FormField label="Area (m²)">
-              <Input type="number" min={1} value={form.size} onChange={e => setForm(f => ({ ...f, size: e.target.value }))} placeholder="e.g. 150" />
+            <FormField label={t("partnerDashboard.listingForm.areaSqm")}>
+              <Input type="number" min={1} value={form.size} onChange={e => setForm(f => ({ ...f, size: e.target.value }))} placeholder={t("partnerDashboard.listingForm.areaPlaceholder")} />
             </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="Property type">
+            <FormField label={t("partnerDashboard.listingForm.propertyType")}>
               <select
                 value={form.property_type}
                 onChange={e => setForm(f => ({ ...f, property_type: e.target.value }))}
                 className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               >
-                <option value="">— Select type —</option>
-                <option>Apartment</option>
-                <option>Villa</option>
-                <option>Penthouse</option>
-                <option>Townhouse</option>
+                <option value="">{t("partnerDashboard.listingForm.selectType")}</option>
+                <option value="Apartment">{t("propertyTypes.Apartment")}</option>
+                <option value="Villa">{t("propertyTypes.Villa")}</option>
+                <option value="Penthouse">{t("propertyTypes.Penthouse")}</option>
+                <option value="Townhouse">{t("propertyTypes.Townhouse")}</option>
               </select>
             </FormField>
 
-            <FormField label="Furnished status">
+            <FormField label={t("partnerDashboard.listingForm.furnishedStatus")}>
               <select
                 value={form.furnished}
                 onChange={e => setForm(f => ({ ...f, furnished: e.target.value }))}
                 className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               >
-                <option value="">— Select —</option>
-                <option>Furnished</option>
-                <option>Semi-furnished</option>
-                <option>Unfurnished</option>
+                <option value="">{t("partnerDashboard.listingForm.selectDash")}</option>
+                <option value="Furnished">{t("furnishing.Furnished")}</option>
+                <option value="Semi-furnished">{t("furnishing.Semi-furnished")}</option>
+                <option value="Unfurnished">{t("furnishing.Unfurnished")}</option>
               </select>
             </FormField>
           </div>
 
-          <FormField label="Owner / agent name">
-            <Input value={form.owner_name} onChange={e => setForm(f => ({ ...f, owner_name: e.target.value }))} placeholder="e.g. Noura Al-Qahtani" />
+          <FormField label={t("partnerDashboard.listingForm.ownerName")}>
+            <Input value={form.owner_name} onChange={e => setForm(f => ({ ...f, owner_name: e.target.value }))} placeholder={t("partnerDashboard.listingForm.ownerNamePlaceholder")} />
           </FormField>
         </div>
 
         {/* Right column */}
         <div className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-card">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Photos</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t("partnerDashboard.listingForm.photos")}</h2>
 
           {/* Photo thumbnails */}
           {media.length > 0 && (
@@ -824,7 +833,7 @@ function PartnerListingForm({
                   >
                     <X className="size-3.5" />
                   </button>
-                  {i === 0 && <span className="absolute bottom-1 start-1 rounded bg-foreground/85 px-1.5 py-0.5 text-[10px] font-bold uppercase text-background">Cover</span>}
+                  {i === 0 && <span className="absolute bottom-1 start-1 rounded bg-foreground/85 px-1.5 py-0.5 text-[10px] font-bold uppercase text-background">{t("partnerDashboard.listingForm.coverBadge")}</span>}
                 </div>
               ))}
             </div>
@@ -837,12 +846,12 @@ function PartnerListingForm({
               onKeyDown={e => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  const t = urlInput.trim();
-                  if (t && !media.includes(t)) setMedia(m => [...m, t]);
+                  const val = urlInput.trim();
+                  if (val && !media.includes(val)) setMedia(m => [...m, val]);
                   setUrlInput("");
                 }
               }}
-              placeholder="Paste image URL and press Enter…"
+              placeholder={t("partnerDashboard.listingForm.urlPlaceholder")}
               className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <Button
@@ -850,39 +859,39 @@ function PartnerListingForm({
               size="sm"
               variant="outline"
               onClick={() => {
-                const t = urlInput.trim();
-                if (t && !media.includes(t)) setMedia(m => [...m, t]);
+                const val = urlInput.trim();
+                if (val && !media.includes(val)) setMedia(m => [...m, val]);
                 setUrlInput("");
               }}
               disabled={!urlInput.trim()}
             >
-              <Plus className="size-4" /> Add
+              <Plus className="size-4" /> {t("partnerDashboard.listingForm.add")}
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground">First photo is the cover shown on the portal.</p>
+          <p className="text-[11px] text-muted-foreground">{t("partnerDashboard.listingForm.firstPhotoNote")}</p>
 
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground pt-2">Description</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground pt-2">{t("partnerDashboard.listingForm.description")}</h2>
           <textarea
             value={form.description}
             onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
             rows={6}
-            placeholder="Describe the property — highlight key features, nearby amenities, access, finishing quality…"
+            placeholder={t("partnerDashboard.listingForm.descriptionPlaceholder")}
             className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
 
           {/* Status note */}
           <div className="rounded-xl border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
             {isEdit
-              ? "Saving will re-submit this listing for admin review. It will be hidden from the portal until re-approved."
-              : "Your listing will be submitted for admin review. Once approved, it will appear on the Maskan portal."}
+              ? t("partnerDashboard.listingForm.editNote")
+              : t("partnerDashboard.listingForm.newNote")}
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button variant="ghost" onClick={onClose} disabled={saving}>{t("partnerDashboard.listingForm.cancel")}</Button>
             <Button onClick={submit} disabled={saving} className="flex-1">
-              {saving ? "Submitting…" : isEdit ? "Save & resubmit for approval" : "Submit for approval"}
+              {saving ? t("partnerDashboard.listingForm.submitting") : isEdit ? t("partnerDashboard.listingForm.saveResubmit") : t("partnerDashboard.listingForm.submitForApproval")}
             </Button>
           </div>
         </div>
@@ -903,6 +912,7 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
 // ── Partner login gate ───────────────────────────────────────────────────────
 
 function PartnerApprovalGate({ state, email, onSignOut }: { state: "pending" | "rejected"; email?: string; onSignOut: () => void }) {
+  const { t } = useLanguage();
   const pending = state === "pending";
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
@@ -914,14 +924,10 @@ function PartnerApprovalGate({ state, email, onSignOut }: { state: "pending" | "
       </div>
       <div className="max-w-md text-center">
         <h1 className="text-2xl font-bold">
-          {pending ? "Approval in progress" : "Access rejected"}
+          {pending ? t("partnerDashboard.approvalGate.pendingHeading") : t("partnerDashboard.approvalGate.rejectedHeading")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {pending ? (
-            <>Your partner account is awaiting review. Please wait for Maskanai Admin approval — you'll get full access once your account is approved.</>
-          ) : (
-            <>Your partner account access has been rejected. Please contact Maskanai Admin for assistance.</>
-          )}
+          {pending ? t("partnerDashboard.approvalGate.pendingDesc") : t("partnerDashboard.approvalGate.rejectedDesc")}
         </p>
         {email && (
           <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1 text-xs text-muted-foreground">
@@ -930,7 +936,7 @@ function PartnerApprovalGate({ state, email, onSignOut }: { state: "pending" | "
         )}
       </div>
       <Button variant="outline" onClick={onSignOut}>
-        <LogOut className="size-4" /> Sign out
+        <LogOut className="size-4" /> {t("partnerDashboard.approvalGate.signOut")}
       </Button>
     </div>
   );
@@ -938,6 +944,7 @@ function PartnerApprovalGate({ state, email, onSignOut }: { state: "pending" | "
 
 function PartnerLoginGate() {
   const { setAuth } = useAuth();
+  const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -953,7 +960,7 @@ function PartnerLoginGate() {
       setAuth(response.user, response.access_token);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      setError(msg && !msg.includes("Request failed") ? msg : "Invalid email or password.");
+      setError(msg && !msg.includes("Request failed") ? msg : t("partnerDashboard.loginGate.invalidCreds"));
     } finally {
       setLoading(false);
     }
@@ -967,13 +974,13 @@ function PartnerLoginGate() {
             <Briefcase className="size-7" />
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold">Partner Portal</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Sign in to access your partner dashboard</p>
+            <h1 className="text-2xl font-bold">{t("partnerDashboard.loginGate.title")}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.loginGate.subtitle")}</p>
           </div>
         </div>
         <form className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-card" onSubmit={handleSubmit}>
           <div>
-            <label className="mb-1.5 block text-sm font-medium">Email</label>
+            <label className="mb-1.5 block text-sm font-medium">{t("partnerDashboard.loginGate.email")}</label>
             <input
               type="email"
               value={email}
@@ -983,13 +990,13 @@ function PartnerLoginGate() {
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium">Password</label>
+            <label className="mb-1.5 block text-sm font-medium">{t("partnerDashboard.loginGate.password")}</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Password"
+                placeholder={t("partnerDashboard.loginGate.password")}
                 className="h-11 w-full rounded-lg border border-border bg-background pe-10 ps-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
               <button
@@ -1003,12 +1010,12 @@ function PartnerLoginGate() {
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={loading || !email || !password}>
-            {loading ? "Signing in…" : "Sign in to Partner Portal"}
+            {loading ? t("partnerDashboard.loginGate.signingIn") : t("partnerDashboard.loginGate.signInCta")}
           </Button>
         </form>
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          Not yet a partner?{" "}
-          <a href="/partner/register" className="font-semibold text-primary hover:underline">Register here</a>
+          {t("partnerDashboard.loginGate.notPartnerYet")}{" "}
+          <a href="/partner/register" className="font-semibold text-primary hover:underline">{t("partnerDashboard.loginGate.registerHere")}</a>
         </p>
       </div>
     </div>

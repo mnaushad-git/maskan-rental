@@ -8,6 +8,7 @@ import { Badge } from "@/components/maskan/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { createLead, fetchAreas, type ApiLeadDetail } from "@/lib/api/maskan";
 import { cities } from "@/lib/maskan-data";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/lead/new")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/lead/new")({
 
 function NewLeadPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { area, city } = Route.useSearch();
 
@@ -50,11 +52,11 @@ function NewLeadPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">
         <Lightbulb className="size-10 text-primary" />
-        <h1 className="text-xl font-bold">Sign in to submit a lead</h1>
+        <h1 className="text-xl font-bold">{t("leadNew.signInGate.heading")}</h1>
         <p className="text-sm text-muted-foreground text-center max-w-sm">
-          Create a free account and tell us what you're looking for. We'll match you with a licensed partner in your target area.
+          {t("leadNew.signInGate.desc")}
         </p>
-        <Button onClick={() => navigate({ to: "/auth" })}>Sign in / Register</Button>
+        <Button onClick={() => navigate({ to: "/auth" })}>{t("leadNew.signInGate.cta")}</Button>
       </div>
     );
   }
@@ -78,7 +80,7 @@ function NewLeadPage() {
       });
       setResult(lead);
     } catch {
-      setError("Failed to submit your lead. Please check your details and try again.");
+      setError(t("leadNew.failedToSubmit"));
     } finally {
       setSubmitting(false);
     }
@@ -91,27 +93,26 @@ function NewLeadPage() {
           <CheckCircle className="size-8" />
         </div>
         <div className="text-center">
-          <h1 className="text-2xl font-bold">Lead submitted!</h1>
+          <h1 className="text-2xl font-bold">{t("leadNew.success.heading")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            We're matching you with a verified partner in <strong>{result.area_name}, {result.city}</strong>.
-            You'll be notified once a partner accepts.
+            {t("leadNew.success.desc", { area: result.area_name, city: result.city })}
           </p>
         </div>
         {result.suggestions.length > 0 && (
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-card">
-            <h2 className="mb-3 font-semibold">Suggested properties for you</h2>
+            <h2 className="mb-3 font-semibold">{t("leadNew.success.suggestedHeading")}</h2>
             <div className="space-y-2">
               {result.suggestions.map(s => (
                 <div key={s.id} className="rounded-lg border border-border p-3 text-sm">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-medium truncate">{s.property_title ?? `Property #${s.property_id}`}</p>
+                      <p className="font-medium truncate">{s.property_title ?? t("leadNew.success.propertyFallback", { id: s.property_id })}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {s.bedrooms ? `${s.bedrooms} BR · ` : ""}
-                        {s.monthly_rent ? `SAR ${s.monthly_rent.toLocaleString()}/mo` : ""}
+                        {s.bedrooms ? t("leadNew.success.bedroomsPrefix", { count: s.bedrooms }) : ""}
+                        {s.monthly_rent ? t("leadNew.success.perMonth", { amount: s.monthly_rent.toLocaleString() }) : ""}
                       </p>
                     </div>
-                    <Badge tone="primary" className="shrink-0">{Math.round(s.match_score)}% match</Badge>
+                    <Badge tone="primary" className="shrink-0">{t("leadNew.success.matchPct", { pct: Math.round(s.match_score) })}</Badge>
                   </div>
                 </div>
               ))}
@@ -119,9 +120,9 @@ function NewLeadPage() {
           </div>
         )}
         <div className="flex flex-wrap justify-center gap-3">
-          <Button variant="outline" onClick={() => navigate({ to: "/search" })}>Browse properties</Button>
-          <Button variant="outline" onClick={() => navigate({ to: "/my-leads" })}>All my leads</Button>
-          <Button onClick={() => navigate({ to: "/lead/$leadId", params: { leadId: String(result.id) } })}>Track this lead</Button>
+          <Button variant="outline" onClick={() => navigate({ to: "/search" })}>{t("leadNew.success.browseProperties")}</Button>
+          <Button variant="outline" onClick={() => navigate({ to: "/my-leads" })}>{t("leadNew.success.allMyLeads")}</Button>
+          <Button onClick={() => navigate({ to: "/lead/$leadId", params: { leadId: String(result.id) } })}>{t("leadNew.success.trackThisLead")}</Button>
         </div>
       </div>
     );
@@ -133,92 +134,92 @@ function NewLeadPage() {
       <div className="px-4 py-12">
       <div className="mx-auto max-w-lg">
         <div className="mb-8">
-          <Badge tone="ai" className="mb-3"><Lightbulb className="size-3" /> Partner matching</Badge>
-          <h1 className="text-2xl font-bold">Tell us what you need</h1>
+          <Badge tone="ai" className="mb-3"><Lightbulb className="size-3" /> {t("leadNew.badge")}</Badge>
+          <h1 className="text-2xl font-bold">{t("leadNew.heading")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            We'll suggest matching properties and connect you with a licensed partner who knows your target area.
+            {t("leadNew.subtitle")}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-8 shadow-card space-y-5">
-          <h2 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Target location</h2>
+          <h2 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">{t("leadNew.sections.targetLocation")}</h2>
           <div>
-            <label className="mb-1.5 block text-sm font-medium">City <span className="text-destructive">*</span></label>
+            <label className="mb-1.5 block text-sm font-medium">{t("leadNew.city")} <span className="text-destructive">*</span></label>
             <select
               required
               value={form.city}
               onChange={e => setForm(f => ({ ...f, city: e.target.value, area_name: "" }))}
               className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
             >
-              {cities.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+              {cities.map(c => <option key={c.name} value={c.name}>{t(`cities.${c.name}`)}</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium">District / Area <span className="text-destructive">*</span></label>
+            <label className="mb-1.5 block text-sm font-medium">{t("leadNew.districtArea")} <span className="text-destructive">*</span></label>
             <select
               required
               value={form.area_name}
               onChange={e => setForm(f => ({ ...f, area_name: e.target.value }))}
               className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
             >
-              <option value="">— Select a district —</option>
+              <option value="">{t("leadNew.selectDistrict")}</option>
               {availableAreas.filter(a => a.city === form.city).sort((a, b) => a.name.localeCompare(b.name)).map(a => (
                 <option key={a.name} value={a.name}>{a.name}</option>
               ))}
             </select>
           </div>
 
-          <h2 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground pt-2">Property requirements</h2>
+          <h2 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground pt-2">{t("leadNew.sections.propertyRequirements")}</h2>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Min budget (SAR/mo)</label>
+              <label className="mb-1.5 block text-sm font-medium">{t("leadNew.minBudget")}</label>
               <Input type="number" min={0} value={form.min_budget} onChange={e => setForm(f => ({ ...f, min_budget: e.target.value }))} placeholder="e.g. 5000" />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Max budget (SAR/mo)</label>
+              <label className="mb-1.5 block text-sm font-medium">{t("leadNew.maxBudget")}</label>
               <Input type="number" min={0} value={form.max_budget} onChange={e => setForm(f => ({ ...f, max_budget: e.target.value }))} placeholder="e.g. 15000" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Bedrooms needed</label>
+              <label className="mb-1.5 block text-sm font-medium">{t("leadNew.bedroomsNeeded")}</label>
               <select value={form.bedrooms_needed} onChange={e => setForm(f => ({ ...f, bedrooms_needed: e.target.value }))} className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary">
-                <option value="">Any</option>
-                {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n} BR</option>)}
+                <option value="">{t("leadNew.any")}</option>
+                {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{t("leadNew.bedroomsOption", { count: n })}</option>)}
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Move-in date</label>
+              <label className="mb-1.5 block text-sm font-medium">{t("leadNew.moveInDate")}</label>
               <Input type="date" value={form.move_in_date} onChange={e => setForm(f => ({ ...f, move_in_date: e.target.value }))} min={new Date().toISOString().split("T")[0]} />
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium">Additional requirements</label>
-            <textarea rows={3} value={form.requirements_note} onChange={e => setForm(f => ({ ...f, requirements_note: e.target.value }))} placeholder="e.g. Need a gym, close to schools, prefer ground floor, furnished…" className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none" />
+            <label className="mb-1.5 block text-sm font-medium">{t("leadNew.additionalRequirements")}</label>
+            <textarea rows={3} value={form.requirements_note} onChange={e => setForm(f => ({ ...f, requirements_note: e.target.value }))} placeholder={t("leadNew.requirementsPlaceholder")} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none" />
           </div>
 
-          <h2 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground pt-2">Your contact</h2>
+          <h2 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground pt-2">{t("leadNew.sections.yourContact")}</h2>
           <div>
-            <label className="mb-1.5 block text-sm font-medium">Full name <span className="text-destructive">*</span></label>
-            <Input required value={form.customer_name} onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))} placeholder="Your full name" />
+            <label className="mb-1.5 block text-sm font-medium">{t("leadNew.fullName")} <span className="text-destructive">*</span></label>
+            <Input required value={form.customer_name} onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))} placeholder={t("leadNew.fullNamePlaceholder")} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Phone <span className="text-destructive">*</span></label>
+              <label className="mb-1.5 block text-sm font-medium">{t("leadNew.phone")} <span className="text-destructive">*</span></label>
               <Input required type="tel" value={form.customer_phone} onChange={e => setForm(f => ({ ...f, customer_phone: e.target.value }))} placeholder="+966 5X XXX XXXX" />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Email <span className="text-destructive">*</span></label>
+              <label className="mb-1.5 block text-sm font-medium">{t("leadNew.email")} <span className="text-destructive">*</span></label>
               <Input required type="email" value={form.customer_email} onChange={e => setForm(f => ({ ...f, customer_email: e.target.value }))} placeholder="you@example.com" />
             </div>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? "Submitting…" : "Submit lead request"}
+            {submitting ? t("leadNew.submitting") : t("leadNew.submitLeadRequest")}
           </Button>
           <p className="text-xs text-center text-muted-foreground">
-            A verified partner covering {form.city} will be notified and may reach out within 24 hours.
+            {t("leadNew.partnerNotifyNote", { city: t(`cities.${form.city}`) })}
           </p>
         </form>
       </div>

@@ -38,6 +38,7 @@ import {
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/compare")({
   head: () => ({
@@ -107,6 +108,7 @@ function computeCompareData(
 
 function ComparePage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [allProperties, setAllProperties] = useState<Property[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -196,20 +198,18 @@ function ComparePage() {
         <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <Badge tone="ai" icon={<Sparkles className="size-3.5" />}>
-              Side-by-side comparison
+              {t("compare.badge")}
             </Badge>
             <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-              Compare properties
+              {t("compare.heading")}
             </h1>
             <p className="mt-2 max-w-2xl text-muted-foreground">
-              Compare up to 3 listings across financials, area quality,
-              amenities, and AI rental intelligence — then let Maskan AI pick
-              the strongest match.
+              {t("compare.desc")}
             </p>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="rounded-full bg-surface-2 px-3 py-1.5 font-semibold text-foreground">
-              {selected.length}/3 selected
+              {t("compare.selectedCount", { count: selected.length })}
             </span>
           </div>
         </header>
@@ -250,19 +250,19 @@ function ComparePage() {
         {/* Comparison categories */}
         <div className="mt-10 space-y-6">
           <CategoryTable
-            title="Financial"
+            title={t("compare.categories.financial")}
             icon={<Crown className="size-4" />}
             rows={[
               {
-                label: "Annual rent",
+                label: t("compare.rows.annualRent"),
                 values: selected.map((p) => ({
                   value: `SAR ${formatSAR(p.price)}`,
                   best: p.price === Math.min(...selected.map((s) => s.price)),
-                  sub: `SAR ${formatSAR(Math.round(p.price / 12))}/mo`,
+                  sub: t("compare.rows.perMonth", { amount: formatSAR(Math.round(p.price / 12)) }),
                 })),
               },
               {
-                label: "Security deposit",
+                label: t("compare.rows.securityDeposit"),
                 values: selected.map((p) => {
                   const d = computeCompareData(p, areaIntelMap[p.district], areaAvgMap[p.district]);
                   return {
@@ -274,7 +274,7 @@ function ComparePage() {
                 }),
               },
               {
-                label: "Price per m²",
+                label: t("compare.rows.pricePerSqm"),
                 values: selected.map((p) => ({
                   value: `SAR ${formatSAR(p.pricePerSqm)}`,
                   best:
@@ -286,11 +286,11 @@ function ComparePage() {
           />
 
           <CategoryTable
-            title="Property"
+            title={t("compare.categories.property")}
             icon={<Building2 className="size-4" />}
             rows={[
               {
-                label: "Bedrooms",
+                label: t("compare.rows.bedrooms"),
                 values: selected.map((p) => ({
                   value: (
                     <span className="inline-flex items-center gap-1.5">
@@ -304,7 +304,7 @@ function ComparePage() {
                 })),
               },
               {
-                label: "Bathrooms",
+                label: t("compare.rows.bathrooms"),
                 values: selected.map((p) => ({
                   value: (
                     <span className="inline-flex items-center gap-1.5">
@@ -318,7 +318,7 @@ function ComparePage() {
                 })),
               },
               {
-                label: "Area",
+                label: t("compare.rows.area"),
                 values: selected.map((p) => ({
                   value: (
                     <span className="inline-flex items-center gap-1.5">
@@ -330,12 +330,12 @@ function ComparePage() {
                 })),
               },
               {
-                label: "Furnishing",
+                label: t("compare.rows.furnishing"),
                 values: selected.map((p) => ({
                   value: (
                     <span className="inline-flex items-center gap-1.5">
                       <Sofa className="size-4 text-muted-foreground" />
-                      {computeCompareData(p, areaIntelMap[p.district], areaAvgMap[p.district]).furnishing}
+                      {t(`furnishing.${computeCompareData(p, areaIntelMap[p.district], areaAvgMap[p.district]).furnishing}`)}
                     </span>
                   ),
                 })),
@@ -344,19 +344,19 @@ function ComparePage() {
           />
 
           <ScoreCategory
-            title="Area"
+            title={t("compare.categories.area")}
             icon={<MapPin className="size-4" />}
             metrics={[
               {
-                label: "Area score",
+                label: t("compare.rows.areaScore"),
                 values: selected.map((p) => computeCompareData(p, areaIntelMap[p.district], areaAvgMap[p.district]).areaScore),
               },
               {
-                label: "School score",
+                label: t("compare.rows.schoolScore"),
                 values: selected.map((p) => computeCompareData(p, areaIntelMap[p.district], areaAvgMap[p.district]).schoolScore),
               },
               {
-                label: "Family score",
+                label: t("compare.rows.familyScore"),
                 values: selected.map((p) => computeCompareData(p, areaIntelMap[p.district], areaAvgMap[p.district]).familyScore),
               },
             ]}
@@ -378,7 +378,7 @@ function PropertyPickerModal({
   candidates,
   onSelect,
   onClose,
-  title = "Select a property",
+  title,
 }: {
   open: boolean;
   candidates: Property[];
@@ -386,6 +386,7 @@ function PropertyPickerModal({
   onClose: () => void;
   title?: string;
 }) {
+  const { t } = useLanguage();
   const [query, setQuery] = useState("");
   const [cityFilter, setCityFilter] = useState("all");
   const [brFilter, setBrFilter] = useState("all");
@@ -463,9 +464,9 @@ function PropertyPickerModal({
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-          <h3 className="font-display text-base font-bold">{title}</h3>
+          <h3 className="font-display text-base font-bold">{title ?? t("compare.picker.selectTitle")}</h3>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {candidates.length.toLocaleString()} available
+            {t("compare.picker.available", { count: candidates.length.toLocaleString() })}
             <button
               type="button"
               onClick={onClose}
@@ -484,7 +485,7 @@ function PropertyPickerModal({
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, area, city or type…"
+              placeholder={t("compare.picker.searchPlaceholder")}
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
             {query && (
@@ -501,7 +502,7 @@ function PropertyPickerModal({
 
         {/* Filter chips */}
         <div className="shrink-0 flex items-center gap-2 overflow-x-auto border-b border-border px-3 py-2">
-          <FilterChip active={cityFilter === "all"} onClick={() => setCityFilter("all")}>All cities</FilterChip>
+          <FilterChip active={cityFilter === "all"} onClick={() => setCityFilter("all")}>{t("compare.picker.allCities")}</FilterChip>
           {cities.map((city) => (
             <FilterChip
               key={city}
@@ -529,8 +530,10 @@ function PropertyPickerModal({
         {/* Result count */}
         <div className="shrink-0 px-4 py-1.5 text-xs text-muted-foreground">
           {filtered.length === 0
-            ? "No properties match"
-            : `${filtered.length}${filtered.length === 60 ? "+" : ""} ${filtered.length === 1 ? "property" : "properties"}`}
+            ? t("compare.picker.noMatch")
+            : t(filtered.length === 1 ? "compare.picker.resultCountSingular" : "compare.picker.resultCountPlural", {
+                count: `${filtered.length}${filtered.length === 60 ? "+" : ""}`,
+              })}
         </div>
 
         {/* Scrollable list */}
@@ -538,13 +541,13 @@ function PropertyPickerModal({
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center text-sm text-muted-foreground">
               <Building2 className="size-9 opacity-25" />
-              <p>No properties match your filters</p>
+              <p>{t("compare.picker.noMatchFilters")}</p>
               <button
                 type="button"
                 onClick={() => { setQuery(""); setCityFilter("all"); setBrFilter("all"); }}
                 className="text-xs text-primary hover:underline"
               >
-                Clear all filters
+                {t("compare.picker.clearFilters")}
               </button>
             </div>
           ) : (
@@ -601,6 +604,7 @@ function PropertyHeaderCard({
   onSwap: (id: string) => void;
 }) {
   const [swapOpen, setSwapOpen] = useState(false);
+  const { t } = useLanguage();
 
   return (
     <>
@@ -613,14 +617,14 @@ function PropertyHeaderCard({
         {isWinner && (
           <div className="absolute left-3 top-3 z-10">
             <Badge tone="ai" icon={<Trophy className="size-3.5" />}>
-              AI Top pick
+              {t("compare.header.aiTopPick")}
             </Badge>
           </div>
         )}
         <button
           type="button"
           onClick={onRemove}
-          aria-label="Remove from comparison"
+          aria-label={t("compare.header.removeFromComparison")}
           className="absolute right-3 top-3 z-10 grid size-8 place-items-center rounded-full bg-background/95 text-foreground shadow-card backdrop-blur transition-colors hover:bg-background"
         >
           <X className="size-4" />
@@ -640,7 +644,7 @@ function PropertyHeaderCard({
           </div>
           <div className="flex items-end justify-between border-t border-border pt-3">
             <div>
-              <div className="text-[11px] text-muted-foreground">Annual rent</div>
+              <div className="text-[11px] text-muted-foreground">{t("compare.header.annualRent")}</div>
               <div className="text-lg font-bold tracking-tight">SAR {formatSAR(p.price)}</div>
             </div>
             <div className="flex flex-wrap justify-end gap-1">
@@ -654,7 +658,7 @@ function PropertyHeaderCard({
                 onClick={() => setSwapOpen(true)}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:bg-surface-2 hover:text-foreground"
               >
-                <ArrowLeftRight className="size-3.5" /> Swap property
+                <ArrowLeftRight className="size-3.5" /> {t("compare.header.swapProperty")}
               </button>
             </div>
           )}
@@ -666,7 +670,7 @@ function PropertyHeaderCard({
         candidates={candidates}
         onSelect={(newId) => onSwap(newId)}
         onClose={() => setSwapOpen(false)}
-        title="Swap with another property"
+        title={t("compare.picker.swapTitle")}
       />
     </>
   );
@@ -680,6 +684,7 @@ function AddPropertySlot({
   onAdd: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { t } = useLanguage();
 
   return (
     <>
@@ -692,9 +697,9 @@ function AddPropertySlot({
           <Plus className="size-5" />
         </span>
         <div className="space-y-1">
-          <div className="text-sm font-semibold">Add a property</div>
+          <div className="text-sm font-semibold">{t("compare.addSlot.addProperty")}</div>
           <p className="text-xs text-muted-foreground">
-            Search from {candidates.length.toLocaleString()} listings
+            {t("compare.addSlot.searchFromListings", { count: candidates.length.toLocaleString() })}
           </p>
         </div>
       </button>
@@ -704,7 +709,7 @@ function AddPropertySlot({
         candidates={candidates}
         onSelect={(id) => onAdd(id)}
         onClose={() => setOpen(false)}
-        title="Add a property to compare"
+        title={t("compare.picker.addTitle")}
       />
     </>
   );
@@ -781,6 +786,7 @@ function ScoreCategory({
   icon: React.ReactNode;
   metrics: { label: string; values: number[] }[];
 }) {
+  const { t } = useLanguage();
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
       <header className="flex items-center gap-2 border-b border-border bg-surface-2/60 px-5 py-3">
@@ -808,7 +814,7 @@ function ScoreCategory({
                     v === best && "bg-primary/8",
                   )}
                 >
-                  <ScoreBar label={v === best ? "Best in compare" : "Score"} value={v} />
+                  <ScoreBar label={v === best ? t("compare.scoreBar.bestInCompare") : t("compare.scoreBar.score")} value={v} />
                 </div>
               ))}
             </div>
@@ -828,11 +834,12 @@ function AmenitiesCategory({
   areaIntelMap: Record<string, ApiAreaIntelligence | null>;
   areaAvgMap: Record<string, number>;
 }) {
+  const { t } = useLanguage();
   const items: { key: keyof CompareData["amenities"]; label: string; icon: React.ReactNode }[] = [
-    { key: "parking", label: "Parking", icon: <Car className="size-4" /> },
-    { key: "gym", label: "Gym", icon: <Dumbbell className="size-4" /> },
-    { key: "pool", label: "Pool", icon: <Waves className="size-4" /> },
-    { key: "balcony", label: "Balcony", icon: <Trees className="size-4" /> },
+    { key: "parking", label: t("compare.amenityItems.parking"), icon: <Car className="size-4" /> },
+    { key: "gym", label: t("compare.amenityItems.gym"), icon: <Dumbbell className="size-4" /> },
+    { key: "pool", label: t("compare.amenityItems.pool"), icon: <Waves className="size-4" /> },
+    { key: "balcony", label: t("compare.amenityItems.balcony"), icon: <Trees className="size-4" /> },
   ];
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
@@ -840,7 +847,7 @@ function AmenitiesCategory({
         <span className="grid size-7 place-items-center rounded-md bg-info/10 text-info">
           <Dumbbell className="size-4" />
         </span>
-        <h2 className="text-sm font-bold uppercase tracking-wide">Amenities</h2>
+        <h2 className="text-sm font-bold uppercase tracking-wide">{t("compare.categories.amenities")}</h2>
       </header>
       <div className="divide-y divide-border">
         {items.map((it) => (
@@ -864,11 +871,11 @@ function AmenitiesCategory({
                 >
                   {has ? (
                     <>
-                      <CheckCircle2 className="size-4" /> Included
+                      <CheckCircle2 className="size-4" /> {t("compare.included")}
                     </>
                   ) : (
                     <>
-                      <Minus className="size-4" /> Not available
+                      <Minus className="size-4" /> {t("compare.notAvailable")}
                     </>
                   )}
                 </div>
@@ -890,6 +897,7 @@ function RentalIntelligenceCategory({
   areaIntelMap: Record<string, ApiAreaIntelligence | null>;
   areaAvgMap: Record<string, number>;
 }) {
+  const { t } = useLanguage();
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
       <header className="flex items-center gap-2 border-b border-border bg-surface-2/60 px-5 py-3">
@@ -897,12 +905,12 @@ function RentalIntelligenceCategory({
           <Sparkles className="size-4" />
         </span>
         <h2 className="text-sm font-bold uppercase tracking-wide">
-          Rental Intelligence
+          {t("compare.categories.rentalIntelligence")}
         </h2>
       </header>
       <div className="grid grid-cols-1 gap-3 px-5 py-5 lg:grid-cols-[200px_repeat(3,minmax(0,1fr))] lg:items-center">
         <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Scores
+          {t("compare.scoresLabel")}
         </div>
         {selected.map((p) => {
           const d = computeCompareData(p, areaIntelMap[p.district], areaAvgMap[p.district]);
@@ -914,13 +922,13 @@ function RentalIntelligenceCategory({
               <div className="flex flex-col items-center gap-1">
                 <ScoreRing score={d.rentalScore} size={56} />
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Rental
+                  {t("compare.rentalLabel")}
                 </div>
               </div>
               <div className="flex flex-col items-center gap-1">
                 <ScoreRing score={p.matchScore} size={56} />
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Property Score
+                  {t("compare.propertyScoreLabel")}
                 </div>
               </div>
             </div>
@@ -948,6 +956,7 @@ function AiRecommendationCard({
   onSaveShortlist: () => void;
   saveState: "idle" | "saving" | "saved";
 }) {
+  const { t } = useLanguage();
   const cheapest = all.reduce((a, b) => (b.p.price < a.p.price ? b : a));
   const largest = all.reduce((a, b) => (b.p.area > a.p.area ? b : a));
   return (
@@ -955,53 +964,51 @@ function AiRecommendationCard({
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div className="max-w-2xl space-y-3">
           <Badge tone="ai" icon={<Sparkles className="size-3.5" />}>
-            Maskan AI Recommendation
+            {t("compare.aiReco.badge")}
           </Badge>
           <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            {winner.title} is the strongest match
+            {t("compare.aiReco.strongestMatch", { title: winner.title })}
           </h2>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Weighing rental value, area quality, family suitability and AI
-            match, <strong className="text-foreground">{winner.district}</strong>{" "}
-            scores <strong className="text-foreground">{totalScore}/100</strong>
-            {" "}— balancing competitive rent of{" "}
-            <strong className="text-foreground">
-              SAR {formatSAR(winner.price)}/yr
-            </strong>{" "}
-            with a {winnerDetails.familyScore}/100 family score and{" "}
-            {winnerDetails.areaScore}/100 area quality.
+            {t("compare.aiReco.description", {
+              district: winner.district,
+              score: totalScore,
+              price: formatSAR(winner.price),
+              family: winnerDetails.familyScore,
+              area: winnerDetails.areaScore,
+            })}
           </p>
           <ul className="grid grid-cols-1 gap-2 pt-2 text-sm sm:grid-cols-2">
             <li className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-              Cheapest annual rent:{" "}
-              <strong>{cheapest.p.district}</strong> at SAR{" "}
-              {formatSAR(cheapest.p.price)}.
+              {t("compare.aiReco.cheapestRentPrefix")}{" "}
+              <strong>{cheapest.p.district}</strong>{" "}
+              {t("compare.aiReco.cheapestRentSuffix", { price: formatSAR(cheapest.p.price) })}
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-              Most spacious: <strong>{largest.p.district}</strong> at{" "}
-              {largest.p.area} m².
+              {t("compare.aiReco.mostSpaciousPrefix")} <strong>{largest.p.district}</strong>{" "}
+              {t("compare.aiReco.mostSpaciousSuffix", { area: largest.p.area })}
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-              Best family fit: <strong>{winner.district}</strong> with{" "}
-              {winnerDetails.schoolScore}/100 school score.
+              {t("compare.aiReco.bestFamilyFitPrefix")} <strong>{winner.district}</strong>{" "}
+              {t("compare.aiReco.bestFamilyFitSuffix", { score: winnerDetails.schoolScore })}
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-              Verified by {winner.agent}.
+              {t("compare.aiReco.verifiedBy", { agent: winner.agent })}
             </li>
           </ul>
           <div className="flex flex-wrap gap-2 pt-3">
             <Button asChild>
               <Link to="/property/$id" params={{ id: winner.id }}>
-                View {winner.district}
+                {t("compare.aiReco.viewDistrict", { district: winner.district })}
               </Link>
             </Button>
             <Button variant="outline" asChild>
               <Link to="/advisor">
-                <Sparkles className="mr-1.5 size-4" /> Ask AI about this
+                <Sparkles className="mr-1.5 size-4" /> {t("compare.aiReco.askAiAboutThis")}
               </Link>
             </Button>
             <Button
@@ -1010,7 +1017,7 @@ function AiRecommendationCard({
               disabled={saveState === "saving"}
             >
               <Heart className={"mr-1.5 size-4 " + (saveState === "saved" ? "fill-destructive text-destructive" : "")} />
-              {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Shortlist saved!" : "Save shortlist"}
+              {saveState === "saving" ? t("compare.aiReco.saving") : saveState === "saved" ? t("compare.aiReco.shortlistSaved") : t("compare.aiReco.saveShortlist")}
             </Button>
           </div>
         </div>
@@ -1019,7 +1026,7 @@ function AiRecommendationCard({
           <ScoreRing score={totalScore} size={96} />
           <div className="text-center">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Composite score
+              {t("compare.aiReco.compositeScore")}
             </div>
             <div className="text-sm font-bold">{winner.district}</div>
           </div>

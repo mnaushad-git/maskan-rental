@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/maskan/Badges";
 import { login, signup } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -37,6 +38,7 @@ export const Route = createFileRoute("/auth")({
 type Mode = "signin" | "signup";
 
 function AuthPage() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { setAuth } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
@@ -53,12 +55,12 @@ function AuthPage() {
     setError(null);
 
     if (mode === "signup" && password.length < 6) {
-      setError("Password must be at least 6 characters.");
+      setError(t("auth.errors.passwordTooShort"));
       return;
     }
 
     if (mode === "signup" && !agreedToTerms) {
-      setError("Please agree to the Terms and Privacy Policy to continue.");
+      setError(t("auth.errors.mustAgree"));
       return;
     }
 
@@ -75,13 +77,13 @@ function AuthPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (mode === "signin") {
-        setError("Invalid email or password.");
+        setError(t("auth.errors.invalidCredentials"));
       } else if (msg.toLowerCase().includes("email already") || msg.includes("409") || msg.includes("Conflict")) {
-        setError("This email is already registered. Try signing in instead.");
+        setError(t("auth.errors.emailAlreadyRegistered"));
       } else if (msg && !msg.includes("500") && !msg.includes("Request failed")) {
         setError(msg);
       } else {
-        setError("Unable to create account. Please try again.");
+        setError(t("auth.errors.unableToCreate"));
       }
     } finally {
       setLoading(false);
@@ -100,25 +102,20 @@ function AuthPage() {
 
           <div className="relative">
             <Badge tone="ai" className="mb-6 border-white/20 bg-white/15 text-white">
-              <Sparkles className="size-3.5" /> Maskan AI
+              <Sparkles className="size-3.5" /> {t("auth.brand")}
             </Badge>
             <h1 className="font-display text-4xl font-bold leading-[1.1] tracking-tight">
-              Smarter rentals,
+              {t("auth.headingSmarter")}
               <br />
-              made for Saudi.
+              {t("auth.headingMadeFor")}
             </h1>
             <p className="mt-4 max-w-md text-base text-primary-foreground/85">
-              Save favorite homes, compare neighborhoods and get AI-powered insights on fair rent —
-              all in one account.
+              {t("auth.marketingDesc")}
             </p>
           </div>
 
           <ul className="relative space-y-4">
-            {[
-              "AI fairness check on every listing",
-              "Side-by-side area & property comparison",
-              "Verified listings across 5 Saudi cities",
-            ].map((b) => (
+            {[t("auth.feature1"), t("auth.feature2"), t("auth.feature3")].map((b) => (
               <li key={b} className="flex items-center gap-3 text-sm">
                 <span className="grid size-7 place-items-center rounded-full bg-white/15">
                   <CheckCircle2 className="size-4" />
@@ -134,9 +131,9 @@ function AuthPage() {
                 <Shield className="size-5" />
               </div>
               <div className="text-sm">
-                <div className="font-semibold">Trusted by 38,000+ renters</div>
+                <div className="font-semibold">{t("auth.trustedBy")}</div>
                 <div className="text-primary-foreground/80">
-                  Bank-grade encryption · No spam, ever
+                  {t("auth.bankGrade")}
                 </div>
               </div>
             </div>
@@ -159,18 +156,16 @@ function AuthPage() {
                       : "text-muted-foreground hover:text-foreground")
                   }
                 >
-                  {m === "signin" ? "Sign in" : "Sign up"}
+                  {m === "signin" ? t("auth.signIn") : t("auth.signUp")}
                 </button>
               ))}
             </div>
 
             <h2 className="font-display text-3xl font-bold tracking-tight">
-              {mode === "signin" ? "Welcome back" : "Create your account"}
+              {mode === "signin" ? t("auth.welcomeBack") : t("auth.createAccount")}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {mode === "signin"
-                ? "Sign in to continue your home search and access saved listings."
-                : "Join Maskan to save homes, compare areas and unlock AI insights."}
+              {mode === "signin" ? t("auth.signInDesc") : t("auth.signUpDesc")}
             </p>
 
             {/* Social */}
@@ -180,7 +175,7 @@ function AuthPage() {
             </div>
 
             <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wider text-muted-foreground">
-              <span className="h-px flex-1 bg-border" /> or continue with email{" "}
+              <span className="h-px flex-1 bg-border" /> {t("auth.orContinueWithEmail")}{" "}
               <span className="h-px flex-1 bg-border" />
             </div>
 
@@ -189,11 +184,11 @@ function AuthPage() {
               onSubmit={handleSubmit}
             >
               {mode === "signup" && (
-                <Field icon={User} label="Full name" type="text" placeholder="Ahmed Al-Saud" value={fullName} onChange={setFullName} />
+                <Field icon={User} label={t("auth.fullName")} type="text" placeholder="Ahmed Al-Saud" value={fullName} onChange={setFullName} />
               )}
               <Field
                 icon={Mail}
-                label="Email address"
+                label={t("auth.emailAddress")}
                 type="email"
                 placeholder="you@example.com"
                 value={email}
@@ -202,20 +197,20 @@ function AuthPage() {
 
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium">Password</label>
+                <label className="mb-1.5 block text-sm font-medium">{t("auth.password")}</label>
                 <div className="relative">
                   <Lock className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder={mode === "signup" ? "Create a strong password" : "Your password"}
+                    placeholder={mode === "signup" ? t("auth.createPasswordPlaceholder") : t("auth.yourPasswordPlaceholder")}
                     className="h-11 w-full rounded-lg border border-border bg-card px-10 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
                     className="absolute end-3 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"
                   >
                     {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -227,10 +222,10 @@ function AuthPage() {
                 <div className="flex items-center justify-between text-sm">
                   <label className="inline-flex items-center gap-2 text-muted-foreground">
                     <input type="checkbox" className="size-4 rounded border-border" />
-                    Remember me
+                    {t("auth.rememberMe")}
                   </label>
                   <a href="#" className="font-semibold text-primary hover:underline">
-                    Forgot password?
+                    {t("auth.forgotPassword")}
                   </a>
                 </div>
               ) : (
@@ -242,13 +237,13 @@ function AuthPage() {
                     className="mt-0.5 size-4 rounded border-border"
                   />
                   <span>
-                    I agree to the{" "}
+                    {t("auth.agreeToTerms")}
                     <a href="#" className="font-semibold text-foreground hover:underline">
-                      Terms
-                    </a>{" "}
-                    and{" "}
+                      {t("auth.terms")}
+                    </a>
+                    {t("auth.and")}
                     <a href="#" className="font-semibold text-foreground hover:underline">
-                      Privacy Policy
+                      {t("auth.privacyPolicy")}
                     </a>
                     .
                   </span>
@@ -258,23 +253,23 @@ function AuthPage() {
               {error && <p className="text-sm text-destructive">{error}</p>}
 
               <Button type="submit" variant="hero" size="lg" className="w-full" disabled={loading || !email || !password || (mode === "signup" && (!fullName || !agreedToTerms))}>
-                {mode === "signin" ? "Sign in" : "Create account"} <ArrowRight />
+                {mode === "signin" ? t("auth.signIn") : t("auth.createAccountBtn")} <ArrowRight className="rtl:rotate-180" />
               </Button>
             </form>
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
-              {mode === "signin" ? "Don't have an account? " : "Already a member? "}
+              {mode === "signin" ? t("auth.dontHaveAccount") : t("auth.alreadyMember")}
               <button
                 type="button"
                 onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
                 className="font-semibold text-primary hover:underline"
               >
-                {mode === "signin" ? "Sign up" : "Sign in"}
+                {mode === "signin" ? t("auth.signUp") : t("auth.signIn")}
               </button>
             </p>
 
             <div className="mt-10 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-              <Building2 className="size-3.5" /> © {new Date().getFullYear()} Maskan · Riyadh, KSA
+              <Building2 className="size-3.5" /> {t("auth.footerCopyright", { year: new Date().getFullYear() })}
             </div>
           </div>
         </main>
@@ -316,16 +311,17 @@ function Field({
 }
 
 function SocialButton({ provider }: { provider: "google" | "apple" }) {
+  const { t } = useLanguage();
   const isGoogle = provider === "google";
   return (
     <button
       type="button"
       disabled
-      title="Coming soon"
+      title={t("auth.comingSoon")}
       className="inline-flex h-11 cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-border bg-card text-sm font-semibold text-muted-foreground opacity-50"
     >
       {isGoogle ? <GoogleIcon /> : <AppleIcon />}
-      {isGoogle ? "Google" : "Apple"}
+      {isGoogle ? t("auth.google") : t("auth.apple")}
     </button>
   );
 }

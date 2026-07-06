@@ -16,6 +16,7 @@ import { Route as PartnerRouteImport } from './routes/partner'
 import { Route as MyLeadsRouteImport } from './routes/my-leads'
 import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as ImportRouteImport } from './routes/import'
+import { Route as EstimateRouteImport } from './routes/estimate'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AreasRouteImport } from './routes/areas'
@@ -64,6 +65,11 @@ const MethodologyRoute = MethodologyRouteImport.update({
 const ImportRoute = ImportRouteImport.update({
   id: '/import',
   path: '/import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstimateRoute = EstimateRouteImport.update({
+  id: '/estimate',
+  path: '/estimate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompareRoute = CompareRouteImport.update({
@@ -145,6 +151,7 @@ export interface FileRoutesByFullPath {
   '/areas': typeof AreasRoute
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
+  '/estimate': typeof EstimateRoute
   '/import': typeof ImportRoute
   '/methodology': typeof MethodologyRoute
   '/my-leads': typeof MyLeadsRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByTo {
   '/areas': typeof AreasRoute
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
+  '/estimate': typeof EstimateRoute
   '/import': typeof ImportRoute
   '/methodology': typeof MethodologyRoute
   '/my-leads': typeof MyLeadsRoute
@@ -192,6 +200,7 @@ export interface FileRoutesById {
   '/areas': typeof AreasRoute
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
+  '/estimate': typeof EstimateRoute
   '/import': typeof ImportRoute
   '/methodology': typeof MethodologyRoute
   '/my-leads': typeof MyLeadsRoute
@@ -217,6 +226,7 @@ export interface FileRouteTypes {
     | '/areas'
     | '/auth'
     | '/compare'
+    | '/estimate'
     | '/import'
     | '/methodology'
     | '/my-leads'
@@ -240,6 +250,7 @@ export interface FileRouteTypes {
     | '/areas'
     | '/auth'
     | '/compare'
+    | '/estimate'
     | '/import'
     | '/methodology'
     | '/my-leads'
@@ -263,6 +274,7 @@ export interface FileRouteTypes {
     | '/areas'
     | '/auth'
     | '/compare'
+    | '/estimate'
     | '/import'
     | '/methodology'
     | '/my-leads'
@@ -287,6 +299,7 @@ export interface RootRouteChildren {
   AreasRoute: typeof AreasRoute
   AuthRoute: typeof AuthRoute
   CompareRoute: typeof CompareRoute
+  EstimateRoute: typeof EstimateRoute
   ImportRoute: typeof ImportRoute
   MethodologyRoute: typeof MethodologyRoute
   MyLeadsRoute: typeof MyLeadsRoute
@@ -350,6 +363,13 @@ declare module '@tanstack/react-router' {
       path: '/import'
       fullPath: '/import'
       preLoaderRoute: typeof ImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estimate': {
+      id: '/estimate'
+      path: '/estimate'
+      fullPath: '/estimate'
+      preLoaderRoute: typeof EstimateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/compare': {
@@ -474,6 +494,7 @@ const rootRouteChildren: RootRouteChildren = {
   AreasRoute: AreasRoute,
   AuthRoute: AuthRoute,
   CompareRoute: CompareRoute,
+  EstimateRoute: EstimateRoute,
   ImportRoute: ImportRoute,
   MethodologyRoute: MethodologyRoute,
   MyLeadsRoute: MyLeadsRoute,

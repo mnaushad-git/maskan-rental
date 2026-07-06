@@ -29,6 +29,7 @@ import {
   type ApiReviewSummary,
 } from "@/lib/api/maskan";
 import type { Property } from "@/lib/maskan-data";
+import { useLanguage, type Language } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/agent/$id")({
   head: () => ({ meta: [{ title: "Agent Profile — Maskan" }] }),
@@ -48,19 +49,19 @@ function waUrl(phone: string): string {
   return `https://wa.me/${normalized}`;
 }
 
-function memberSince(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+function memberSince(dateStr: string, lang: Language): string {
+  return new Date(dateStr).toLocaleDateString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", { month: "long", year: "numeric" });
 }
 
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string, lang: Language, t: (key: string, vars?: Record<string, string | number>) => string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const days = Math.floor(diff / 86400000);
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 30)  return `${days} days ago`;
+  if (days === 0) return t("agent.timeAgo.today");
+  if (days === 1) return t("agent.timeAgo.yesterday");
+  if (days < 30)  return t("agent.timeAgo.daysAgo", { count: days });
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months} month${months > 1 ? "s" : ""} ago`;
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  if (months < 12) return t(months > 1 ? "agent.timeAgo.monthsAgo" : "agent.timeAgo.monthAgo", { count: months });
+  return new Date(dateStr).toLocaleDateString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", { month: "short", year: "numeric" });
 }
 
 function reviewerInitials(name: string | null): string {
@@ -91,7 +92,16 @@ function StarDisplay({ score, size = 4 }: { score: number; size?: number }) {
 // ── Interactive star picker ───────────────────────────────────────────────────
 
 function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const { t } = useLanguage();
   const [hovered, setHovered] = useState(0);
+  const ratingLabels = [
+    "",
+    t("agent.reviews.ratingPoor"),
+    t("agent.reviews.ratingFair"),
+    t("agent.reviews.ratingGood"),
+    t("agent.reviews.ratingVeryGood"),
+    t("agent.reviews.ratingExcellent"),
+  ];
   return (
     <div className="flex items-center gap-1">
       {[1, 2, 3, 4, 5].map((i) => {
@@ -104,15 +114,15 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
             onMouseLeave={() => setHovered(0)}
             onClick={() => onChange(i)}
             className="transition-transform hover:scale-110"
-            aria-label={`${i} star${i > 1 ? "s" : ""}`}
+            aria-label={t(i > 1 ? "agent.starsLabel" : "agent.starLabel", { count: i })}
           >
             <Star className={cn("size-7 transition-colors", active ? "fill-warning text-warning" : "text-muted-foreground/30")} strokeWidth={1.5} />
           </button>
         );
       })}
       {value > 0 && (
-        <span className="ml-2 text-sm font-semibold text-foreground">
-          {["", "Poor", "Fair", "Good", "Very good", "Excellent"][value]}
+        <span className="ms-2 text-sm font-semibold text-foreground">
+          {ratingLabels[value]}
         </span>
       )}
     </div>
@@ -130,7 +140,7 @@ function DistributionBars({ summary }: { summary: ApiReviewSummary }) {
         const pct   = Math.round((count / max) * 100);
         return (
           <div key={star} className="flex items-center gap-2 text-xs">
-            <span className="w-3 shrink-0 text-right text-muted-foreground">{star}</span>
+            <span className="w-3 shrink-0 text-end text-muted-foreground">{star}</span>
             <Star className="size-3 shrink-0 fill-warning text-warning" />
             <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
               <div
@@ -138,7 +148,7 @@ function DistributionBars({ summary }: { summary: ApiReviewSummary }) {
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <span className="w-4 shrink-0 text-right text-muted-foreground">{count}</span>
+            <span className="w-4 shrink-0 text-end text-muted-foreground">{count}</span>
           </div>
         );
       })}
@@ -149,7 +159,8 @@ function DistributionBars({ summary }: { summary: ApiReviewSummary }) {
 // ── Single review card ────────────────────────────────────────────────────────
 
 function ReviewCard({ review }: { review: ApiReview }) {
-  const name = review.reviewer_name ?? "Anonymous";
+  const { lang, t } = useLanguage();
+  const name = review.reviewer_name ?? t("agent.reviews.anonymous");
   return (
     <div className="flex gap-4 py-5 border-b border-border last:border-0">
       <div className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">
@@ -159,7 +170,7 @@ function ReviewCard({ review }: { review: ApiReview }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold text-sm">{name}</span>
           <StarDisplay score={review.rating} size={3} />
-          <span className="text-xs text-muted-foreground ml-auto">{timeAgo(review.created_at)}</span>
+          <span className="text-xs text-muted-foreground ms-auto">{timeAgo(review.created_at, lang, t)}</span>
         </div>
         {review.comment && (
           <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{review.comment}</p>
@@ -172,6 +183,7 @@ function ReviewCard({ review }: { review: ApiReview }) {
 // ── Reviews section (aggregate + form + list) ─────────────────────────────────
 
 function ReviewsSection({ mediatorId, displayName }: { mediatorId: number; displayName: string }) {
+  const { t } = useLanguage();
   const { user } = useAuth();
 
   const [summary,   setSummary]   = useState<ApiReviewSummary | null>(null);
@@ -212,7 +224,7 @@ function ReviewsSection({ mediatorId, displayName }: { mediatorId: number; displ
         fetchMediatorReviews(mediatorId).then(setReviews),
       ]);
     } catch {
-      alert("Failed to submit review. Please try again.");
+      alert(t("agent.reviews.failedToSubmit"));
     } finally {
       setSubmitting(false);
     }
@@ -222,7 +234,7 @@ function ReviewsSection({ mediatorId, displayName }: { mediatorId: number; displ
 
   return (
     <div className="mt-10 space-y-6">
-      <h2 className="text-xl font-bold tracking-tight">Reviews</h2>
+      <h2 className="text-xl font-bold tracking-tight">{t("agent.reviews.heading")}</h2>
 
       {/* Aggregate */}
       {summary && summary.review_count > 0 && (
@@ -237,7 +249,7 @@ function ReviewsSection({ mediatorId, displayName }: { mediatorId: number; displ
                 <StarDisplay score={summary.avg_rating ?? 0} size={5} />
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
-                {summary.review_count} review{summary.review_count !== 1 ? "s" : ""}
+                {t(summary.review_count === 1 ? "agent.reviewCountSingular" : "agent.reviewCountPlural", { count: summary.review_count })}
               </div>
             </div>
             {/* Distribution */}
@@ -252,8 +264,8 @@ function ReviewsSection({ mediatorId, displayName }: { mediatorId: number; displ
       {!user && (
         <div className="rounded-2xl border border-dashed border-border p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            <Link to="/auth" className="font-semibold text-primary hover:underline">Sign in</Link>
-            {" "}to leave a review for {displayName}.
+            <Link to="/auth" className="font-semibold text-primary hover:underline">{t("agent.reviews.signInPrefix")}</Link>
+            {t("agent.reviews.signInSuffix", { name: displayName })}
           </p>
         </div>
       )}
@@ -261,7 +273,7 @@ function ReviewsSection({ mediatorId, displayName }: { mediatorId: number; displ
       {user && !submitted && (
         <div ref={formRef} className="rounded-2xl border border-border bg-card p-6 shadow-card space-y-4">
           <div className="text-sm font-semibold">
-            {myReview ? "Update your review" : `Rate ${displayName}`}
+            {myReview ? t("agent.reviews.updateReview") : t("agent.reviews.rateAgent", { name: displayName })}
           </div>
 
           <StarPicker value={rating} onChange={setRating} />
@@ -269,16 +281,16 @@ function ReviewsSection({ mediatorId, displayName }: { mediatorId: number; displ
           <textarea
             value={comment}
             onChange={e => setComment(e.target.value)}
-            placeholder="Share your experience (optional)…"
+            placeholder={t("agent.reviews.commentPlaceholder")}
             rows={3}
             className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
           />
 
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
-              {myReview?.status === "pending" && "Your previous review is pending approval. "}
-              {myReview?.status === "rejected" && "Your previous review was rejected. "}
-              {myReview ? "Editing resets to pending." : "One review per agent. Reviewed before publishing."}
+              {myReview?.status === "pending" && t("agent.reviews.pendingApproval")}
+              {myReview?.status === "rejected" && t("agent.reviews.rejected")}
+              {myReview ? t("agent.reviews.editingResets") : t("agent.reviews.onePerAgent")}
             </p>
             <button
               type="button"
@@ -292,7 +304,7 @@ function ReviewsSection({ mediatorId, displayName }: { mediatorId: number; displ
               )}
             >
               <Send className="size-4" />
-              {submitting ? "Submitting…" : myReview ? "Update" : "Submit"}
+              {submitting ? t("agent.reviews.submitting") : myReview ? t("agent.reviews.update") : t("agent.reviews.submit")}
             </button>
           </div>
         </div>
@@ -300,10 +312,10 @@ function ReviewsSection({ mediatorId, displayName }: { mediatorId: number; displ
 
       {submitted && (
         <div className="rounded-2xl border border-warning/30 bg-warning/8 p-5 text-center space-y-1">
-          <div className="text-sm font-semibold text-warning">Review submitted — pending admin approval</div>
-          <p className="text-xs text-muted-foreground">Your review will appear publicly once a Maskan admin approves it. This usually takes 24–48 hours.</p>
+          <div className="text-sm font-semibold text-warning">{t("agent.reviews.submittedPendingTitle")}</div>
+          <p className="text-xs text-muted-foreground">{t("agent.reviews.submittedPendingDesc")}</p>
           <button type="button" className="mt-1 text-xs text-muted-foreground underline" onClick={() => setSubmitted(false)}>
-            Edit review
+            {t("agent.reviews.editReview")}
           </button>
         </div>
       )}
@@ -318,7 +330,7 @@ function ReviewsSection({ mediatorId, displayName }: { mediatorId: number; displ
       ) : (
         !user && (
           <div className="py-10 text-center text-sm text-muted-foreground">
-            No reviews yet. Be the first to review {displayName}.
+            {t("agent.reviews.noReviewsBeFirst", { name: displayName })}
           </div>
         )
       )}
@@ -331,6 +343,7 @@ function ReviewsSection({ mediatorId, displayName }: { mediatorId: number; displ
 const NAV = <TopNav />;
 
 function AgentProfilePage() {
+  const { t, lang } = useLanguage();
   const { id } = Route.useParams();
   const agentId = Number(id);
 
@@ -363,7 +376,7 @@ function AgentProfilePage() {
         <div className="flex h-[60vh] items-center justify-center">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <div className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            Loading profile…
+            {t("agent.loadingProfile")}
           </div>
         </div>
       </div>
@@ -376,15 +389,15 @@ function AgentProfilePage() {
         {NAV}
         <div className="flex h-[60vh] flex-col items-center justify-center gap-4 text-center">
           <Building2 className="size-12 text-muted-foreground/30" />
-          <div className="text-lg font-bold">Partner not found</div>
-          <p className="text-sm text-muted-foreground">This agent may no longer be active on Maskan.</p>
-          <Link to="/search" className="text-sm font-semibold text-primary hover:underline">← Browse all listings</Link>
+          <div className="text-lg font-bold">{t("agent.partnerNotFound")}</div>
+          <p className="text-sm text-muted-foreground">{t("agent.partnerNotFoundDesc")}</p>
+          <Link to="/search" className="text-sm font-semibold text-primary hover:underline">{t("agent.browseAllListings")}</Link>
         </div>
       </div>
     );
   }
 
-  const displayName   = partner.agency_name ?? "Maskan Agent";
+  const displayName   = partner.agency_name ?? t("agent.defaultAgentName");
   const initials      = agentInitials(partner.agency_name);
   const realRating    = summary?.avg_rating ?? null;
   const reviewCount   = summary?.review_count ?? 0;
@@ -400,7 +413,7 @@ function AgentProfilePage() {
 
       <div className="container-page py-5">
         <Link to="/partners" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" /> All partners
+          <ArrowLeft className="size-4 rtl:rotate-180" /> {t("agent.allPartners")}
         </Link>
       </div>
 
@@ -424,23 +437,23 @@ function AgentProfilePage() {
                   )}
                   {partner.is_verified && (
                     <div className="mb-1 flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success">
-                      <BadgeCheck className="size-3.5" /> Verified
+                      <BadgeCheck className="size-3.5" /> {t("agent.verified")}
                     </div>
                   )}
                 </div>
 
                 <h1 className="text-xl font-bold tracking-tight">{displayName}</h1>
-                <p className="mt-0.5 text-xs text-muted-foreground">Member since {memberSince(partner.created_at)}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{t("agent.memberSince", { date: memberSince(partner.created_at, lang) })}</p>
 
                 {/* Real rating from reviews */}
                 {realRating !== null ? (
                   <div className="mt-3 flex items-center gap-2">
                     <StarDisplay score={realRating} />
                     <span className="text-sm font-bold">{realRating.toFixed(1)}</span>
-                    <span className="text-xs text-muted-foreground">· {reviewCount} review{reviewCount !== 1 ? "s" : ""}</span>
+                    <span className="text-xs text-muted-foreground">· {t(reviewCount === 1 ? "agent.reviewCountSingular" : "agent.reviewCountPlural", { count: reviewCount })}</span>
                   </div>
                 ) : (
-                  <div className="mt-3 text-xs text-muted-foreground">No reviews yet</div>
+                  <div className="mt-3 text-xs text-muted-foreground">{t("agent.noReviewsYet")}</div>
                 )}
 
                 {partner.bio && (
@@ -450,9 +463,9 @@ function AgentProfilePage() {
                 {/* Stats */}
                 <div className="mt-5 grid grid-cols-3 divide-x divide-border rounded-xl border border-border text-center">
                   {[
-                    { value: listings.length,             label: "Listings" },
-                    { value: partner.total_leads_accepted, label: "Deals"   },
-                    { value: partner.areas.length,         label: "Areas"   },
+                    { value: listings.length,             label: t("agent.listingsLabel") },
+                    { value: partner.total_leads_accepted, label: t("agent.dealsLabel")   },
+                    { value: partner.areas.length,         label: t("agent.areasLabel")   },
                   ].map(({ value, label }) => (
                     <div key={label} className="py-3">
                       <div className="text-lg font-bold">{value}</div>
@@ -465,7 +478,7 @@ function AgentProfilePage() {
 
             {/* Contact */}
             <div className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contact agent</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("agent.contactAgent")}</div>
               <a
                 href={waUrl(partner.phone)}
                 target="_blank"
@@ -475,13 +488,13 @@ function AgentProfilePage() {
                 <svg viewBox="0 0 24 24" className="size-4 fill-current" aria-hidden="true">
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                 </svg>
-                WhatsApp
+                {t("agent.whatsapp")}
               </a>
               <a
                 href={`tel:${partner.phone}`}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface py-3 text-sm font-semibold text-foreground hover:bg-surface-2 transition-colors"
               >
-                <Phone className="size-4" /> Call {partner.phone}
+                <Phone className="size-4" /> {t("agent.call", { phone: partner.phone })}
               </a>
             </div>
 
@@ -490,12 +503,12 @@ function AgentProfilePage() {
               <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
                 <div className="mb-4 flex items-center gap-2">
                   <MapPin className="size-4 text-primary" />
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Service areas</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("agent.serviceAreas")}</div>
                 </div>
                 <div className="space-y-4">
                   {Object.entries(cityClusters).map(([city, areas]) => (
                     <div key={city}>
-                      <div className="mb-2 text-xs font-semibold text-foreground">{city}</div>
+                      <div className="mb-2 text-xs font-semibold text-foreground">{t(`cities.${city === "Al Khobar" ? "Khobar" : city}`)}</div>
                       <div className="flex flex-wrap gap-1.5">
                         {areas.map((a) => (
                           <span key={a} className="rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-muted-foreground">{a}</span>
@@ -514,26 +527,30 @@ function AgentProfilePage() {
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold tracking-tight">
-                  {listings.length > 0 ? `${listings.length} active listing${listings.length !== 1 ? "s" : ""}` : "Listings"}
+                  {listings.length > 0
+                    ? t(listings.length === 1 ? "agent.activeListingsSingular" : "agent.activeListingsPlural", { count: listings.length })
+                    : t("agent.listingsHeading")}
                 </h2>
-                <p className="text-sm text-muted-foreground">Properties currently listed by {displayName}</p>
+                <p className="text-sm text-muted-foreground">{t("agent.propertiesListedBy", { name: displayName })}</p>
               </div>
               {listings.length > 0 && (
-                <Badge tone="primary" className="hidden sm:flex">{listings.length} {listings.length === 1 ? "property" : "properties"}</Badge>
+                <Badge tone="primary" className="hidden sm:flex">
+                  {t(listings.length === 1 ? "agent.propertyCountSingular" : "agent.propertyCountPlural", { count: listings.length })}
+                </Badge>
               )}
             </div>
 
             {listings.length === 0 ? (
               <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border py-16 text-center">
                 <Home className="size-12 text-muted-foreground/30" />
-                <div className="text-base font-semibold text-muted-foreground">No active listings right now</div>
+                <div className="text-base font-semibold text-muted-foreground">{t("agent.noActiveListings")}</div>
                 <a
                   href={waUrl(partner.phone)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-white"
                 >
-                  <MessageCircle className="size-4" /> Ask on WhatsApp
+                  <MessageCircle className="size-4" /> {t("agent.askOnWhatsapp")}
                 </a>
               </div>
             ) : (

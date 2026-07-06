@@ -17,6 +17,7 @@ import { chatWithAdvisor, createLead, fetchProperty, mapApiProperty } from "@/li
 import type { Property } from "@/lib/maskan-data";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/advisor")({
   validateSearch: (s: Record<string, unknown>): { q?: string; propertyId?: number } => ({
@@ -88,13 +89,6 @@ function persistHistory(msgs: Msg[]) {
   } catch {}
 }
 
-const SUGGESTED = [
-  "What are the best family areas in North Riyadh?",
-  "Compare Al Narjis vs Al Yasmin for a family of 4",
-  "Is SAR 8,000/month fair for a 3BR in Al Malqa?",
-  "Which areas have the best value for money?",
-];
-
 // ── Lead creation system context injected into every Claude call ──────────────
 const LEAD_SYSTEM_CTX: Array<{ role: "user" | "assistant"; content: string }> = [
   {
@@ -141,6 +135,7 @@ function buildPropertyContext(p: Property): Array<{ role: string; content: strin
 const LEAD_MARKER_RE = /\[CREATE_LEAD:(\{[\s\S]*?\})\]\s*$/m;
 
 function AdvisorPage() {
+  const { t } = useLanguage();
   const { q: prefilledQ = "", propertyId } = Route.useSearch();
   const [messages, setMessages] = useState<Msg[]>(() => loadHistory());
   const [input, setInput] = useState("");
@@ -243,7 +238,7 @@ function AdvisorPage() {
     } catch {
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        { role: "ai", text: "Sorry, I couldn't reach the AI service. Please try again.", ts: Date.now() },
+        { role: "ai", text: t("advisor.errorReachingAI"), ts: Date.now() },
       ]);
     } finally {
       setIsLoading(false);
@@ -261,7 +256,7 @@ function AdvisorPage() {
         <div className="flex shrink-0 items-center gap-3 border-b border-ai/20 bg-ai-soft/25 px-4 py-2.5">
           <Sparkles className="size-4 shrink-0 text-ai" />
           <div className="min-w-0 flex-1 text-xs">
-            <span className="font-semibold text-ai">Property context loaded · </span>
+            <span className="font-semibold text-ai">{t("advisor.propertyContextLoaded")}</span>
             <span className="text-muted-foreground">
               {propertyCtx.title}, {propertyCtx.district} · SAR {Math.round(propertyCtx.price / 12).toLocaleString()}/mo
             </span>
@@ -271,7 +266,7 @@ function AdvisorPage() {
             params={{ id: String(propertyCtx.id) }}
             className="shrink-0 inline-flex items-center gap-0.5 text-xs text-ai hover:underline"
           >
-            View <ChevronRight className="size-3" />
+            {t("advisor.view")} <ChevronRight className="size-3 rtl:rotate-180" />
           </Link>
           <button
             type="button"
@@ -308,7 +303,7 @@ function AdvisorPage() {
             }}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
           >
-            <Plus className="size-3.5" /> New chat
+            <Plus className="size-3.5" /> {t("advisor.newChat")}
           </button>
         </div>
         <form
@@ -327,7 +322,7 @@ function AdvisorPage() {
                 e.target.style.height = "auto";
                 e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
               }}
-              placeholder="Ask about areas, rent fairness… or say 'I want to find a 3BR in Al Yasmin'"
+              placeholder={t("advisor.inputPlaceholder")}
               rows={1}
               className="flex-1 resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
               onKeyDown={(e) => {
@@ -339,7 +334,7 @@ function AdvisorPage() {
             />
             <button
               type="submit"
-              aria-label="Send"
+              aria-label={t("advisor.send")}
               disabled={!input.trim() || isLoading}
               className="mb-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-30"
             >
@@ -347,7 +342,7 @@ function AdvisorPage() {
             </button>
           </div>
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            Maskan AI answers based on live platform data. You can also ask it to create a lead request.
+            {t("advisor.footerDisclaimer")}
           </p>
         </form>
       </div>
@@ -357,6 +352,7 @@ function AdvisorPage() {
 
 /* ── Lead confirm card (shown in chat when AI gathers enough data) ─────────── */
 function LeadConfirmCard({ data }: { data: LeadData }) {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [phone, setPhone] = useState("");
@@ -369,12 +365,12 @@ function LeadConfirmCard({ data }: { data: LeadData }) {
       <div className="mb-8 ms-10 rounded-2xl border border-border bg-card p-5 shadow-card">
         <div className="mb-2 flex items-center gap-2">
           <ClipboardList className="size-4 text-primary" />
-          <span className="text-sm font-semibold">Ready to submit your lead</span>
+          <span className="text-sm font-semibold">{t("advisor.leadConfirm.readyToSubmit")}</span>
         </div>
         <p className="mb-4 text-sm text-muted-foreground">
-          Sign in to submit this lead — partners covering <strong>{data.area_name}, {data.city}</strong> will be notified.
+          {t("advisor.leadConfirm.signInDesc", { area: data.area_name, city: data.city })}
         </p>
-        <Button size="sm" onClick={() => void navigate({ to: "/auth" })}>Sign in to continue</Button>
+        <Button size="sm" onClick={() => void navigate({ to: "/auth" })}>{t("advisor.leadConfirm.signInButton")}</Button>
       </div>
     );
   }
@@ -384,13 +380,13 @@ function LeadConfirmCard({ data }: { data: LeadData }) {
       <div className="mb-8 ms-10 flex items-center gap-3 rounded-2xl border border-success/30 bg-success/5 p-5">
         <CheckCircle className="size-5 shrink-0 text-success" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-success">Lead submitted!</p>
+          <p className="text-sm font-semibold text-success">{t("advisor.leadConfirm.leadSubmitted")}</p>
           <p className="text-xs text-muted-foreground">
-            Partners covering {data.area_name}, {data.city} will be notified. You'll hear back within 24 hours.
+            {t("advisor.leadConfirm.willBeNotified", { area: data.area_name, city: data.city })}
           </p>
         </div>
         <Link to="/lead/$leadId" params={{ leadId: String(doneLeadId) }}>
-          <Button size="sm" variant="outline">Track lead →</Button>
+          <Button size="sm" variant="outline">{t("advisor.leadConfirm.trackLead")}</Button>
         </Link>
       </div>
     );
@@ -400,32 +396,32 @@ function LeadConfirmCard({ data }: { data: LeadData }) {
     <div className="mb-8 ms-10 rounded-2xl border border-primary/20 bg-primary/5 p-5 shadow-card">
       <div className="mb-3 flex items-center gap-2">
         <ClipboardList className="size-4 text-primary" />
-        <span className="text-sm font-semibold">Ready to submit your lead request</span>
+        <span className="text-sm font-semibold">{t("advisor.leadConfirm.readyToSubmitFull")}</span>
       </div>
 
       {/* Lead summary */}
       <div className="mb-4 grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-xl bg-surface p-3 text-sm">
-        <div><span className="text-muted-foreground">District: </span><span className="font-medium">{data.area_name}</span></div>
-        <div><span className="text-muted-foreground">City: </span><span className="font-medium">{data.city}</span></div>
+        <div><span className="text-muted-foreground">{t("advisor.leadConfirm.district")}</span><span className="font-medium">{data.area_name}</span></div>
+        <div><span className="text-muted-foreground">{t("advisor.leadConfirm.city")}</span><span className="font-medium">{data.city}</span></div>
         {data.bedrooms_needed != null && (
-          <div><span className="text-muted-foreground">Bedrooms: </span><span className="font-medium">{data.bedrooms_needed} BR</span></div>
+          <div><span className="text-muted-foreground">{t("advisor.leadConfirm.bedrooms")}</span><span className="font-medium">{t("advisor.leadConfirm.bedroomsValue", { count: data.bedrooms_needed })}</span></div>
         )}
         {data.max_budget != null && (
-          <div><span className="text-muted-foreground">Budget: </span><span className="font-medium">SAR {data.max_budget.toLocaleString()}/mo</span></div>
+          <div><span className="text-muted-foreground">{t("advisor.leadConfirm.budget")}</span><span className="font-medium">{t("advisor.leadConfirm.budgetValue", { amount: data.max_budget.toLocaleString() })}</span></div>
         )}
         {data.move_in_date && (
-          <div><span className="text-muted-foreground">Move-in: </span><span className="font-medium">{data.move_in_date}</span></div>
+          <div><span className="text-muted-foreground">{t("advisor.leadConfirm.moveIn")}</span><span className="font-medium">{data.move_in_date}</span></div>
         )}
         {data.requirements_note && (
-          <div className="col-span-2"><span className="text-muted-foreground">Requirements: </span><span className="font-medium">{data.requirements_note}</span></div>
+          <div className="col-span-2"><span className="text-muted-foreground">{t("advisor.leadConfirm.requirements")}</span><span className="font-medium">{data.requirements_note}</span></div>
         )}
       </div>
 
       {/* Phone input */}
       <div className="mb-3">
         <label className="mb-1.5 block text-xs font-medium">
-          Your phone number <span className="text-destructive">*</span>
-          <span className="ms-1 font-normal text-muted-foreground">(so the partner can reach you)</span>
+          {t("advisor.leadConfirm.yourPhone")} <span className="text-destructive">*</span>
+          <span className="ms-1 font-normal text-muted-foreground">{t("advisor.leadConfirm.phoneNote")}</span>
         </label>
         <div className="flex items-center gap-2">
           <Phone className="size-4 shrink-0 text-muted-foreground" />
@@ -462,15 +458,15 @@ function LeadConfirmCard({ data }: { data: LeadData }) {
               });
               setDoneLeadId(lead.id);
             } catch {
-              setError("Failed to submit lead. Please try again.");
+              setError(t("advisor.leadConfirm.failedToSubmit"));
             } finally {
               setSubmitting(false);
             }
           }}
         >
-          {submitting ? "Submitting…" : "Submit lead request"}
+          {submitting ? t("advisor.leadConfirm.submitting") : t("advisor.leadConfirm.submitLeadRequest")}
         </Button>
-        <span className="text-xs text-muted-foreground">Free · Partners pay SAR 25 to see your details</span>
+        <span className="text-xs text-muted-foreground">{t("advisor.leadConfirm.freeNote")}</span>
       </div>
     </div>
   );
@@ -478,14 +474,24 @@ function LeadConfirmCard({ data }: { data: LeadData }) {
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
 function EmptyState({ onSend, propertyCtx }: { onSend: (t: string) => void; propertyCtx: Property | null }) {
+  const { t } = useLanguage();
   const suggested = propertyCtx
     ? [
-        `Is SAR ${Math.round(propertyCtx.price / 12).toLocaleString()}/month fair for a ${propertyCtx.bedrooms}BR in ${propertyCtx.district}?`,
-        `What are the pros and cons of living in ${propertyCtx.district}?`,
-        `How does ${propertyCtx.district} compare to similar areas in ${propertyCtx.city}?`,
-        `What should I check before renting this property?`,
+        t("advisor.suggested.propFair", {
+          amount: Math.round(propertyCtx.price / 12).toLocaleString(),
+          bedrooms: propertyCtx.bedrooms,
+          district: propertyCtx.district,
+        }),
+        t("advisor.suggested.propPros", { district: propertyCtx.district }),
+        t("advisor.suggested.propCompare", { district: propertyCtx.district, city: propertyCtx.city }),
+        t("advisor.suggested.propCheck"),
       ]
-    : SUGGESTED;
+    : [
+        t("advisor.suggested.q1"),
+        t("advisor.suggested.q2"),
+        t("advisor.suggested.q3"),
+        t("advisor.suggested.q4"),
+      ];
 
   return (
     <div className="flex h-full flex-col items-center justify-center px-4 pb-16">
@@ -494,16 +500,16 @@ function EmptyState({ onSend, propertyCtx }: { onSend: (t: string) => void; prop
       </div>
       {propertyCtx ? (
         <>
-          <h2 className="font-display text-2xl font-bold tracking-tight">Ask about this property</h2>
+          <h2 className="font-display text-2xl font-bold tracking-tight">{t("advisor.emptyState.askAboutProperty")}</h2>
           <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
             {propertyCtx.title} · {propertyCtx.district}, {propertyCtx.city}
           </p>
         </>
       ) : (
         <>
-          <h2 className="font-display text-2xl font-bold tracking-tight">Maskan AI Advisor</h2>
+          <h2 className="font-display text-2xl font-bold tracking-tight">{t("advisor.emptyState.title")}</h2>
           <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
-            Ask anything about rental properties, neighborhoods, or fair pricing — or let me help you create a partner lead request.
+            {t("advisor.emptyState.desc")}
           </p>
         </>
       )}
@@ -512,7 +518,7 @@ function EmptyState({ onSend, propertyCtx }: { onSend: (t: string) => void; prop
           <button
             key={q}
             onClick={() => onSend(q)}
-            className="rounded-xl border border-border bg-card px-4 py-3 text-left text-sm text-foreground transition-colors hover:border-ai/40 hover:bg-ai-soft/30"
+            className="rounded-xl border border-border bg-card px-4 py-3 text-start text-sm text-foreground transition-colors hover:border-ai/40 hover:bg-ai-soft/30"
           >
             {q}
           </button>
@@ -522,13 +528,13 @@ function EmptyState({ onSend, propertyCtx }: { onSend: (t: string) => void; prop
       {/* Lead request shortcut */}
       <div className="mt-4 w-full max-w-lg">
         <button
-          onClick={() => onSend("I want to find a rental property. Can you help me submit a lead request?")}
-          className="flex w-full items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-left text-sm transition-colors hover:bg-primary/10"
+          onClick={() => onSend(t("advisor.emptyState.leadShortcutPrompt"))}
+          className="flex w-full items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-start text-sm transition-colors hover:bg-primary/10"
         >
           <Briefcase className="size-4 shrink-0 text-primary" />
           <div>
-            <span className="font-medium text-foreground">Get matched with a partner</span>
-            <span className="ms-2 text-muted-foreground">Tell me what you need — I'll find the right partner for you.</span>
+            <span className="font-medium text-foreground">{t("advisor.emptyState.getMatchedTitle")}</span>
+            <span className="ms-2 text-muted-foreground">{t("advisor.emptyState.getMatchedDesc")}</span>
           </div>
         </button>
       </div>

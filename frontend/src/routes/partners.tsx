@@ -19,6 +19,7 @@ import { Badge } from "@/components/maskan/Badges";
 import { fetchPublicPartners, type ApiPartnerPublic } from "@/lib/api/maskan";
 import { cities } from "@/lib/maskan-data";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/partners")({
   head: () => ({
@@ -60,9 +61,10 @@ function initials(partner: ApiPartnerPublic) {
 }
 
 function PartnerCard({ partner }: { partner: ApiPartnerPublic }) {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const displayName = partner.agency_name ?? `Partner #${partner.id}`;
-  const cities = Array.from(new Set(partner.areas.map((a) => a.city)));
+  const partnerCities = Array.from(new Set(partner.areas.map((a) => a.city)));
   const districtCount = partner.areas.length;
 
   return (
@@ -99,7 +101,7 @@ function PartnerCard({ partner }: { partner: ApiPartnerPublic }) {
             </h3>
             {partner.is_verified && (
               <div className="mt-0.5 flex items-center gap-1 text-xs font-medium text-success">
-                <ShieldCheck className="size-3.5" /> Verified partner
+                <ShieldCheck className="size-3.5" /> {t("partners.verifiedPartner")}
               </div>
             )}
           </div>
@@ -107,7 +109,7 @@ function PartnerCard({ partner }: { partner: ApiPartnerPublic }) {
         {partner.total_leads_accepted > 0 && (
           <div className="shrink-0 text-end">
             <div className="text-xl font-bold">{partner.total_leads_accepted}</div>
-            <div className="text-[10px] text-muted-foreground">leads closed</div>
+            <div className="text-[10px] text-muted-foreground">{t("partners.leadsClosed")}</div>
           </div>
         )}
       </div>
@@ -122,15 +124,15 @@ function PartnerCard({ partner }: { partner: ApiPartnerPublic }) {
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <MapPin className="size-3.5" />
-            {districtCount} district{districtCount !== 1 ? "s" : ""} covered
+            {t(districtCount === 1 ? "partners.districtsCoveredSingular" : "partners.districtsCoveredPlural", { count: districtCount })}
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {cities.map((city) => (
+            {partnerCities.map((city) => (
               <span
                 key={city}
                 className="rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-foreground"
               >
-                {city}
+                {t(`cities.${city === "Al Khobar" ? "Khobar" : city}`)}
               </span>
             ))}
           </div>
@@ -145,7 +147,7 @@ function PartnerCard({ partner }: { partner: ApiPartnerPublic }) {
             ))}
             {partner.areas.length > 5 && (
               <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] text-muted-foreground">
-                +{partner.areas.length - 5} more
+                {t("partners.moreDistricts", { count: partner.areas.length - 5 })}
               </span>
             )}
           </div>
@@ -165,13 +167,14 @@ function PartnerCard({ partner }: { partner: ApiPartnerPublic }) {
           });
         }}
       >
-        Submit a lead request
+        {t("partners.submitLeadRequest")}
       </Button>
     </div>
   );
 }
 
 function PartnersPage() {
+  const { t } = useLanguage();
   const [partners, setPartners] = useState<ApiPartnerPublic[]>([]);
   const [loading, setLoading] = useState(true);
   const [cityFilter, setCityFilter] = useState("Any");
@@ -209,14 +212,13 @@ function PartnersPage() {
       <section className="border-b border-border bg-surface">
         <div className="container-page py-10">
           <Badge tone="primary" className="mb-3">
-            <Briefcase className="size-3.5" /> Verified partners
+            <Briefcase className="size-3.5" /> {t("partners.badge")}
           </Badge>
           <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
-            Find a Maskan Partner
+            {t("partners.heading")}
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Licensed real estate partners covering every district across Saudi Arabia.
-            Submit a lead and get matched with the right partner for your area within 24 hours.
+            {t("partners.subtitle")}
           </p>
 
           {/* Filters */}
@@ -227,7 +229,7 @@ function PartnersPage() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by name, area, city…"
+                placeholder={t("partners.searchPlaceholder")}
                 className="h-10 w-full rounded-xl border border-border bg-card ps-9 pe-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
               />
               {query && (
@@ -252,10 +254,10 @@ function PartnersPage() {
                 }}
                 className="h-10 rounded-xl border border-border bg-card px-3 text-sm outline-none focus:border-primary"
               >
-                <option value="Any">All cities</option>
+                <option value="Any">{t("partners.allCities")}</option>
                 {cities.map((c) => (
                   <option key={c.name} value={c.name}>
-                    {c.name}
+                    {t(`cities.${c.name}`)}
                   </option>
                 ))}
               </select>
@@ -267,12 +269,14 @@ function PartnersPage() {
                 onClick={() => { setCityFilter("Any"); setQuery(""); }}
                 className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
               >
-                <X className="size-3.5" /> Clear filters
+                <X className="size-3.5" /> {t("partners.clearFilters")}
               </button>
             )}
 
             <div className="ms-auto text-sm text-muted-foreground">
-              {loading ? "Loading…" : `${filtered.length} partner${filtered.length !== 1 ? "s" : ""}`}
+              {loading
+                ? t("partners.loading")
+                : t(filtered.length === 1 ? "partners.partnerCountSingular" : "partners.partnerCountPlural", { count: filtered.length })}
             </div>
           </div>
         </div>
@@ -297,21 +301,21 @@ function PartnersPage() {
               <Users className="size-8" />
             </div>
             <div>
-              <p className="font-semibold">No partners found</p>
+              <p className="font-semibold">{t("partners.noPartnersFound")}</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {hasFilters
-                  ? "Try adjusting your filters."
-                  : "No active partners are registered yet. Be the first!"}
+                  ? t("partners.tryAdjustingFilters")
+                  : t("partners.noActivePartners")}
               </p>
             </div>
             {hasFilters && (
               <Button variant="outline" onClick={() => { setCityFilter("Any"); setQuery(""); }}>
-                Clear filters
+                {t("partners.clearFilters")}
               </Button>
             )}
             <Link to="/partner/register">
               <Button variant="ghost" size="sm">
-                <Briefcase className="size-4" /> Become a partner
+                <Briefcase className="size-4" /> {t("partners.becomeAPartner")}
               </Button>
             </Link>
           </div>
@@ -331,14 +335,14 @@ function PartnersPage() {
                 <Star className="size-6" />
               </div>
               <div>
-                <h2 className="font-display text-xl font-bold">Are you a licensed agent?</h2>
+                <h2 className="font-display text-xl font-bold">{t("partners.areYouLicensed")}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Join Maskan as a partner and receive verified leads in your district for SAR 99/month.
+                  {t("partners.joinDesc")}
                 </p>
               </div>
               <Link to="/partner/register">
                 <Button>
-                  <Briefcase className="size-4" /> Register as a partner
+                  <Briefcase className="size-4" /> {t("partners.registerAsPartner")}
                 </Button>
               </Link>
             </div>

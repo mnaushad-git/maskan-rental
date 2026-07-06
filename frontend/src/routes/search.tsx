@@ -39,6 +39,7 @@ import {
 } from "@/lib/maskan-search-data";
 import { formatSAR } from "@/lib/maskan-data";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/search")({
   head: () => ({
@@ -89,8 +90,15 @@ const DEFAULTS: Filters = {
   pool: false,
 };
 
+// Small helper so call sites can write tSearch("clear") instead of t("search.clear").
+function useSearchT() {
+  const { t } = useLanguage();
+  return (key: string, vars?: Record<string, string | number>) => t(`search.${key}`, vars);
+}
+
 function SearchPage() {
   const { user } = useAuth();
+  const tSearch = useSearchT();
   const rawSearch = useRouterState({ select: s => s.location.searchStr });
   const _qs = new URLSearchParams(rawSearch);
   const [filters, setFilters] = useState<Filters>({
@@ -101,7 +109,7 @@ function SearchPage() {
     maxRent:  Number(_qs.get("maxRent") ?? 500000),
     type:     _qs.get("type")     ?? "Any",
   });
-  const [view, setView] = useState<"grid" | "list" | "map">("grid");
+  const [view, setView] = useState<"grid" | "list" | "map">("map");
   const [sort, setSort] = useState<"match" | "price-asc" | "price-desc" | "value">("match");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [compare, setCompare] = useState<string[]>([]);
@@ -141,7 +149,7 @@ function SearchPage() {
         setProperties((prev) => enrichPropertiesWithScores(prev, intelList, avgMap));
       } catch {
         if (!cancelled) {
-          setError("Unable to load live listings.");
+          setError(tSearch("errorLoading"));
           setProperties([]);
           setLoading(false);
         }
@@ -160,6 +168,8 @@ function SearchPage() {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisible);
     };
+    // tSearch intentionally omitted — switching language shouldn't re-fetch listings.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const results = useMemo(() => {
@@ -239,7 +249,9 @@ function SearchPage() {
           setView={setView}
         />
 
-        {loading && <p className="mt-3 text-sm text-muted-foreground">Loading live listings...</p>}
+        {loading && (
+          <p className="mt-3 text-sm text-muted-foreground">{tSearch("loadingListings")}</p>
+        )}
         {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
         {/* Mobile-only filter trigger bar */}
@@ -250,7 +262,7 @@ function SearchPage() {
             className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold shadow-sm"
           >
             <SlidersHorizontal className="size-4" />
-            Filters
+            {tSearch("filters")}
             {activeFilterCount > 0 && (
               <span className="inline-flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                 {activeFilterCount}
@@ -263,7 +275,7 @@ function SearchPage() {
               onClick={() => setFilters(DEFAULTS)}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
-              <X className="size-3.5" /> Clear
+              <X className="size-3.5" /> {tSearch("clear")}
             </button>
           )}
         </div>
@@ -306,17 +318,19 @@ function SearchPage() {
 }
 
 function Breadcrumbs({ city }: { city: string }) {
+  const { t } = useLanguage();
+  const tSearch = useSearchT();
   return (
     <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <Link to="/" className="inline-flex items-center gap-1 hover:text-foreground">
-        <ChevronLeft className="size-3.5" /> Back to home
+        <ChevronLeft className="size-3.5 rtl:rotate-180" /> {tSearch("backToHome")}
       </Link>
       <span>·</span>
-      <span>Search</span>
+      <span>{tSearch("breadcrumb")}</span>
       {city !== "Any" && (
         <>
           <span>·</span>
-          <span className="text-foreground">{city}</span>
+          <span className="text-foreground">{t(`cities.${city}`)}</span>
         </>
       )}
     </nav>
@@ -336,15 +350,14 @@ function ResultsHeader({
   view: "grid" | "list" | "map";
   setView: (v: "grid" | "list" | "map") => void;
 }) {
+  const tSearch = useSearchT();
   return (
     <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
       <div>
         <h1 className="font-display text-3xl font-bold tracking-tight">
-          {count} rental {count === 1 ? "home" : "homes"} match
+          {tSearch(count === 1 ? "resultsHeadingSingular" : "resultsHeadingPlural", { count })}
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Ranked by property score: price fairness, area quality, and size.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">{tSearch("rankedBy")}</p>
       </div>
       <div className="flex items-center gap-2">
         {view !== "map" && (
@@ -355,17 +368,17 @@ function ResultsHeader({
               onChange={(e) => setSort(e.target.value as never)}
               className="bg-transparent text-sm font-medium outline-none"
             >
-              <option value="match">Best property score</option>
-              <option value="value">Best rental value</option>
-              <option value="price-asc">Price: low to high</option>
-              <option value="price-desc">Price: high to low</option>
+              <option value="match">{tSearch("sortBestScore")}</option>
+              <option value="value">{tSearch("sortBestValue")}</option>
+              <option value="price-asc">{tSearch("sortPriceLowHigh")}</option>
+              <option value="price-desc">{tSearch("sortPriceHighLow")}</option>
             </select>
           </div>
         )}
         <div className="flex items-center rounded-xl border border-border bg-card p-1 shadow-sm">
           <button
             onClick={() => setView("grid")}
-            aria-label="Grid view"
+            aria-label={tSearch("gridView")}
             className={cn(
               "grid size-8 place-items-center rounded-lg transition-colors",
               view === "grid" ? "bg-surface text-foreground" : "text-muted-foreground hover:text-foreground",
@@ -375,7 +388,7 @@ function ResultsHeader({
           </button>
           <button
             onClick={() => setView("list")}
-            aria-label="List view"
+            aria-label={tSearch("listView")}
             className={cn(
               "grid size-8 place-items-center rounded-lg transition-colors",
               view === "list" ? "bg-surface text-foreground" : "text-muted-foreground hover:text-foreground",
@@ -385,7 +398,7 @@ function ResultsHeader({
           </button>
           <button
             onClick={() => setView("map")}
-            aria-label="Map view"
+            aria-label={tSearch("mapView")}
             className={cn(
               "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors",
               view === "map"
@@ -393,7 +406,7 @@ function ResultsHeader({
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <Map className="size-3.5" /> Map
+            <Map className="size-3.5" /> {tSearch("mapView")}
           </button>
         </div>
       </div>
@@ -411,6 +424,8 @@ function FilterFields({
   filters: Filters;
   setFilters: (f: Filters) => void;
 }) {
+  const { t } = useLanguage();
+  const tSearch = useSearchT();
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) =>
     setFilters({ ...filters, [k]: v });
 
@@ -422,64 +437,95 @@ function FilterFields({
 
   return (
     <div className="space-y-5">
-      <Field label="City">
+      <Field label={tSearch("city")}>
         <Select value={filters.city} onChange={(v) => setFilters({ ...filters, city: v, district: "Any" })}>
-          {cities.map((c) => (<option key={c}>{c}</option>))}
+          {cities.map((c) => (
+            <option key={c} value={c}>
+              {c === "Any" ? t("onboarding.any") : t(`cities.${c}`)}
+            </option>
+          ))}
         </Select>
       </Field>
 
-      <Field label="District">
+      <Field label={tSearch("district")}>
         <Select value={filters.district} onChange={(v) => set("district", v)}>
-          {districts.map((d) => (<option key={d}>{d}</option>))}
+          {districts.map((d) => (
+            <option key={d} value={d}>
+              {d === "Any" ? t("onboarding.any") : d}
+            </option>
+          ))}
         </Select>
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Min rent (SAR)">
+        <Field label={tSearch("minRent")}>
           <NumberInput value={filters.minRent} onChange={(v) => set("minRent", v)} step={5000} placeholder="0" />
         </Field>
-        <Field label="Max rent (SAR)">
+        <Field label={tSearch("maxRent")}>
           <NumberInput value={filters.maxRent} onChange={(v) => set("maxRent", v)} step={5000} placeholder="500,000" />
         </Field>
       </div>
 
-      <Field label="Bedrooms">
+      <Field label={tSearch("bedrooms")}>
         <SegmentedControl
           value={String(filters.bedrooms)}
           options={["0", "1", "2", "3", "4", "5"]}
-          labels={["Any", "1+", "2+", "3+", "4+", "5+"]}
+          labels={[
+            t("onboarding.any"),
+            tSearch("anyPlus1"),
+            tSearch("anyPlus2"),
+            tSearch("anyPlus3"),
+            tSearch("anyPlus4"),
+            tSearch("anyPlus5"),
+          ]}
           onChange={(v) => set("bedrooms", Number(v))}
         />
       </Field>
 
-      <Field label="Bathrooms">
+      <Field label={tSearch("bathrooms")}>
         <SegmentedControl
           value={String(filters.bathrooms)}
           options={["0", "1", "2", "3", "4"]}
-          labels={["Any", "1+", "2+", "3+", "4+"]}
+          labels={[
+            t("onboarding.any"),
+            tSearch("anyPlus1"),
+            tSearch("anyPlus2"),
+            tSearch("anyPlus3"),
+            tSearch("anyPlus4"),
+          ]}
           onChange={(v) => set("bathrooms", Number(v))}
         />
       </Field>
 
-      <Field label="Property type">
+      <Field label={tSearch("propertyType")}>
         <Select value={filters.type} onChange={(v) => set("type", v)}>
-          {types.map((t) => (<option key={t}>{t}</option>))}
+          {types.map((type) => (
+            <option key={type} value={type}>
+              {t(`propertyTypes.${type}`)}
+            </option>
+          ))}
         </Select>
       </Field>
 
-      <Field label="Furnishing">
+      <Field label={tSearch("furnishing")}>
         <Select value={filters.furnishing} onChange={(v) => set("furnishing", v)}>
-          {furnishings.map((t) => (<option key={t}>{t}</option>))}
+          {furnishings.map((f) => (
+            <option key={f} value={f}>
+              {t(`furnishing.${f}`)}
+            </option>
+          ))}
         </Select>
       </Field>
 
       <div>
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Amenities</div>
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {tSearch("amenities")}
+        </div>
         <div className="grid grid-cols-2 gap-2">
-          <Toggle label="Parking"  icon={<Car className="size-3.5" />}    active={filters.parking} onToggle={() => set("parking", !filters.parking)} />
-          <Toggle label="Balcony"  icon={<Trees className="size-3.5" />}  active={filters.balcony} onToggle={() => set("balcony", !filters.balcony)} />
-          <Toggle label="Gym"      icon={<Dumbbell className="size-3.5" />} active={filters.gym}   onToggle={() => set("gym", !filters.gym)} />
-          <Toggle label="Pool"     icon={<Waves className="size-3.5" />}  active={filters.pool}   onToggle={() => set("pool", !filters.pool)} />
+          <Toggle label={tSearch("parking")} icon={<Car className="size-3.5" />} active={filters.parking} onToggle={() => set("parking", !filters.parking)} />
+          <Toggle label={tSearch("balcony")} icon={<Trees className="size-3.5" />} active={filters.balcony} onToggle={() => set("balcony", !filters.balcony)} />
+          <Toggle label={tSearch("gym")} icon={<Dumbbell className="size-3.5" />} active={filters.gym} onToggle={() => set("gym", !filters.gym)} />
+          <Toggle label={tSearch("pool")} icon={<Waves className="size-3.5" />} active={filters.pool} onToggle={() => set("pool", !filters.pool)} />
         </div>
       </div>
     </div>
@@ -494,15 +540,16 @@ function FiltersPanel({
   filters: Filters;
   setFilters: (f: Filters) => void;
 }) {
+  const tSearch = useSearchT();
   return (
     <aside className="hidden h-fit rounded-2xl border border-border bg-card p-5 shadow-card lg:block lg:sticky lg:top-20">
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="size-4 text-primary" />
-          <h2 className="text-sm font-semibold">Filters</h2>
+          <h2 className="text-sm font-semibold">{tSearch("filters")}</h2>
         </div>
         <button type="button" onClick={() => setFilters(DEFAULTS)} className="text-xs font-semibold text-primary hover:underline">
-          Reset
+          {tSearch("reset")}
         </button>
       </div>
       <FilterFields filters={filters} setFilters={setFilters} />
@@ -524,6 +571,7 @@ function MobileFilterSheet({
   setFilters: (f: Filters) => void;
   resultsCount: number;
 }) {
+  const tSearch = useSearchT();
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 lg:hidden">
@@ -532,7 +580,7 @@ function MobileFilterSheet({
       {/* Sheet */}
       <div className="absolute inset-x-0 bottom-0 flex max-h-[90vh] flex-col rounded-t-3xl bg-background shadow-2xl">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
-          <div className="text-base font-semibold">Filters</div>
+          <div className="text-base font-semibold">{tSearch("filters")}</div>
           <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="size-5" />
           </button>
@@ -543,10 +591,13 @@ function MobileFilterSheet({
         <div className="shrink-0 border-t border-border bg-background px-5 py-4">
           <div className="flex gap-3">
             <Button variant="outline" className="flex-1" onClick={() => setFilters(DEFAULTS)}>
-              Reset
+              {tSearch("reset")}
             </Button>
             <Button variant="hero" className="flex-[2]" onClick={onClose}>
-              Show {resultsCount} {resultsCount === 1 ? "property" : "properties"}
+              {tSearch(
+                resultsCount === 1 ? "showNPropertiesSingular" : "showNPropertiesPlural",
+                { count: resultsCount },
+              )}
             </Button>
           </div>
         </div>
@@ -686,6 +737,7 @@ function ResultsPanel({
   onToggleCompare: (id: string) => void;
   onToggleSave: (id: string) => void | Promise<void>;
 }) {
+  const tSearch = useSearchT();
   const leadCity = city !== "Any" ? city : "Riyadh";
   const leadArea = district !== "Any" ? district : "";
 
@@ -694,9 +746,9 @@ function ResultsPanel({
       <div className="space-y-4">
         <div className="grid place-items-center rounded-2xl border border-dashed border-border bg-card p-16 text-center">
           <Building2 className="size-10 text-muted-foreground" />
-          <h3 className="mt-4 font-display text-lg font-bold">No matches yet</h3>
+          <h3 className="mt-4 font-display text-lg font-bold">{tSearch("noMatchesTitle")}</h3>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            Try widening your budget or removing a filter. Our AI can also suggest similar areas.
+            {tSearch("noMatchesDesc")}
           </p>
         </div>
         <LeadCTABanner city={leadCity} area={leadArea} />
@@ -730,19 +782,21 @@ function ResultsPanel({
 }
 
 function LeadCTABanner({ city, area }: { city: string; area: string }) {
+  const { t } = useLanguage();
+  const tSearch = useSearchT();
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
         <Briefcase className="size-5 shrink-0 text-primary mt-0.5" />
         <div>
-          <p className="font-semibold text-sm">Can't find what you're looking for?</p>
+          <p className="font-semibold text-sm">{tSearch("cantFindTitle")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Submit a free lead request — verified partners covering {city} will reach out within 24 hours.
+            {tSearch("cantFindDesc", { city: t(`cities.${city}`) })}
           </p>
         </div>
       </div>
       <Link to="/lead/new" search={{ area, city }} className="shrink-0">
-        <Button size="sm">Submit a lead request</Button>
+        <Button size="sm">{tSearch("submitLeadRequest")}</Button>
       </Link>
     </div>
   );
@@ -763,6 +817,8 @@ function ResultCard({
   onCompare: () => void;
   onSave: () => void;
 }) {
+  const { t } = useLanguage();
+  const tSearch = useSearchT();
   const isList = variant === "list";
   const hasPhone = !!p.agentPhone;
   const waLink = hasPhone
@@ -786,12 +842,12 @@ function ResultCard({
           />
           <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
             <Badge tone="ai">
-              <Sparkles className="size-3" /> Score {p.matchScore}
+              <Sparkles className="size-3" /> {tSearch("score", { score: p.matchScore })}
             </Badge>
             <button
               type="button"
               onClick={(e) => { e.preventDefault(); onSave(); }}
-              aria-label="Save"
+              aria-label={tSearch("save")}
               className={cn(
                 "grid size-9 place-items-center rounded-full shadow-card backdrop-blur transition-colors",
                 saved ? "bg-destructive text-destructive-foreground" : "bg-background/95 text-foreground hover:bg-background",
@@ -826,24 +882,26 @@ function ResultCard({
               <Maximize className="size-4" /> {p.area} m²
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <Sofa className="size-4" /> {p.furnished}
+              <Sofa className="size-4" /> {t(`furnishing.${p.furnished}`)}
             </span>
           </div>
 
           <div className="grid grid-cols-3 gap-2 rounded-xl bg-surface p-3 text-center">
-            <Mini label="Price" value={p.rentalScore} tone="primary" />
-            <Mini label="Area" value={p.areaScore} tone="secondary" />
-            <Mini label="Score" value={p.matchScore} tone="ai" />
+            <Mini label={tSearch("priceMini")} value={p.rentalScore} tone="primary" />
+            <Mini label={tSearch("areaMini")} value={p.areaScore} tone="secondary" />
+            <Mini label={tSearch("scoreMini")} value={p.matchScore} tone="ai" />
           </div>
 
           {!isList && <AiRecBox reasons={p.reasons} />}
 
           <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
             <div>
-              <div className="text-xs text-muted-foreground">Annual rent</div>
+              <div className="text-xs text-muted-foreground">{t("propertyCard.annualRent")}</div>
               <div className="font-display text-xl font-bold tracking-tight">
                 SAR {formatSAR(p.price)}
-                <span className="ml-1 text-xs font-medium text-muted-foreground">/yr</span>
+                <span className="ms-1 text-xs font-medium text-muted-foreground">
+                  {t("propertyCard.perYear")}
+                </span>
               </div>
             </div>
             <Button
@@ -853,7 +911,7 @@ function ResultCard({
               aria-pressed={compared}
             >
               <GitCompare className="size-3.5" />
-              {compared ? "Added" : "Compare"}
+              {compared ? tSearch("added") : tSearch("compare")}
             </Button>
           </div>
         </div>
@@ -866,7 +924,7 @@ function ResultCard({
             href={`tel:${p.agentPhone}`}
             className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-2 text-xs font-medium text-foreground transition-colors hover:bg-surface"
           >
-            <Phone className="size-3.5" /> Call
+            <Phone className="size-3.5" /> {t("propertyCard.call")}
           </a>
           <a
             href={waLink}
@@ -877,7 +935,7 @@ function ResultCard({
             <svg viewBox="0 0 24 24" className="size-3.5 fill-current" aria-hidden="true">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
             </svg>
-            WhatsApp
+            {t("propertyCard.whatsapp")}
           </a>
         </div>
       )}
@@ -906,17 +964,32 @@ function Mini({
   );
 }
 
+// Reasons come pre-formatted in English from the API mapper (see mapApiProperty in
+// lib/api/maskan.ts) — translate the small fixed vocabulary here at render time.
+function translateReason(reason: string, t: (key: string, vars?: Record<string, string | number>) => string): string {
+  if (reason === "Verified listing") return t("search.reasonVerifiedListing");
+  if (reason === "Detailed description available") return t("search.reasonDetailedDescription");
+  if (reason === "Fresh inventory") return t("search.reasonFreshInventory");
+  if (reason === "Good rental value") return t("search.reasonGoodRentalValue");
+  if (reason.endsWith(" location")) {
+    return t("search.reasonLocation", { area: reason.slice(0, -" location".length) });
+  }
+  return reason;
+}
+
 function AiRecBox({ reasons }: { reasons: string[] }) {
+  const { t } = useLanguage();
+  const tSearch = useSearchT();
   return (
     <div className="rounded-xl border border-ai/20 bg-ai-soft/60 p-3">
       <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-ai">
-        <Sparkles className="size-3.5" /> Recommended because
+        <Sparkles className="size-3.5" /> {tSearch("recommendedBecause")}
       </div>
       <ul className="grid grid-cols-2 gap-1.5">
         {reasons.slice(0, 4).map((r) => (
           <li key={r} className="flex items-center gap-1.5 text-xs text-foreground">
             <CheckCircle2 className="size-3.5 shrink-0 text-primary" />
-            <span className="truncate">{r}</span>
+            <span className="truncate">{translateReason(r, t)}</span>
           </li>
         ))}
       </ul>
@@ -926,6 +999,7 @@ function AiRecBox({ reasons }: { reasons: string[] }) {
 
 /* ------------------------------- Compare Bar ----------------------------- */
 function CompareBar({ count, onClear }: { count: number; onClear: () => void }) {
+  const tSearch = useSearchT();
   return (
     <div className="sticky bottom-4 z-40 mx-auto w-full max-w-3xl px-4">
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-elevated">
@@ -934,23 +1008,25 @@ function CompareBar({ count, onClear }: { count: number; onClear: () => void }) 
             <GitCompare className="size-4" />
           </div>
           <div>
-            <div className="text-sm font-semibold">{count} properties selected</div>
-            <div className="text-xs text-muted-foreground">
-              Compare scores, price and amenities side-by-side
+            <div className="text-sm font-semibold">
+              {tSearch(count === 1 ? "propertiesSelectedSingular" : "propertiesSelectedPlural", {
+                count,
+              })}
             </div>
+            <div className="text-xs text-muted-foreground">{tSearch("compareSideBySide")}</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={onClear}>
-            <X className="size-3.5" /> Clear
+            <X className="size-3.5" /> {tSearch("clear")}
           </Button>
           {count >= 2 ? (
             <Button variant="hero" size="sm" asChild>
-              <Link to="/compare">Compare now</Link>
+              <Link to="/compare">{tSearch("compareNow")}</Link>
             </Button>
           ) : (
             <Button variant="hero" size="sm" disabled>
-              Compare now
+              {tSearch("compareNow")}
             </Button>
           )}
         </div>

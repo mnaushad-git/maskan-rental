@@ -3027,13 +3027,27 @@ function LeadsView({
       next.delete(leadId);
     } else {
       next.add(leadId);
-      if (!convoMessages[leadId]) {
-        const msgs = await adminFetchMessages(leadId).catch(() => []);
-        setConvoMessages(m => ({ ...m, [leadId]: msgs }));
-      }
+      // Always fetch fresh on expand — a customer reply since the last time
+      // this was open must not be masked by a stale cached snapshot.
+      const msgs = await adminFetchMessages(leadId).catch(() => []);
+      setConvoMessages(m => ({ ...m, [leadId]: msgs }));
     }
     setExpandedConvos(next);
   }
+
+  // Poll open conversations so a customer's reply appears without the admin
+  // having to manually collapse/re-expand the panel.
+  useEffect(() => {
+    if (expandedConvos.size === 0) return;
+    const interval = setInterval(() => {
+      for (const leadId of expandedConvos) {
+        adminFetchMessages(leadId)
+          .then(msgs => setConvoMessages(m => ({ ...m, [leadId]: msgs })))
+          .catch(() => {});
+      }
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [expandedConvos]);
 
   async function handleSendMessage(leadId: number) {
     const content = (adminDraft[leadId] ?? "").trim();
