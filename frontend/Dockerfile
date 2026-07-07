@@ -10,6 +10,9 @@ COPY . .
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
+ARG VITE_GOOGLE_MAPS_API_KEY
+ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
+
 # Build a Node.js server (default Nitro target is cloudflare, which produces a
 # Worker that can't run on a VPS). node-server emits a self-contained app at
 # .output/server/index.mjs.
