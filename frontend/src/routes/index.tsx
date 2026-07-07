@@ -28,6 +28,7 @@ import {
   type ApiPartnerPublic,
 } from "@/lib/api/maskan";
 import type { SearchProperty } from "@/lib/maskan-search-data";
+import type { ListingType } from "@/lib/listingCategories";
 import type { Property } from "@/lib/maskan-data";
 import { LocationOnboarding, hasSeenOnboarding } from "@/components/maskan/LocationOnboarding";
 import { PropertyCard } from "@/components/maskan/PropertyCard";
@@ -55,6 +56,7 @@ export const Route = createFileRoute("/")({
 });
 
 const DEFAULT_FILTERS: SearchBarFilters = {
+  listingType: "rent",
   city: "Riyadh",
   district: "Any",
   minRent: 0,
@@ -86,12 +88,13 @@ function Index() {
   );
   // Newest-first (backend orders by id desc) — reused for the "new listings" section below.
   const fullProperties = useMemo<Property[]>(
-    () => rawProperties.map(mapApiProperty),
-    [rawProperties],
+    () => rawProperties.map(mapApiProperty).filter((p) => p.listingType === filters.listingType),
+    [rawProperties, filters.listingType],
   );
 
   const mapProperties = useMemo(() => {
     return properties.filter((p) => {
+      if (p.listingType !== filters.listingType) return false;
       if (filters.city !== "Any" && p.city !== filters.city) return false;
       if (filters.district !== "Any" && p.district !== filters.district) return false;
       if (p.price < filters.minRent || p.price > filters.maxRent) return false;
@@ -106,13 +109,20 @@ function Index() {
       <HomeSearchSection
         filters={filters}
         onSearch={(f) => setFilters(f)}
+        onListingTypeChange={(v) => setFilters((f) => ({
+          ...f,
+          listingType: v,
+          type: "Any",
+          minRent: 0,
+          maxRent: v === "sale" ? 30_000_000 : 500_000,
+        }))}
         onChangeLocation={() => setShowOnboarding(true)}
       />
       <HomeMapSection properties={mapProperties} loading={loading} filters={filters} />
       <TruPartnerCTA partners={previewPartners} />
       <AskAdvisorCTA />
       <TruEstimateCTA />
-      <NewListings properties={fullProperties} />
+      <NewListings properties={fullProperties} listingType={filters.listingType} />
       <Footer />
       {showOnboarding && (
         <LocationOnboarding
@@ -130,10 +140,12 @@ function Index() {
 function HomeSearchSection({
   filters,
   onSearch,
+  onListingTypeChange,
   onChangeLocation,
 }: {
   filters: SearchBarFilters;
   onSearch: (filters: SearchBarFilters) => void;
+  onListingTypeChange: (v: ListingType) => void;
   onChangeLocation: () => void;
 }) {
   const { t } = useLanguage();
@@ -166,7 +178,7 @@ function HomeSearchSection({
           </button>
         </div>
 
-        <SearchBar onSearch={onSearch} />
+        <SearchBar onSearch={onSearch} onListingTypeChange={onListingTypeChange} />
       </div>
     </section>
   );
@@ -206,11 +218,12 @@ function HomeMapSection({
             to="/search"
             search={
               {
+                listingType: filters.listingType,
                 ...(filters.city !== "Any" ? { city: filters.city } : {}),
                 ...(filters.district !== "Any" ? { district: filters.district } : {}),
                 ...(filters.type !== "Any" ? { type: filters.type } : {}),
                 ...(filters.minRent > 0 ? { minRent: filters.minRent } : {}),
-                ...(filters.maxRent < 500000 ? { maxRent: filters.maxRent } : {}),
+                ...(filters.maxRent < (filters.listingType === "sale" ? 30_000_000 : 500_000) ? { maxRent: filters.maxRent } : {}),
               } as never
             }
           >
@@ -364,7 +377,7 @@ function TruEstimateCTA() {
 /* ------------------------------- New Listings ------------------------------ */
 const LISTING_CITIES = ["Riyadh", "Jeddah", "Dammam", "Khobar", "Madinah"];
 
-function NewListings({ properties }: { properties: Property[] }) {
+function NewListings({ properties, listingType }: { properties: Property[]; listingType: ListingType }) {
   const { t } = useLanguage();
   const [city, setCity] = useState("Riyadh");
   // Backend returns properties newest-first, so the first few per city are the latest listings.
@@ -378,10 +391,12 @@ function NewListings({ properties }: { properties: Property[] }) {
           <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">
             {t("home.newListings.heading", { city: cityLabel })}
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">{t("home.newListings.subtitle")}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t(listingType === "sale" ? "home.newListings.subtitleSale" : "home.newListings.subtitle")}
+          </p>
         </div>
         <Button variant="ghost" size="sm" className="hidden md:inline-flex" asChild>
-          <Link to="/search" search={{ city } as never}>
+          <Link to="/search" search={{ city, listingType } as never}>
             {t("home.newListings.viewAllIn", { city: cityLabel })} <ArrowRight />
           </Link>
         </Button>

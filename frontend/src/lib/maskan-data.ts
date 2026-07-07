@@ -8,16 +8,18 @@ export type Property = {
   title: string;
   district: string;
   city: string;
-  price: number; // SAR / year
+  // Rent listings: SAR / year. Sale listings: total SAR sale price.
+  price: number;
+  listingType: "rent" | "sale";
   bedrooms: number;
   bathrooms: number;
   area: number; // sqm
-  type: "Apartment" | "Villa" | "Penthouse" | "Townhouse";
+  type: string;
   image: string;        // primary image (first in gallery)
   images: string[];     // all image URLs
   matchScore: number; // 0-100
   badges: ("Best Match" | "New" | "Verified" | "Price Drop" | "Hot")[];
-  status: "Available" | "Reserved" | "Rented";
+  status: "Available" | "Reserved" | "Rented" | "Sold";
   pricePerSqm: number;
   agent: string;
   agentPhone: string | null;
@@ -32,6 +34,7 @@ export const properties: Property[] = [
     district: "Al Olaya",
     city: "Riyadh",
     price: 145000,
+    listingType: "rent" as const,
     bedrooms: 3,
     bathrooms: 3,
     area: 210,
@@ -53,6 +56,7 @@ export const properties: Property[] = [
     district: "Al Yasmin",
     city: "Riyadh",
     price: 235000,
+    listingType: "rent" as const,
     bedrooms: 5,
     bathrooms: 6,
     area: 480,
@@ -74,6 +78,7 @@ export const properties: Property[] = [
     district: "King Abdullah Financial District",
     city: "Riyadh",
     price: 420000,
+    listingType: "rent" as const,
     bedrooms: 4,
     bathrooms: 5,
     area: 360,
@@ -95,6 +100,7 @@ export const properties: Property[] = [
     district: "Al Shati",
     city: "Jeddah",
     price: 168000,
+    listingType: "rent" as const,
     bedrooms: 4,
     bathrooms: 4,
     area: 260,
@@ -116,6 +122,7 @@ export const properties: Property[] = [
     district: "Al Narjis",
     city: "Riyadh",
     price: 98000,
+    listingType: "rent" as const,
     bedrooms: 3,
     bathrooms: 3,
     area: 195,
@@ -137,6 +144,7 @@ export const properties: Property[] = [
     district: "Al Malqa",
     city: "Riyadh",
     price: 205000,
+    listingType: "rent" as const,
     bedrooms: 4,
     bathrooms: 5,
     area: 380,

@@ -40,6 +40,8 @@ import {
 import { formatSAR } from "@/lib/maskan-data";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
+import { ListingCategoryBar } from "@/components/maskan/ListingCategoryBar";
+import { allCategories, type ListingType } from "@/lib/listingCategories";
 
 export const Route = createFileRoute("/search")({
   head: () => ({
@@ -61,6 +63,7 @@ export const Route = createFileRoute("/search")({
 });
 
 type Filters = {
+  listingType: ListingType;
   city: string;
   district: string;
   minRent: number;
@@ -76,6 +79,7 @@ type Filters = {
 };
 
 const DEFAULTS: Filters = {
+  listingType: "rent",
   city: "Any",
   district: "Any",
   minRent: 0,
@@ -101,12 +105,14 @@ function SearchPage() {
   const tSearch = useSearchT();
   const rawSearch = useRouterState({ select: s => s.location.searchStr });
   const _qs = new URLSearchParams(rawSearch);
+  const initialListingType = (_qs.get("listingType") as ListingType) ?? "rent";
   const [filters, setFilters] = useState<Filters>({
     ...DEFAULTS,
+    listingType: initialListingType,
     city:     _qs.get("city")     ?? "Any",
     district: _qs.get("district") ?? "Any",
     minRent:  Number(_qs.get("minRent") ?? 0),
-    maxRent:  Number(_qs.get("maxRent") ?? 500000),
+    maxRent:  Number(_qs.get("maxRent") ?? (initialListingType === "sale" ? 30_000_000 : 500_000)),
     type:     _qs.get("type")     ?? "Any",
   });
   const [view, setView] = useState<"grid" | "list" | "map">("map");
@@ -174,6 +180,7 @@ function SearchPage() {
 
   const results = useMemo(() => {
     const list = properties.filter((p) => {
+      if (p.listingType !== filters.listingType) return false;
       if (filters.city !== "Any" && p.city !== filters.city) return false;
       if (filters.district !== "Any" && p.district !== filters.district) return false;
       if (p.price < filters.minRent || p.price > filters.maxRent) return false;
@@ -241,8 +248,24 @@ function SearchPage() {
       <TopNav />
       <div className="container-page py-6">
         <Breadcrumbs city={filters.city} />
+
+        <ListingCategoryBar
+          className="mt-4"
+          listingType={filters.listingType}
+          onListingTypeChange={(v) => setFilters({
+            ...filters,
+            listingType: v,
+            type: "Any",
+            minRent: 0,
+            maxRent: v === "sale" ? 30_000_000 : 500_000,
+          })}
+          propertyType={filters.type}
+          onPropertyTypeChange={(v) => setFilters({ ...filters, type: v })}
+        />
+
         <ResultsHeader
           count={results.length}
+          listingType={filters.listingType}
           sort={sort}
           setSort={setSort}
           view={view}
@@ -339,23 +362,28 @@ function Breadcrumbs({ city }: { city: string }) {
 
 function ResultsHeader({
   count,
+  listingType,
   sort,
   setSort,
   view,
   setView,
 }: {
   count: number;
+  listingType: ListingType;
   sort: string;
   setSort: (s: "match" | "price-asc" | "price-desc" | "value") => void;
   view: "grid" | "list" | "map";
   setView: (v: "grid" | "list" | "map") => void;
 }) {
   const tSearch = useSearchT();
+  const headingKey = listingType === "sale"
+    ? (count === 1 ? "resultsHeadingSaleSingular" : "resultsHeadingSalePlural")
+    : (count === 1 ? "resultsHeadingSingular" : "resultsHeadingPlural");
   return (
     <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
       <div>
         <h1 className="font-display text-3xl font-bold tracking-tight">
-          {tSearch(count === 1 ? "resultsHeadingSingular" : "resultsHeadingPlural", { count })}
+          {tSearch(headingKey, { count })}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">{tSearch("rankedBy")}</p>
       </div>
@@ -432,7 +460,7 @@ function FilterFields({
   const cities = ["Any", "Riyadh", "Jeddah", "Dammam", "Khobar", "Madinah"];
   const districts =
     filters.city === "Any" ? ["Any"] : ["Any", ...(districtsByCity[filters.city] ?? [])];
-  const types = ["Any", "Apartment", "Villa", "Penthouse", "Townhouse"];
+  const types = ["Any", ...allCategories(filters.listingType)];
   const furnishings = ["Any", "Furnished", "Semi-furnished", "Unfurnished"];
 
   return (
@@ -458,10 +486,10 @@ function FilterFields({
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label={tSearch("minRent")}>
+        <Field label={tSearch(filters.listingType === "sale" ? "minPrice" : "minRent")}>
           <NumberInput value={filters.minRent} onChange={(v) => set("minRent", v)} step={5000} placeholder="0" />
         </Field>
-        <Field label={tSearch("maxRent")}>
+        <Field label={tSearch(filters.listingType === "sale" ? "maxPrice" : "maxRent")}>
           <NumberInput value={filters.maxRent} onChange={(v) => set("maxRent", v)} step={5000} placeholder="500,000" />
         </Field>
       </div>
@@ -896,12 +924,16 @@ function ResultCard({
 
           <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
             <div>
-              <div className="text-xs text-muted-foreground">{t("propertyCard.annualRent")}</div>
+              <div className="text-xs text-muted-foreground">
+                {p.listingType === "sale" ? t("propertyCard.salePrice") : t("propertyCard.annualRent")}
+              </div>
               <div className="font-display text-xl font-bold tracking-tight">
                 SAR {formatSAR(p.price)}
-                <span className="ms-1 text-xs font-medium text-muted-foreground">
-                  {t("propertyCard.perYear")}
-                </span>
+                {p.listingType !== "sale" && (
+                  <span className="ms-1 text-xs font-medium text-muted-foreground">
+                    {t("propertyCard.perYear")}
+                  </span>
+                )}
               </div>
             </div>
             <Button

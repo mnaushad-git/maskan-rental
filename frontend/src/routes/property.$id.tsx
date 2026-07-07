@@ -15,11 +15,13 @@ import {
   GraduationCap,
   Heart,
   Hospital,
+  Landmark,
   Lightbulb,
   MapPin,
   Maximize,
   MessageCircle,
   Phone,
+  PiggyBank,
   School,
   Send,
   ShoppingBag,
@@ -78,11 +80,16 @@ function PropertyDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const isSale = property?.listingType === "sale";
+  // District rent averages don't mean anything against a one-time sale price —
+  // only feed them into the score/comparison logic for rent listings.
+  const effectiveAreaAvgMonthly = isSale ? null : areaAvgMonthly;
+
   const propertyScore = useMemo(
     () => property
-      ? computePropertyScore(property.price / 12, property.bedrooms, areaIntel?.area_score, areaAvgMonthly ?? undefined)
+      ? computePropertyScore(isSale ? 0 : property.price / 12, property.bedrooms, areaIntel?.area_score, effectiveAreaAvgMonthly ?? undefined)
       : 72,
-    [property, areaIntel, areaAvgMonthly],
+    [property, areaIntel, effectiveAreaAvgMonthly, isSale],
   );
 
   useEffect(() => {
@@ -150,13 +157,17 @@ function PropertyDetail() {
       <div className="container-page grid grid-cols-1 gap-10 pb-32 lg:pb-16 lg:grid-cols-[1.7fr_1fr]">
         <main className="space-y-10">
           <Summary property={property} />
-          <RentalIntelligence property={property} areaIntel={areaIntel} areaAvgMonthly={areaAvgMonthly} />
-          <FairRent property={property} areaAvgMonthly={areaAvgMonthly} />
-          <RentCalculator property={property} />
+          <RentalIntelligence property={property} areaIntel={areaIntel} areaAvgMonthly={effectiveAreaAvgMonthly} />
+          {isSale ? (
+            <PurchasePriceInsight property={property} />
+          ) : (
+            <FairRent property={property} areaAvgMonthly={areaAvgMonthly} />
+          )}
+          {isSale ? <PurchaseCostBreakdown property={property} /> : <RentCalculator property={property} />}
           <AreaSummary property={property} areaIntel={areaIntel} />
           <NearbyPlaces areaIntel={areaIntel} district={property.district} />
           <ComparableListings currentId={property.id} properties={properties} />
-          <AiSummary property={property} areaIntel={areaIntel} areaAvgMonthly={areaAvgMonthly} />
+          <AiSummary property={property} areaIntel={areaIntel} areaAvgMonthly={effectiveAreaAvgMonthly} />
         </main>
 
         <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
@@ -169,12 +180,16 @@ function PropertyDetail() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-xl lg:hidden">
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
-            <div className="text-[11px] text-muted-foreground">{t("propertyCard.annualRent")}</div>
+            <div className="text-[11px] text-muted-foreground">
+              {isSale ? t("propertyCard.salePrice") : t("propertyCard.annualRent")}
+            </div>
             <div className="truncate text-base font-bold tracking-tight">
               SAR {formatSAR(property.price)}
-              <span className="ms-1 text-xs font-normal text-muted-foreground">
-                / SAR {formatSAR(Math.round(property.price / 12))}{tProp("perMonthShort")}
-              </span>
+              {!isSale && (
+                <span className="ms-1 text-xs font-normal text-muted-foreground">
+                  / SAR {formatSAR(Math.round(property.price / 12))}{tProp("perMonthShort")}
+                </span>
+              )}
             </div>
           </div>
           {property.agentPhone ? (
@@ -316,7 +331,9 @@ function Summary({ property }: { property: Property }) {
           </p>
         </div>
         <div className="text-end">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">{t("propertyCard.annualRent")}</div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">
+            {property.listingType === "sale" ? t("propertyCard.salePrice") : t("propertyCard.annualRent")}
+          </div>
           <div className="font-display text-3xl font-bold tracking-tight md:text-4xl">SAR {formatSAR(property.price)}</div>
           <div className="mt-1 text-sm text-muted-foreground">SAR {formatSAR(property.pricePerSqm)} / m²</div>
         </div>
@@ -349,7 +366,8 @@ function RentalIntelligence({
 }: { property: Property; areaIntel: ApiAreaIntelligence | null; areaAvgMonthly: number | null }) {
   const { lang } = useLanguage();
   const tProp = usePropT();
-  const monthlyRent = Math.round(property.price / 12);
+  const isSale = property.listingType === "sale";
+  const monthlyRent = isSale ? 0 : Math.round(property.price / 12);
   const priceFairness = computePriceFairness(monthlyRent, areaAvgMonthly);
   const areaQuality = Math.round(areaIntel?.area_score ?? 75);
   const amenities = Math.round(areaIntel?.lifestyle_score ?? 75);
@@ -375,10 +393,10 @@ function RentalIntelligence({
     <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div>
-          <Badge tone="ai" className="mb-3"><Sparkles className="size-3.5" /> {tProp("rentalIntelligence.badge")}</Badge>
-          <h2 className="font-display text-2xl font-bold tracking-tight">{tProp("rentalIntelligence.title")}</h2>
+          <Badge tone="ai" className="mb-3"><Sparkles className="size-3.5" /> {tProp(isSale ? "rentalIntelligence.badgeSale" : "rentalIntelligence.badge")}</Badge>
+          <h2 className="font-display text-2xl font-bold tracking-tight">{tProp(isSale ? "rentalIntelligence.titleSale" : "rentalIntelligence.title")}</h2>
           <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            {tProp("rentalIntelligence.subtitle")}
+            {tProp(isSale ? "rentalIntelligence.subtitleSale" : "rentalIntelligence.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-4 rounded-2xl bg-surface px-5 py-4">
@@ -484,6 +502,28 @@ function FairRent({ property, areaAvgMonthly }: { property: Property; areaAvgMon
           <span>SAR {formatSAR(scaleMax)}</span>
         </div>
       </div>
+    </section>
+  );
+}
+
+/* --------------------------- Purchase Price Insight ----------------------- */
+function PurchasePriceInsight({ property }: { property: Property }) {
+  const tProp = usePropT();
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <h2 className="font-display text-2xl font-bold tracking-tight">{tProp("purchaseInsight.title")}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{tProp("purchaseInsight.subtitle")}</p>
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="rounded-xl bg-surface p-4">
+          <div className="text-xs text-muted-foreground">{tProp("purchaseInsight.totalPrice")}</div>
+          <div className="mt-1 text-2xl font-bold tracking-tight">SAR {formatSAR(property.price)}</div>
+        </div>
+        <div className="rounded-xl bg-surface p-4">
+          <div className="text-xs text-muted-foreground">{tProp("purchaseInsight.pricePerSqm")}</div>
+          <div className="mt-1 text-2xl font-bold tracking-tight">SAR {formatSAR(property.pricePerSqm)}</div>
+        </div>
+      </div>
+      <p className="mt-4 text-xs text-muted-foreground">{tProp("purchaseInsight.noComparableNote")}</p>
     </section>
   );
 }
@@ -756,7 +796,16 @@ function AiSummary({ property, areaIntel, areaAvgMonthly }: {
               <Link to="/advisor" search={{ propertyId: Number(property.id) }} onClick={() => storeAdvisorCtx(property)}><MessageCircle className="size-4" /> {tProp("aiSummary.askAI")}</Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link to="/advisor" search={{ propertyId: Number(property.id), q: `What negotiation tips do you have for renting ${property.title} in ${property.district} at SAR ${Math.round(property.price / 12).toLocaleString()}/month?` }} onClick={() => storeAdvisorCtx(property)}><TrendingUp className="size-4" /> {tProp("aiSummary.negotiationTips")}</Link>
+              <Link
+                to="/advisor"
+                search={{
+                  propertyId: Number(property.id),
+                  q: property.listingType === "sale"
+                    ? `What negotiation tips do you have for buying ${property.title} in ${property.district} at SAR ${property.price.toLocaleString()}?`
+                    : `What negotiation tips do you have for renting ${property.title} in ${property.district} at SAR ${Math.round(property.price / 12).toLocaleString()}/month?`,
+                }}
+                onClick={() => storeAdvisorCtx(property)}
+              ><TrendingUp className="size-4" /> {tProp("aiSummary.negotiationTips")}</Link>
             </Button>
           </div>
         </div>
@@ -1042,6 +1091,189 @@ function RentCalculator({ property }: { property: Property }) {
   );
 }
 
+const DOWN_PAYMENT_OPTIONS = [10, 20, 30, 50] as const;
+const RETT_RATE = 0.05;   // KSA Real Estate Transaction Tax
+const BROKER_RATE = 0.025;
+const MORTGAGE_ANNUAL_RATE = 0.05;
+const MORTGAGE_YEARS = 20;
+
+function PurchaseCostBreakdown({ property }: { property: Property }) {
+  const tProp = usePropT();
+  const price = property.price;
+  const [downPct, setDownPct] = useState<10 | 20 | 30 | 50>(20);
+  const [salaryInput, setSalaryInput] = useState("");
+
+  const downPayment = Math.round(price * (downPct / 100));
+  const financedAmount = price - downPayment;
+  const rett = Math.round(price * RETT_RATE);
+  const brokerFee = Math.round(price * BROKER_RATE);
+  const totalUpfront = downPayment + rett + brokerFee;
+
+  const monthlyRate = MORTGAGE_ANNUAL_RATE / 12;
+  const numPayments = MORTGAGE_YEARS * 12;
+  const monthlyPayment = financedAmount > 0
+    ? Math.round(
+        (financedAmount * monthlyRate * (1 + monthlyRate) ** numPayments) /
+        ((1 + monthlyRate) ** numPayments - 1),
+      )
+    : 0;
+
+  const monthlySalary = parseFloat(salaryInput.replace(/,/g, "")) || 0;
+  const pct = monthlySalary > 0 ? (monthlyPayment / monthlySalary) * 100 : null;
+
+  const affordTone =
+    pct === null ? null
+    : pct <= 25   ? "success"
+    : pct <= 33   ? "warning"
+    :               "danger";
+
+  const affordMsg =
+    pct === null ? null
+    : pct <= 25   ? tProp("rentCalculator.affordComfortable")
+    : pct <= 33   ? tProp("rentCalculator.affordBorderline")
+    :               tProp("purchaseAffordability.affordAbove");
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6 shadow-card space-y-6">
+      <div className="flex items-center gap-2">
+        <div className="grid size-9 place-items-center rounded-xl bg-primary-soft">
+          <Landmark className="size-4 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-base font-bold">{tProp("purchaseCost.title")}</h2>
+          <p className="text-xs text-muted-foreground">{tProp("purchaseCost.subtitle")}</p>
+        </div>
+      </div>
+
+      {/* Down payment selector */}
+      <div>
+        <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {tProp("purchaseCost.downPayment")}
+        </div>
+        <div className="grid grid-cols-4 gap-2">
+          {DOWN_PAYMENT_OPTIONS.map((pctOpt) => (
+            <button
+              key={pctOpt}
+              type="button"
+              onClick={() => setDownPct(pctOpt)}
+              className={cn(
+                "rounded-xl border px-3 py-3 text-center transition-colors",
+                downPct === pctOpt
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-surface text-foreground hover:bg-surface-2",
+              )}
+            >
+              <div className="text-sm font-semibold">{pctOpt}%</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Down payment callout */}
+      <div className="rounded-xl border border-primary/20 bg-primary/8 p-5 text-center">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tProp("purchaseCost.downPaymentAmount")}</div>
+        <div className="mt-1 text-4xl font-bold tracking-tight text-primary">SAR {formatSAR(downPayment)}</div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          {tProp("purchaseCost.financedAmount", { amount: formatSAR(financedAmount) })}
+        </div>
+      </div>
+
+      {/* Upfront cost table */}
+      <div>
+        <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {tProp("purchaseCost.upfrontCost")}
+        </div>
+        <div className="overflow-hidden rounded-xl border border-border">
+          {[
+            { label: tProp("purchaseCost.downPaymentAmount"), note: null, value: downPayment },
+            { label: tProp("purchaseCost.transferTax"), note: "(5%)", value: rett },
+            { label: tProp("purchaseCost.brokerFee"), note: "(2.5%)", value: brokerFee },
+          ].map(({ label, note, value }) => (
+            <div key={label} className="flex items-center justify-between border-b border-border px-4 py-3 text-sm last:border-0">
+              <span className="text-muted-foreground">
+                {label} {note && <span className="text-xs">{note}</span>}
+              </span>
+              <span className="font-semibold tabular-nums">SAR {formatSAR(value)}</span>
+            </div>
+          ))}
+          <div className="flex items-center justify-between bg-surface px-4 py-3 text-sm font-bold">
+            <span>{tProp("purchaseCost.totalUpfront")}</span>
+            <span className="text-primary tabular-nums">SAR {formatSAR(totalUpfront)}</span>
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">{tProp("purchaseCost.estimatesDisclaimer")}</p>
+      </div>
+
+      {/* Financing estimate */}
+      <div>
+        <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {tProp("purchaseCost.financingEstimate")}
+        </div>
+        <div className="flex items-center justify-between rounded-xl bg-surface p-4">
+          <div>
+            <div className="text-xs text-muted-foreground">{tProp("purchaseCost.estMonthlyPayment")}</div>
+            <div className="mt-1 text-xl font-bold tracking-tight">SAR {formatSAR(monthlyPayment)}</div>
+          </div>
+          <PiggyBank className="size-6 text-muted-foreground" />
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          {tProp("purchaseCost.financingNote", { years: MORTGAGE_YEARS, rate: (MORTGAGE_ANNUAL_RATE * 100).toFixed(0) })}
+        </p>
+      </div>
+
+      {/* Affordability check */}
+      <div>
+        <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {tProp("rentCalculator.affordabilityCheck")}
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="shrink-0 text-sm text-muted-foreground">{tProp("rentCalculator.monthlySalary")}</label>
+          <div className="relative flex-1">
+            <span className="absolute inset-y-0 start-3 flex items-center text-xs font-semibold text-muted-foreground">SAR</span>
+            <input
+              type="number"
+              min={0}
+              value={salaryInput}
+              onChange={(e) => setSalaryInput(e.target.value)}
+              placeholder={tProp("rentCalculator.salaryPlaceholder")}
+              className="h-9 w-full rounded-lg border border-border bg-background ps-10 pe-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+        </div>
+
+        {pct !== null ? (
+          <div className={cn(
+            "mt-3 flex items-start gap-3 rounded-xl border p-4",
+            affordTone === "success" && "border-success/30 bg-success/8",
+            affordTone === "warning" && "border-warning/30 bg-warning/8",
+            affordTone === "danger" && "border-destructive/30 bg-destructive/8",
+          )}>
+            <span className={cn(
+              "mt-1 size-2.5 shrink-0 rounded-full",
+              affordTone === "success" && "bg-success",
+              affordTone === "warning" && "bg-warning",
+              affordTone === "danger" && "bg-destructive",
+            )} />
+            <div>
+              <div className="text-sm font-bold">{tProp("rentCalculator.pctOfIncome", { pct: pct.toFixed(1) })}</div>
+              <div className={cn(
+                "mt-0.5 text-xs",
+                affordTone === "success" && "text-success",
+                affordTone === "warning" && "text-warning",
+                affordTone === "danger" && "text-destructive",
+              )}>
+                {affordMsg}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">{tProp("purchaseAffordability.enterSalaryPrompt")}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── ActionsCard ───────────────────────────────────────────────────────────────
 
 function ActionsCard({ property, propertyScore }: { property: Property; propertyScore?: number }) {
@@ -1077,15 +1309,20 @@ function ActionsCard({ property, propertyScore }: { property: Property; property
   };
 
   const saved = savedRecordId !== null;
+  const isSale = property.listingType === "sale";
 
   return (
     <>
       <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-xs text-muted-foreground">{t("propertyCard.annualRent")}</div>
+            <div className="text-xs text-muted-foreground">
+              {isSale ? t("propertyCard.salePrice") : t("propertyCard.annualRent")}
+            </div>
             <div className="font-display text-2xl font-bold tracking-tight">SAR {formatSAR(property.price)}</div>
-            <div className="text-xs text-muted-foreground">{tProp("actions.perMonth", { amount: formatSAR(Math.round(property.price / 12)) })}</div>
+            {!isSale && (
+              <div className="text-xs text-muted-foreground">{tProp("actions.perMonth", { amount: formatSAR(Math.round(property.price / 12)) })}</div>
+            )}
           </div>
           <ScoreRing score={propertyScore ?? property.matchScore} />
         </div>
@@ -1106,11 +1343,13 @@ function ActionsCard({ property, propertyScore }: { property: Property; property
             </Button>
           </div>
         </div>
-        <div className="mt-5 space-y-2 border-t border-border pt-5 text-sm">
-          <Row icon={<Wallet className="size-4" />} label={tProp("actions.deposit")} value={tProp("actions.depositValue")} />
-          <Row icon={<Calendar className="size-4" />} label={tProp("actions.available")} value={tProp("actions.immediately")} />
-          <Row icon={<Building2 className="size-4" />} label={tProp("actions.lease")} value={tProp("actions.twelveMonths")} />
-        </div>
+        {!isSale && (
+          <div className="mt-5 space-y-2 border-t border-border pt-5 text-sm">
+            <Row icon={<Wallet className="size-4" />} label={tProp("actions.deposit")} value={tProp("actions.depositValue")} />
+            <Row icon={<Calendar className="size-4" />} label={tProp("actions.available")} value={tProp("actions.immediately")} />
+            <Row icon={<Building2 className="size-4" />} label={tProp("actions.lease")} value={tProp("actions.twelveMonths")} />
+          </div>
+        )}
       </div>
 
       <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">

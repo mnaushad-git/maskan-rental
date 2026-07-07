@@ -8,7 +8,9 @@ class PropertyBase(BaseModel):
     area: str
     city: str
     size_sq_m: int | None = None
-    monthly_rent: float
+    listing_type: str = "rent"
+    monthly_rent: float | None = None
+    sale_price: float | None = None
     bedrooms: int | None = None
     bathrooms: int | None = None
     owner_name: str | None = None
@@ -31,7 +33,9 @@ class PartnerPropertyCreate(BaseModel):
     area: str
     city: str
     size_sq_m: int | None = None
-    monthly_rent: float
+    listing_type: str = "rent"
+    monthly_rent: float | None = None
+    sale_price: float | None = None
     bedrooms: int | None = None
     bathrooms: int | None = None
     owner_name: str | None = None
@@ -45,7 +49,9 @@ class PropertyUpdate(BaseModel):
     area: str | None = None
     city: str | None = None
     size_sq_m: int | None = None
+    listing_type: str | None = None
     monthly_rent: float | None = None
+    sale_price: float | None = None
     bedrooms: int | None = None
     bathrooms: int | None = None
     owner_name: str | None = None
@@ -64,7 +70,9 @@ class PartnerPropertyUpdate(BaseModel):
     area: str | None = None
     city: str | None = None
     size_sq_m: int | None = None
+    listing_type: str | None = None
     monthly_rent: float | None = None
+    sale_price: float | None = None
     bedrooms: int | None = None
     bathrooms: int | None = None
     owner_name: str | None = None

@@ -57,7 +57,7 @@ export function RecommendationBadge({ label }: { label: string }) {
   );
 }
 
-export function StatusBadge({ status }: { status: "Available" | "Reserved" | "Rented" }) {
+export function StatusBadge({ status }: { status: "Available" | "Reserved" | "Rented" | "Sold" }) {
   const { t } = useLanguage();
   const tone: Tone = status === "Available" ? "success" : status === "Reserved" ? "warning" : "neutral";
   return (

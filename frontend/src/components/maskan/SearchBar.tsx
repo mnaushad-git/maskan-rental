@@ -1,9 +1,11 @@
-import { MapPin, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { DoorOpen, Key, MapPin, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { districtsByCity } from "@/lib/maskan-search-data";
 import { useLanguage } from "@/lib/i18n/context";
+import { allCategories, type ListingType } from "@/lib/listingCategories";
+import { cn } from "@/lib/utils";
 
 // ── Location options ──────────────────────────────────────────────────────────
 // District/neighbourhood names stay in their original form in both languages —
@@ -20,7 +22,7 @@ function buildLocationOptions(tCity: (city: string) => string): LocationOption[]
 
 // ── Budget options ────────────────────────────────────────────────────────────
 
-const BUDGET_OPTIONS = [
+const RENT_BUDGET_OPTIONS = [
   { min: 0, max: 500000 },
   { min: 50000, max: 80000 },
   { min: 80000, max: 200000 },
@@ -28,7 +30,7 @@ const BUDGET_OPTIONS = [
   { min: 400000, max: 500000 },
 ] as const;
 
-const BUDGET_LABEL_KEYS = [
+const RENT_BUDGET_LABEL_KEYS = [
   "searchBar.anyBudget",
   "searchBar.budget50to80",
   "searchBar.budget80to200",
@@ -36,9 +38,24 @@ const BUDGET_LABEL_KEYS = [
   "searchBar.budget400plus",
 ];
 
-const PROPERTY_TYPE_KEYS = ["Any", "Apartment", "Villa", "Penthouse", "Townhouse"];
+const SALE_BUDGET_OPTIONS = [
+  { min: 0, max: 30_000_000 },
+  { min: 0, max: 500_000 },
+  { min: 500_000, max: 1_500_000 },
+  { min: 1_500_000, max: 5_000_000 },
+  { min: 5_000_000, max: 30_000_000 },
+] as const;
+
+const SALE_BUDGET_LABEL_KEYS = [
+  "searchBar.anyBudget",
+  "searchBar.saleBudgetUnder500k",
+  "searchBar.saleBudget500kTo1_5m",
+  "searchBar.saleBudget1_5mTo5m",
+  "searchBar.saleBudget5mPlus",
+];
 
 export type SearchBarFilters = {
+  listingType: ListingType;
   city: string;
   district: string;
   minRent: number;
@@ -170,20 +187,37 @@ function LocationPicker({
 
 export function SearchBar({
   onSearch,
+  onListingTypeChange,
 }: {
   /** When provided, "Search" reports filters here instead of navigating to /search. */
   onSearch?: (filters: SearchBarFilters) => void;
+  /** Fires immediately on Rent/Sale toggle click (before "Search" is pressed) — lets an
+   * embedded map/preview below the bar react live instead of waiting for a full search. */
+  onListingTypeChange?: (v: ListingType) => void;
 }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const locationOptions = buildLocationOptions((city) => t(`cities.${city}`));
   const [location, setLocation] = useState<LocationOption | null>(null);
+  const [listingType, setListingType] = useState<ListingType>("rent");
   const [propertyType, setPropertyType] = useState("Any");
   const [budgetIdx, setBudgetIdx] = useState(0);
 
+  const budgetOptions = listingType === "sale" ? SALE_BUDGET_OPTIONS : RENT_BUDGET_OPTIONS;
+  const budgetLabelKeys = listingType === "sale" ? SALE_BUDGET_LABEL_KEYS : RENT_BUDGET_LABEL_KEYS;
+  const propertyTypeKeys = ["Any", ...allCategories(listingType)];
+
+  function switchListingType(v: ListingType) {
+    setListingType(v);
+    setPropertyType("Any");
+    setBudgetIdx(0);
+    onListingTypeChange?.(v);
+  }
+
   function currentFilters(): SearchBarFilters {
-    const budget = BUDGET_OPTIONS[budgetIdx];
+    const budget = budgetOptions[budgetIdx];
     return {
+      listingType,
       city: location?.city && location.city !== "Any" ? location.city : "Any",
       district: location?.district && location.district !== "Any" ? location.district : "Any",
       minRent: budget.min,
@@ -193,11 +227,12 @@ export function SearchBar({
   }
 
   function toSearchParams(filters: SearchBarFilters): Record<string, string> {
-    const params: Record<string, string> = {};
+    const params: Record<string, string> = { listingType: filters.listingType };
     if (filters.city !== "Any") params.city = filters.city;
     if (filters.district !== "Any") params.district = filters.district;
+    const defaultMax = filters.listingType === "sale" ? 30_000_000 : 500_000;
     if (filters.minRent > 0) params.minRent = String(filters.minRent);
-    if (filters.maxRent < 500000) params.maxRent = String(filters.maxRent);
+    if (filters.maxRent < defaultMax) params.maxRent = String(filters.maxRent);
     if (filters.type !== "Any") params.type = filters.type;
     return params;
   }
@@ -217,6 +252,28 @@ export function SearchBar({
 
   return (
     <div className="rounded-2xl border border-border bg-card p-2 shadow-elevated">
+      <div className="flex items-center gap-1 p-1">
+        <button
+          type="button"
+          onClick={() => switchListingType("rent")}
+          className={cn(
+            "flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
+            listingType === "rent" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <DoorOpen className="size-4" /> {t("listingCategories.rent")}
+        </button>
+        <button
+          type="button"
+          onClick={() => switchListingType("sale")}
+          className={cn(
+            "flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
+            listingType === "sale" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <Key className="size-4" /> {t("listingCategories.sale")}
+        </button>
+      </div>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-[1.4fr_1fr_1fr_auto]">
         <LocationPicker options={locationOptions} value={location} onChange={setLocation} />
 
@@ -230,7 +287,7 @@ export function SearchBar({
               onChange={(e) => setPropertyType(e.target.value)}
               className="w-full bg-transparent text-sm font-medium outline-none cursor-pointer"
             >
-              {PROPERTY_TYPE_KEYS.map((key) => (
+              {propertyTypeKeys.map((key) => (
                 <option key={key} value={key}>
                   {t(`propertyTypes.${key}`)}
                 </option>
@@ -242,16 +299,16 @@ export function SearchBar({
         <label className="flex items-center gap-3 border-t border-border px-4 py-3 md:border-s md:border-t-0 cursor-pointer">
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {t("searchBar.budgetPerYear")}
+              {listingType === "sale" ? t("searchBar.budget") : t("searchBar.budgetPerYear")}
             </div>
             <select
               value={budgetIdx}
               onChange={(e) => setBudgetIdx(Number(e.target.value))}
               className="w-full bg-transparent text-sm font-medium outline-none cursor-pointer"
             >
-              {BUDGET_OPTIONS.map((_, i) => (
+              {budgetOptions.map((_, i) => (
                 <option key={i} value={i}>
-                  {t(BUDGET_LABEL_KEYS[i])}
+                  {t(budgetLabelKeys[i])}
                 </option>
               ))}
             </select>

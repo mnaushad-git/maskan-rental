@@ -35,7 +35,9 @@ export type ApiProperty = {
   area: string;
   city: string;
   size_sq_m: number | null;
-  monthly_rent: number;
+  listing_type: "rent" | "sale";
+  monthly_rent: number | null;
+  sale_price: number | null;
   bedrooms: number | null;
   bathrooms: number | null;
   owner_name: string | null;
@@ -94,10 +96,7 @@ function imageForProperty(id: number) {
 }
 
 function inferPropertyType(property: ApiProperty): UiProperty["type"] {
-  if (property.property_type) {
-    const t = property.property_type;
-    if (t === "Apartment" || t === "Villa" || t === "Penthouse" || t === "Townhouse") return t;
-  }
+  if (property.property_type) return property.property_type;
   const title = property.title.toLowerCase();
   if (title.includes("penthouse")) return "Penthouse";
   if (title.includes("townhouse")) return "Townhouse";
@@ -136,14 +135,20 @@ function estimateAreaScore(property: ApiProperty) {
 }
 
 function estimateRentalScore(property: ApiProperty) {
+  if (property.listing_type === "sale" || property.monthly_rent == null) {
+    return Math.max(72, Math.min(95, 82 + (property.bedrooms ?? 0) * 2));
+  }
   const score = 90 - Math.floor(property.monthly_rent / 50000) + (property.bedrooms ?? 0) * 2;
   return Math.max(72, Math.min(95, score));
 }
 
 export function mapApiProperty(property: ApiProperty): UiProperty {
   const estimatedArea = estimateAreaSqm(property);
-  const annualRent = property.monthly_rent * 12;
-  const matchScore = computePropertyScore(property.monthly_rent, property.bedrooms ?? 0);
+  const isSale = property.listing_type === "sale";
+  const displayPrice = isSale ? (property.sale_price ?? 0) : (property.monthly_rent ?? 0) * 12;
+  const matchScore = isSale
+    ? computePropertyScore(0, property.bedrooms ?? 0)
+    : computePropertyScore(property.monthly_rent ?? 0, property.bedrooms ?? 0);
   const imageUrls = (property.images ?? []).map(i => i.url);
   const primaryImage = imageUrls[0] ?? property.image_url ?? imageForProperty(property.id);
 
@@ -152,7 +157,8 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     title: property.title,
     district: property.area,
     city: property.city,
-    price: annualRent,
+    price: displayPrice,
+    listingType: property.listing_type,
     bedrooms: property.bedrooms ?? 0,
     bathrooms: property.bathrooms ?? 0,
     area: estimatedArea,
@@ -162,7 +168,7 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     matchScore,
     badges: ["Verified", matchScore >= 90 ? "Best Match" : "New"],
     status: property.status === "Published" ? "Available" : property.status === "Suspended" ? "Reserved" : "Available",
-    pricePerSqm: Math.round(annualRent / estimatedArea),
+    pricePerSqm: estimatedArea > 0 ? Math.round(displayPrice / estimatedArea) : 0,
     agent: property.mediator_agent_name ?? property.owner_name ?? "Maskan Agent",
     agentPhone: property.mediator_phone ?? null,
     agentProfileImage: property.mediator_profile_image_url ?? null,
@@ -179,6 +185,7 @@ export function mapApiSearchProperty(property: ApiProperty): UiSearchProperty {
     city: uiProperty.city,
     district: uiProperty.district,
     price: uiProperty.price,
+    listingType: uiProperty.listingType,
     bedrooms: uiProperty.bedrooms,
     bathrooms: uiProperty.bathrooms,
     area: uiProperty.area,

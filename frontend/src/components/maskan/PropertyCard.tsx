@@ -100,12 +100,16 @@ export function PropertyCard({ p }: { p: Property }) {
 
           <div className="mt-auto flex items-end justify-between border-t border-border pt-4">
             <div>
-              <div className="text-xs text-muted-foreground">{t("propertyCard.annualRent")}</div>
+              <div className="text-xs text-muted-foreground">
+                {p.listingType === "sale" ? t("propertyCard.salePrice") : t("propertyCard.annualRent")}
+              </div>
               <div className="text-xl font-bold tracking-tight">
                 SAR {formatSAR(p.price)}
-                <span className="ms-1 text-xs font-medium text-muted-foreground">
-                  {t("propertyCard.perYear")}
-                </span>
+                {p.listingType !== "sale" && (
+                  <span className="ms-1 text-xs font-medium text-muted-foreground">
+                    {t("propertyCard.perYear")}
+                  </span>
+                )}
               </div>
             </div>
             <div className="text-end text-xs text-muted-foreground">

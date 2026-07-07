@@ -8,11 +8,13 @@ export type SearchProperty = {
   title: string;
   city: string;
   district: string;
+  // Rent listings: SAR / year. Sale listings: total SAR sale price.
   price: number;
+  listingType: "rent" | "sale";
   bedrooms: number;
   bathrooms: number;
   area: number;
-  type: "Apartment" | "Villa" | "Penthouse" | "Townhouse";
+  type: string;
   furnished: "Furnished" | "Unfurnished" | "Semi-furnished";
   image: string;
   rentalScore: number;
@@ -35,6 +37,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     title: "Skyline Residence",
     city: "Riyadh", district: "Al Olaya",
     price: 145000, bedrooms: 3, bathrooms: 3, area: 210, type: "Apartment",
+    listingType: "rent",
     furnished: "Semi-furnished",
     rentalScore: 92, areaScore: 88, matchScore: 96,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
@@ -44,6 +47,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     title: "Najdi Modern Villa",
     city: "Riyadh", district: "Al Yasmin",
     price: 235000, bedrooms: 5, bathrooms: 6, area: 480, type: "Villa",
+    listingType: "rent",
     furnished: "Unfurnished",
     rentalScore: 88, areaScore: 92, matchScore: 91,
     amenities: { parking: true, balcony: true, gym: false, pool: true },
@@ -53,6 +57,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     title: "KAFD Penthouse",
     city: "Riyadh", district: "KAFD",
     price: 420000, bedrooms: 4, bathrooms: 5, area: 360, type: "Penthouse",
+    listingType: "rent",
     furnished: "Furnished",
     rentalScore: 79, areaScore: 95, matchScore: 88,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
@@ -62,6 +67,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     title: "Coastal Townhouse",
     city: "Jeddah", district: "Al Shati",
     price: 168000, bedrooms: 4, bathrooms: 4, area: 260, type: "Townhouse",
+    listingType: "rent",
     furnished: "Unfurnished",
     rentalScore: 90, areaScore: 86, matchScore: 84,
     amenities: { parking: true, balcony: true, gym: false, pool: false },
@@ -71,6 +77,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     title: "Family Apartment",
     city: "Riyadh", district: "Al Narjis",
     price: 98000, bedrooms: 3, bathrooms: 3, area: 195, type: "Apartment",
+    listingType: "rent",
     furnished: "Unfurnished",
     rentalScore: 94, areaScore: 86, matchScore: 89,
     amenities: { parking: true, balcony: true, gym: false, pool: false },
@@ -80,6 +87,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     title: "Garden Villa",
     city: "Riyadh", district: "Al Malqa",
     price: 205000, bedrooms: 4, bathrooms: 5, area: 380, type: "Villa",
+    listingType: "rent",
     furnished: "Semi-furnished",
     rentalScore: 85, areaScore: 94, matchScore: 92,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
@@ -89,6 +97,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     title: "Marina View Apartment",
     city: "Jeddah", district: "Al Hamra",
     price: 132000, bedrooms: 3, bathrooms: 3, area: 220, type: "Apartment",
+    listingType: "rent",
     furnished: "Furnished",
     rentalScore: 87, areaScore: 89, matchScore: 86,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
@@ -98,6 +107,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     title: "Diplomatic Quarter Villa",
     city: "Riyadh", district: "Al Safarat",
     price: 290000, bedrooms: 5, bathrooms: 6, area: 520, type: "Villa",
+    listingType: "rent",
     furnished: "Unfurnished",
     rentalScore: 81, areaScore: 96, matchScore: 87,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
@@ -107,6 +117,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     title: "Corniche Apartment",
     city: "Khobar", district: "Al Aqrabiyah",
     price: 76000, bedrooms: 2, bathrooms: 2, area: 140, type: "Apartment",
+    listingType: "rent",
     furnished: "Semi-furnished",
     rentalScore: 93, areaScore: 82, matchScore: 83,
     amenities: { parking: true, balcony: true, gym: false, pool: false },
@@ -116,6 +127,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     title: "Modern Family Townhouse",
     city: "Riyadh", district: "Al Aqiq",
     price: 152000, bedrooms: 4, bathrooms: 4, area: 280, type: "Townhouse",
+    listingType: "rent",
     furnished: "Unfurnished",
     rentalScore: 89, areaScore: 88, matchScore: 90,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
@@ -125,6 +137,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     title: "Business Bay Apartment",
     city: "Dammam", district: "Al Shati",
     price: 84000, bedrooms: 2, bathrooms: 2, area: 155, type: "Apartment",
+    listingType: "rent",
     furnished: "Furnished",
     rentalScore: 91, areaScore: 80, matchScore: 81,
     amenities: { parking: true, balcony: true, gym: true, pool: false },
@@ -134,6 +147,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     title: "Hittin Premium Villa",
     city: "Riyadh", district: "Hittin",
     price: 268000, bedrooms: 5, bathrooms: 6, area: 460, type: "Villa",
+    listingType: "rent",
     furnished: "Semi-furnished",
     rentalScore: 83, areaScore: 93, matchScore: 89,
     amenities: { parking: true, balcony: true, gym: true, pool: true },

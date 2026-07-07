@@ -21,6 +21,8 @@ def list_properties(
     area: str | None = Query(default=None),
     city: str | None = Query(default=None),
     mediator_id: int | None = Query(default=None),
+    listing_type: str | None = Query(default=None),
+    property_type: str | None = Query(default=None),
     include_all: bool = Query(default=False),
     admin: User | None = Depends(get_optional_admin_user),
     db: Session = Depends(get_db),
@@ -35,6 +37,10 @@ def list_properties(
         stmt = stmt.where(Property.city.ilike(f"%{city}%"))
     if mediator_id is not None:
         stmt = stmt.where(Property.mediator_id == mediator_id)
+    if listing_type:
+        stmt = stmt.where(Property.listing_type == listing_type)
+    if property_type:
+        stmt = stmt.where(Property.property_type == property_type)
     stmt = stmt.order_by(Property.id.desc()).offset(skip).limit(limit)
     return db.scalars(stmt).all()
 

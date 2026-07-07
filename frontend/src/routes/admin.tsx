@@ -3376,7 +3376,7 @@ function toListing(property: ApiProperty): Listing {
     title: property.title,
     city: property.city,
     district: property.area,
-    rent: property.monthly_rent,
+    rent: property.monthly_rent ?? property.sale_price ?? 0,
     status: (property.status as ListingStatus) ?? "Draft",
     owner: property.owner_name ?? "Unassigned",
     createdAt: property.created_at,
