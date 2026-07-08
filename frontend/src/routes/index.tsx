@@ -7,13 +7,18 @@ import {
   Calculator,
   ChevronRight,
   Facebook,
+  Home,
   Instagram,
   Linkedin,
   Loader2,
+  Map,
   MapPin,
+  ShieldCheck,
   Sparkles,
   Twitter,
+  Users,
 } from "lucide-react";
+import heroImg from "@/assets/hero-villa.jpg";
 import { TopNav, Logo } from "@/components/maskan/TopNav";
 import { Button } from "@/components/ui/button";
 import { SearchBar, type SearchBarFilters } from "@/components/maskan/SearchBar";
@@ -108,6 +113,7 @@ function Index() {
       <TopNav />
       <HomeSearchSection
         filters={filters}
+        listingsCount={rawProperties.length}
         onSearch={(f) => setFilters(f)}
         onListingTypeChange={(v) => setFilters((f) => ({
           ...f,
@@ -119,9 +125,7 @@ function Index() {
         onChangeLocation={() => setShowOnboarding(true)}
       />
       <HomeMapSection properties={mapProperties} loading={loading} filters={filters} />
-      <TruPartnerCTA partners={previewPartners} />
-      <AskAdvisorCTA />
-      <TruEstimateCTA />
+      <FeaturesGrid partners={previewPartners} />
       <NewListings properties={fullProperties} listingType={filters.listingType} />
       <Footer />
       {showOnboarding && (
@@ -139,46 +143,54 @@ function Index() {
 /* ----------------------------- Search section ----------------------------- */
 function HomeSearchSection({
   filters,
+  listingsCount,
   onSearch,
   onListingTypeChange,
   onChangeLocation,
 }: {
   filters: SearchBarFilters;
+  listingsCount: number;
   onSearch: (filters: SearchBarFilters) => void;
   onListingTypeChange: (v: ListingType) => void;
   onChangeLocation: () => void;
 }) {
   const { t } = useLanguage();
-  const locationLabel =
-    filters.city === "Any"
-      ? t("home.allOfSaudi")
-      : filters.district !== "Any"
-        ? `${filters.district}, ${t(`cities.${filters.city}`)}`
-        : t(`cities.${filters.city}`);
 
   return (
-    <section className="border-b border-border bg-surface">
-      <div className="container-page py-6 sm:py-8">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <Badge tone="ai" className="mb-2">
-              <Sparkles className="size-3.5" /> {t("home.poweredBy")}
-            </Badge>
-            <h1 className="font-display text-xl font-bold tracking-tight sm:text-2xl">
-              {t("home.headingWithCity", { location: locationLabel })}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">{t("home.subtitle")}</p>
-          </div>
+    <section className="relative overflow-hidden bg-[#0b3d2e]">
+      <div className="absolute inset-0">
+        <img src={heroImg} alt="" className="size-full object-cover opacity-40" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0b3d2e]/85 via-[#0b3d2e]/92 to-[#0b3d2e]" />
+      </div>
+
+      <div className="container-page relative py-6 sm:py-10 lg:py-12">
+        <div className="mb-3 flex justify-end">
           <button
             type="button"
             onClick={onChangeLocation}
-            className="flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold transition-colors hover:border-primary hover:text-primary"
+            className="flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition-colors hover:border-white/40 hover:bg-white/20"
           >
             <MapPin className="size-3.5" /> {t("home.changeCity")}
           </button>
         </div>
 
         <SearchBar onSearch={onSearch} onListingTypeChange={onListingTypeChange} />
+
+        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/70">
+          <span className="inline-flex items-center gap-1.5">
+            <Home className="size-4" />
+            {t(
+              listingsCount === 1 ? "home.stats.verifiedListingsSingular" : "home.stats.verifiedListingsPlural",
+              { count: listingsCount },
+            )}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Users className="size-4" /> {t("home.stats.trustedByRenters")}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck className="size-4" /> {t("home.stats.aiScoring")}
+          </span>
+        </div>
       </div>
     </section>
   );
@@ -195,6 +207,15 @@ function HomeMapSection({
   filters: SearchBarFilters;
 }) {
   const { t } = useLanguage();
+  const searchParams = {
+    listingType: filters.listingType,
+    ...(filters.city !== "Any" ? { city: filters.city } : {}),
+    ...(filters.district !== "Any" ? { district: filters.district } : {}),
+    ...(filters.type !== "Any" ? { type: filters.type } : {}),
+    ...(filters.minRent > 0 ? { minRent: filters.minRent } : {}),
+    ...(filters.maxRent < (filters.listingType === "sale" ? 30_000_000 : 500_000) ? { maxRent: filters.maxRent } : {}),
+  } as never;
+
   return (
     <section className="container-page py-8 sm:py-10">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -213,46 +234,43 @@ function HomeMapSection({
                 )}
           </span>
         </div>
-        <Button variant="ghost" size="sm" asChild>
-          <Link
-            to="/search"
-            search={
-              {
-                listingType: filters.listingType,
-                ...(filters.city !== "Any" ? { city: filters.city } : {}),
-                ...(filters.district !== "Any" ? { district: filters.district } : {}),
-                ...(filters.type !== "Any" ? { type: filters.type } : {}),
-                ...(filters.minRent > 0 ? { minRent: filters.minRent } : {}),
-                ...(filters.maxRent < (filters.listingType === "sale" ? 30_000_000 : 500_000) ? { maxRent: filters.maxRent } : {}),
-              } as never
-            }
-          >
+        <Button variant="ghost" size="sm" className="hidden sm:inline-flex" asChild>
+          <Link to="/search" search={searchParams}>
             {t("map.fullSearch")} <ArrowRight />
           </Link>
         </Button>
       </div>
 
       {loading ? (
-        <div className="grid h-[calc(100vh-220px)] min-h-[520px] place-items-center rounded-2xl border border-border bg-surface">
+        <div className="grid h-64 place-items-center rounded-2xl border border-border bg-surface lg:h-[480px]">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" /> {t("common.loading")}
           </div>
         </div>
       ) : properties.length === 0 ? (
-        <div className="grid h-[calc(100vh-220px)] min-h-[520px] place-items-center rounded-2xl border border-dashed border-border bg-surface text-center">
+        <div className="grid h-64 place-items-center rounded-2xl border border-dashed border-border bg-surface text-center lg:h-[480px]">
           <div>
             <Building2 className="mx-auto size-8 text-muted-foreground" />
             <p className="mt-3 text-sm text-muted-foreground">{t("map.empty")}</p>
           </div>
         </div>
       ) : (
-        <PropertyMapView properties={properties} />
+        <div className="relative">
+          <PropertyMapView properties={properties} heightClassName="h-64 sm:h-80 lg:h-[480px]" />
+          <div className="absolute inset-x-0 bottom-4 flex justify-center sm:hidden">
+            <Button size="sm" className="shadow-elevated" asChild>
+              <Link to="/search" search={searchParams}>
+                <Map className="size-4" /> {t("home.viewFullMap")}
+              </Link>
+            </Button>
+          </div>
+        </div>
       )}
     </section>
   );
 }
 
-/* ------------------------------ TruPartner CTA ----------------------------- */
+/* ------------------------------- Features grid ----------------------------- */
 const AVATAR_COLORS = [
   "bg-primary text-primary-foreground",
   "bg-emerald-600 text-white",
@@ -268,108 +286,88 @@ function avatarInitials(p: ApiPartnerPublic) {
     .join("");
 }
 
-function TruPartnerCTA({ partners }: { partners: ApiPartnerPublic[] }) {
+function FeaturesGrid({ partners }: { partners: ApiPartnerPublic[] }) {
   const { t } = useLanguage();
   return (
     <section className="container-page py-8 sm:py-10">
-      <Link
-        to="/partners"
-        className="group flex items-center justify-between gap-4 overflow-hidden rounded-2xl bg-gradient-to-br from-[#0b3d2e] to-[#123c33] p-6 text-white shadow-card transition-transform hover:-translate-y-0.5 sm:p-8"
-      >
-        <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">
-            <Briefcase className="size-3.5" /> {t("home.truPartner.badge")}
-            <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-              {t("home.truPartner.new")}
-            </span>
-          </div>
-          <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">
-            {t("home.truPartner.title")}
-          </h2>
-          <p className="mt-2 max-w-lg text-sm text-white/70">{t("home.truPartner.body")}</p>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-3">
-          {partners.length > 0 && (
-            <div className="hidden -space-x-3 sm:flex">
-              {partners.map((p) =>
-                p.profile_image_url ? (
-                  <img
-                    key={p.id}
-                    src={p.profile_image_url}
-                    alt=""
-                    className="size-10 rounded-full border-2 border-[#0b3d2e] object-cover"
-                  />
-                ) : (
-                  <div
-                    key={p.id}
-                    className={`grid size-10 place-items-center rounded-full border-2 border-[#0b3d2e] text-xs font-bold ${AVATAR_COLORS[p.id % AVATAR_COLORS.length]}`}
-                  >
-                    {avatarInitials(p)}
-                  </div>
-                ),
-              )}
+      <h2 className="mb-5 font-display text-lg font-bold tracking-tight sm:text-xl">
+        {t("home.exploreMore")}
+      </h2>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Link
+          to="/partners"
+          className="group flex flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br from-[#0b3d2e] to-[#123c33] p-6 text-white shadow-card transition-transform hover:-translate-y-0.5"
+        >
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">
+              <Briefcase className="size-3.5" /> {t("home.truPartner.badge")}
+              <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                {t("home.truPartner.new")}
+              </span>
             </div>
-          )}
-          <ChevronRight className="size-6 text-white/70 transition-transform group-hover:translate-x-1" />
-        </div>
-      </Link>
-    </section>
-  );
-}
-
-/* ---------------------------- Ask AI Advisor CTA --------------------------- */
-function AskAdvisorCTA() {
-  const { t } = useLanguage();
-  return (
-    <section className="container-page py-8 sm:py-10">
-      <Link
-        to="/advisor"
-        className="group flex items-center justify-between gap-4 overflow-hidden rounded-2xl bg-gradient-to-br from-[#0b3d2e] to-[#123c33] p-6 text-white shadow-card transition-transform hover:-translate-y-0.5 sm:p-8"
-      >
-        <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">
-            <Sparkles className="size-3.5" /> {t("home.truAIAdvisor.badge")}
-            <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-              {t("home.truAIAdvisor.new")}
-            </span>
+            <h3 className="font-display text-lg font-bold tracking-tight">{t("home.truPartner.title")}</h3>
+            <p className="mt-2 text-sm text-white/70">{t("home.truPartner.body")}</p>
           </div>
-          <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">
-            {t("home.truAIAdvisor.title")}
-          </h2>
-          <p className="mt-2 max-w-lg text-sm text-white/70">{t("home.truAIAdvisor.body")}</p>
-        </div>
-        <ChevronRight className="size-6 shrink-0 text-white/70 transition-transform group-hover:translate-x-1" />
-      </Link>
-    </section>
-  );
-}
-
-/* ------------------------------ TruEstimate CTA ----------------------------- */
-function TruEstimateCTA() {
-  const { t } = useLanguage();
-  return (
-    <section className="container-page py-8 sm:py-10">
-      <Link
-        to="/estimate"
-        className="group flex items-center justify-between gap-4 overflow-hidden rounded-2xl bg-primary-soft p-6 shadow-card transition-transform hover:-translate-y-0.5 sm:p-8"
-      >
-        <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-background/70 px-3 py-1 text-xs font-semibold text-primary">
-            <Calculator className="size-3.5" /> {t("home.truEstimate.badge")}
+          <div className="mt-5 flex items-center justify-between">
+            {partners.length > 0 ? (
+              <div className="-space-x-3 flex">
+                {partners.map((p) =>
+                  p.profile_image_url ? (
+                    <img
+                      key={p.id}
+                      src={p.profile_image_url}
+                      alt=""
+                      className="size-9 rounded-full border-2 border-[#0b3d2e] object-cover"
+                    />
+                  ) : (
+                    <div
+                      key={p.id}
+                      className={`grid size-9 place-items-center rounded-full border-2 border-[#0b3d2e] text-xs font-bold ${AVATAR_COLORS[p.id % AVATAR_COLORS.length]}`}
+                    >
+                      {avatarInitials(p)}
+                    </div>
+                  ),
+                )}
+              </div>
+            ) : <span />}
+            <ChevronRight className="size-5 text-white/70 transition-transform group-hover:translate-x-1" />
           </div>
-          <h2 className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            {t("home.truEstimate.title")}
-          </h2>
-          <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-            {t("home.truEstimate.body")}
-          </p>
-          <Button variant="hero" size="sm" className="mt-4">
-            {t("home.truEstimate.getStarted")}
-          </Button>
-        </div>
-        <Building2 className="hidden size-20 shrink-0 text-primary/25 sm:block" />
-      </Link>
+        </Link>
+
+        <Link
+          to="/advisor"
+          className="group flex flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br from-[#0b3d2e] to-[#123c33] p-6 text-white shadow-card transition-transform hover:-translate-y-0.5"
+        >
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">
+              <Sparkles className="size-3.5" /> {t("home.truAIAdvisor.badge")}
+              <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                {t("home.truAIAdvisor.new")}
+              </span>
+            </div>
+            <h3 className="font-display text-lg font-bold tracking-tight">{t("home.truAIAdvisor.title")}</h3>
+            <p className="mt-2 text-sm text-white/70">{t("home.truAIAdvisor.body")}</p>
+          </div>
+          <ChevronRight className="mt-5 size-5 self-end text-white/70 transition-transform group-hover:translate-x-1" />
+        </Link>
+
+        <Link
+          to="/estimate"
+          className="group flex flex-col justify-between overflow-hidden rounded-2xl bg-primary-soft p-6 shadow-card transition-transform hover:-translate-y-0.5"
+        >
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-background/70 px-3 py-1 text-xs font-semibold text-primary">
+              <Calculator className="size-3.5" /> {t("home.truEstimate.badge")}
+            </div>
+            <h3 className="font-display text-lg font-bold tracking-tight text-foreground">{t("home.truEstimate.title")}</h3>
+            <p className="mt-2 text-sm text-muted-foreground">{t("home.truEstimate.body")}</p>
+          </div>
+          <div className="mt-5 flex items-center justify-between">
+            <Button variant="hero" size="sm">{t("home.truEstimate.getStarted")}</Button>
+            <Building2 className="size-8 text-primary/25" />
+          </div>
+        </Link>
+      </div>
     </section>
   );
 }
@@ -377,11 +375,21 @@ function TruEstimateCTA() {
 /* ------------------------------- New Listings ------------------------------ */
 const LISTING_CITIES = ["Riyadh", "Jeddah", "Dammam", "Khobar", "Madinah"];
 
+// Types with a lived-in feel (bedrooms/bathrooms) — kept separate from
+// commercial/land categories (Warehouse, Station, Land, ...) so this teaser
+// reads as "homes" even though the same city may have newer commercial
+// sample listings sorted ahead of them by id.
+const RESIDENTIAL_TYPES = new Set([
+  "Apartment", "Villa", "Penthouse", "Townhouse", "Big Flat", "Floor", "Chalet",
+]);
+
 function NewListings({ properties, listingType }: { properties: Property[]; listingType: ListingType }) {
   const { t } = useLanguage();
   const [city, setCity] = useState("Riyadh");
   // Backend returns properties newest-first, so the first few per city are the latest listings.
-  const listings = properties.filter((p) => p.city === city).slice(0, 6);
+  const cityProperties = properties.filter((p) => p.city === city);
+  const residential = cityProperties.filter((p) => RESIDENTIAL_TYPES.has(p.type));
+  const listings = (residential.length > 0 ? residential : cityProperties).slice(0, 8);
   const cityLabel = t(`cities.${city}`);
 
   return (
@@ -425,11 +433,9 @@ function NewListings({ properties, listingType }: { properties: Property[]; list
           {t("home.newListings.empty", { city: cityLabel })}
         </p>
       ) : (
-        <div className="mt-5 flex gap-4 overflow-x-auto pb-2">
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {listings.map((p) => (
-            <div key={p.id} className="w-80 shrink-0">
-              <PropertyCard p={p} />
-            </div>
+            <PropertyCard key={p.id} p={p} />
           ))}
         </div>
       )}

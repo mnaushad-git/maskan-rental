@@ -5,6 +5,7 @@ import type { SearchProperty } from "@/lib/maskan-search-data";
 import { formatSAR } from "@/lib/maskan-data";
 import { CITY_CENTERS, DISTRICT_COORDS } from "@/lib/geo";
 import { useLanguage } from "@/lib/i18n/context";
+import { cn } from "@/lib/utils";
 
 function getCoords(p: SearchProperty): [number, number] {
   return DISTRICT_COORDS[`${p.district}|${p.city}`] ?? CITY_CENTERS[p.city] ?? CITY_CENTERS.Riyadh;
@@ -131,7 +132,14 @@ function getHtmlMarkerClass(): HtmlMarkerCtor {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function PropertyMapView({ properties }: { properties: SearchProperty[] }) {
+export function PropertyMapView({
+  properties,
+  heightClassName = "h-[calc(100vh-220px)] min-h-[520px]",
+}: {
+  properties: SearchProperty[];
+  /** Overrides the default full-height map — e.g. a shorter responsive preview on the homepage. */
+  heightClassName?: string;
+}) {
   const { t } = useLanguage();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapObjRef = useRef<google.maps.Map | null>(null);
@@ -226,7 +234,7 @@ export function PropertyMapView({ properties }: { properties: SearchProperty[] }
   }, [properties, ready]);
 
   return (
-    <div className="relative h-[calc(100vh-220px)] min-h-[520px] overflow-hidden rounded-2xl border border-border shadow-card">
+    <div className={cn("relative overflow-hidden rounded-2xl border border-border shadow-card", heightClassName)}>
       <div ref={mapRef} className="size-full" />
 
       {!ready && (

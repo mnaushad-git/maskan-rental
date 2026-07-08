@@ -37,7 +37,7 @@ export const en = {
   },
   listingCategories: {
     rent: "Rent",
-    sale: "Sale",
+    sale: "Buy",
     all: "All",
     more: "More",
   },
@@ -170,11 +170,15 @@ export const en = {
     perYear: "/yr",
   },
   home: {
-    poweredBy: "Powered by Maskan AI",
-    headingWithCity: "Find your next home in {{location}}",
-    allOfSaudi: "all of Saudi Arabia",
-    subtitle: "Compare areas, evaluate rental value, and discover homes that match your lifestyle.",
     changeCity: "Change city",
+    stats: {
+      verifiedListingsSingular: "{{count}}+ verified listing",
+      verifiedListingsPlural: "{{count}}+ verified listings",
+      trustedByRenters: "Trusted by 38,000+ renters",
+      aiScoring: "AI-powered fair-price scoring",
+    },
+    exploreMore: "More ways Maskan helps",
+    viewFullMap: "View full map",
     truPartner: {
       badge: "TruPartner™",
       new: "New",

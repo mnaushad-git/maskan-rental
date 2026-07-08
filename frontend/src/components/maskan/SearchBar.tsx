@@ -277,43 +277,45 @@ export function SearchBar({
       <div className="grid grid-cols-1 gap-2 md:grid-cols-[1.4fr_1fr_1fr_auto]">
         <LocationPicker options={locationOptions} value={location} onChange={setLocation} />
 
-        <label className="flex items-center gap-3 border-t border-border px-4 py-3 md:border-s md:border-t-0 cursor-pointer">
-          <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {t("searchBar.propertyType")}
+        <div className="grid grid-cols-2 border-t border-border md:contents">
+          <label className="flex items-center gap-3 px-4 py-2.5 md:border-s md:border-t-0 md:py-3 cursor-pointer">
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {t("searchBar.propertyType")}
+              </div>
+              <select
+                value={propertyType}
+                onChange={(e) => setPropertyType(e.target.value)}
+                className="w-full bg-transparent text-sm font-medium outline-none cursor-pointer"
+              >
+                {propertyTypeKeys.map((key) => (
+                  <option key={key} value={key}>
+                    {t(`propertyTypes.${key}`)}
+                  </option>
+                ))}
+              </select>
             </div>
-            <select
-              value={propertyType}
-              onChange={(e) => setPropertyType(e.target.value)}
-              className="w-full bg-transparent text-sm font-medium outline-none cursor-pointer"
-            >
-              {propertyTypeKeys.map((key) => (
-                <option key={key} value={key}>
-                  {t(`propertyTypes.${key}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </label>
+          </label>
 
-        <label className="flex items-center gap-3 border-t border-border px-4 py-3 md:border-s md:border-t-0 cursor-pointer">
-          <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {listingType === "sale" ? t("searchBar.budget") : t("searchBar.budgetPerYear")}
+          <label className="flex items-center gap-3 border-s border-border px-4 py-2.5 md:border-t-0 md:py-3 cursor-pointer">
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {listingType === "sale" ? t("searchBar.budget") : t("searchBar.budgetPerYear")}
+              </div>
+              <select
+                value={budgetIdx}
+                onChange={(e) => setBudgetIdx(Number(e.target.value))}
+                className="w-full bg-transparent text-sm font-medium outline-none cursor-pointer"
+              >
+                {budgetOptions.map((_, i) => (
+                  <option key={i} value={i}>
+                    {t(budgetLabelKeys[i])}
+                  </option>
+                ))}
+              </select>
             </div>
-            <select
-              value={budgetIdx}
-              onChange={(e) => setBudgetIdx(Number(e.target.value))}
-              className="w-full bg-transparent text-sm font-medium outline-none cursor-pointer"
-            >
-              {budgetOptions.map((_, i) => (
-                <option key={i} value={i}>
-                  {t(budgetLabelKeys[i])}
-                </option>
-              ))}
-            </select>
-          </div>
-        </label>
+          </label>
+        </div>
 
         <div className="flex items-center gap-2 p-1">
           <Button

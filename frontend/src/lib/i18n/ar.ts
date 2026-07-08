@@ -39,7 +39,7 @@ export const ar: TranslationDict = {
   },
   listingCategories: {
     rent: "إيجار",
-    sale: "بيع",
+    sale: "شراء",
     all: "الكل",
     more: "المزيد",
   },
@@ -171,11 +171,15 @@ export const ar: TranslationDict = {
     perYear: "/سنويًا",
   },
   home: {
-    poweredBy: "مدعوم بذكاء مسكن الاصطناعي",
-    headingWithCity: "اعثر على منزلك القادم في {{location}}",
-    allOfSaudi: "جميع أنحاء المملكة العربية السعودية",
-    subtitle: "قارن بين الأحياء، قيّم القيمة الإيجارية، واكتشف منازل تناسب أسلوب حياتك.",
     changeCity: "تغيير المدينة",
+    stats: {
+      verifiedListingsSingular: "{{count}}+ إعلان موثّق",
+      verifiedListingsPlural: "{{count}}+ إعلان موثّق",
+      trustedByRenters: "موثوق به من قِبل أكثر من 38,000 مستأجر",
+      aiScoring: "تقييم أسعار عادل مدعوم بالذكاء الاصطناعي",
+    },
+    exploreMore: "طرق أخرى يساعدك بها مسكن",
+    viewFullMap: "عرض الخريطة كاملة",
     truPartner: {
       badge: "TruPartner™",
       new: "جديد",
