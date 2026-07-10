@@ -157,10 +157,10 @@ function HomeSearchSection({
   const { t } = useLanguage();
 
   return (
-    <section className="relative overflow-hidden bg-[#0b3d2e]">
+    <section className="relative overflow-hidden bg-primary-soft">
       <div className="absolute inset-0">
-        <img src={heroImg} alt="" className="size-full object-cover opacity-40" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0b3d2e]/85 via-[#0b3d2e]/92 to-[#0b3d2e]" />
+        <img src={heroImg} alt="" className="size-full object-cover opacity-15" />
+        <div className="absolute inset-0 bg-gradient-to-b from-primary-soft/90 via-primary-soft/95 to-primary-soft" />
       </div>
 
       <div className="container-page relative py-6 sm:py-10 lg:py-12">
@@ -168,7 +168,7 @@ function HomeSearchSection({
           <button
             type="button"
             onClick={onChangeLocation}
-            className="flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition-colors hover:border-white/40 hover:bg-white/20"
+            className="flex items-center gap-1.5 rounded-full border border-border bg-background px-4 py-2 text-xs font-semibold text-foreground shadow-card transition-colors hover:bg-surface"
           >
             <MapPin className="size-3.5" /> {t("home.changeCity")}
           </button>
@@ -176,19 +176,19 @@ function HomeSearchSection({
 
         <SearchBar onSearch={onSearch} onListingTypeChange={onListingTypeChange} />
 
-        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/70">
+        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
-            <Home className="size-4" />
+            <Home className="size-4 text-primary" />
             {t(
               listingsCount === 1 ? "home.stats.verifiedListingsSingular" : "home.stats.verifiedListingsPlural",
               { count: listingsCount },
             )}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <Users className="size-4" /> {t("home.stats.trustedByRenters")}
+            <Users className="size-4 text-primary" /> {t("home.stats.trustedByRenters")}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <ShieldCheck className="size-4" /> {t("home.stats.aiScoring")}
+            <ShieldCheck className="size-4 text-primary" /> {t("home.stats.aiScoring")}
           </span>
         </div>
       </div>
@@ -286,88 +286,130 @@ function avatarInitials(p: ApiPartnerPublic) {
     .join("");
 }
 
+type FeatureTabKey = "partner" | "advisor" | "estimate";
+
+const FEATURE_ACCENT: Record<FeatureTabKey, { bg: string; text: string }> = {
+  partner: { bg: "bg-secondary/10", text: "text-secondary" },
+  advisor: { bg: "bg-ai-soft", text: "text-ai" },
+  estimate: { bg: "bg-primary-soft", text: "text-primary" },
+};
+
 function FeaturesGrid({ partners }: { partners: ApiPartnerPublic[] }) {
   const { t } = useLanguage();
+  const [active, setActive] = useState<FeatureTabKey>("partner");
+
+  const tabs: Array<{
+    key: FeatureTabKey;
+    icon: typeof Briefcase;
+    label: string;
+    newLabel?: string;
+    title: string;
+    body: string;
+    to: string;
+  }> = [
+    {
+      key: "partner",
+      icon: Briefcase,
+      label: t("home.truPartner.badge"),
+      newLabel: t("home.truPartner.new"),
+      title: t("home.truPartner.title"),
+      body: t("home.truPartner.body"),
+      to: "/partners",
+    },
+    {
+      key: "advisor",
+      icon: Sparkles,
+      label: t("home.truAIAdvisor.badge"),
+      newLabel: t("home.truAIAdvisor.new"),
+      title: t("home.truAIAdvisor.title"),
+      body: t("home.truAIAdvisor.body"),
+      to: "/advisor",
+    },
+    {
+      key: "estimate",
+      icon: Calculator,
+      label: t("home.truEstimate.badge"),
+      title: t("home.truEstimate.title"),
+      body: t("home.truEstimate.body"),
+      to: "/estimate",
+    },
+  ];
+
+  const activeTab = tabs.find((tb) => tb.key === active)!;
+  const accent = FEATURE_ACCENT[active];
+
   return (
     <section className="container-page py-8 sm:py-10">
       <h2 className="mb-5 font-display text-lg font-bold tracking-tight sm:text-xl">
         {t("home.exploreMore")}
       </h2>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Link
-          to="/partners"
-          className="group flex flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br from-[#0b3d2e] to-[#123c33] p-6 text-white shadow-card transition-transform hover:-translate-y-0.5"
-        >
-          <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">
-              <Briefcase className="size-3.5" /> {t("home.truPartner.badge")}
-              <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                {t("home.truPartner.new")}
-              </span>
-            </div>
-            <h3 className="font-display text-lg font-bold tracking-tight">{t("home.truPartner.title")}</h3>
-            <p className="mt-2 text-sm text-white/70">{t("home.truPartner.body")}</p>
-          </div>
-          <div className="mt-5 flex items-center justify-between">
-            {partners.length > 0 ? (
-              <div className="-space-x-3 flex">
-                {partners.map((p) =>
-                  p.profile_image_url ? (
-                    <img
-                      key={p.id}
-                      src={p.profile_image_url}
-                      alt=""
-                      className="size-9 rounded-full border-2 border-[#0b3d2e] object-cover"
-                    />
-                  ) : (
-                    <div
-                      key={p.id}
-                      className={`grid size-9 place-items-center rounded-full border-2 border-[#0b3d2e] text-xs font-bold ${AVATAR_COLORS[p.id % AVATAR_COLORS.length]}`}
-                    >
-                      {avatarInitials(p)}
-                    </div>
-                  ),
-                )}
-              </div>
-            ) : <span />}
-            <ChevronRight className="size-5 text-white/70 transition-transform group-hover:translate-x-1" />
-          </div>
-        </Link>
 
-        <Link
-          to="/advisor"
-          className="group flex flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br from-[#0b3d2e] to-[#123c33] p-6 text-white shadow-card transition-transform hover:-translate-y-0.5"
-        >
-          <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">
-              <Sparkles className="size-3.5" /> {t("home.truAIAdvisor.badge")}
-              <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                {t("home.truAIAdvisor.new")}
-              </span>
-            </div>
-            <h3 className="font-display text-lg font-bold tracking-tight">{t("home.truAIAdvisor.title")}</h3>
-            <p className="mt-2 text-sm text-white/70">{t("home.truAIAdvisor.body")}</p>
-          </div>
-          <ChevronRight className="mt-5 size-5 self-end text-white/70 transition-transform group-hover:translate-x-1" />
-        </Link>
-
-        <Link
-          to="/estimate"
-          className="group flex flex-col justify-between overflow-hidden rounded-2xl bg-primary-soft p-6 shadow-card transition-transform hover:-translate-y-0.5"
-        >
-          <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-background/70 px-3 py-1 text-xs font-semibold text-primary">
-              <Calculator className="size-3.5" /> {t("home.truEstimate.badge")}
-            </div>
-            <h3 className="font-display text-lg font-bold tracking-tight text-foreground">{t("home.truEstimate.title")}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{t("home.truEstimate.body")}</p>
-          </div>
-          <div className="mt-5 flex items-center justify-between">
-            <Button variant="hero" size="sm">{t("home.truEstimate.getStarted")}</Button>
-            <Building2 className="size-8 text-primary/25" />
-          </div>
-        </Link>
+      <div className="flex gap-1.5 rounded-2xl border border-border bg-surface p-1.5">
+        {tabs.map((tab) => {
+          const isActive = tab.key === active;
+          const tabAccent = FEATURE_ACCENT[tab.key];
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActive(tab.key)}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-xs font-semibold transition-colors sm:text-sm",
+                isActive ? `${tabAccent.bg} ${tabAccent.text}` : "text-muted-foreground hover:bg-surface-2",
+              )}
+            >
+              <tab.icon className="size-4 shrink-0" />
+              <span className="truncate">{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
+
+      <Link
+        to={activeTab.to}
+        className={cn(
+          "group mt-3 flex flex-col justify-between overflow-hidden rounded-2xl p-6 shadow-card transition-transform hover:-translate-y-0.5 sm:min-h-60",
+          accent.bg,
+        )}
+      >
+        <div>
+          {activeTab.newLabel && (
+            <div className="mb-3">
+              <Badge tone="info">{activeTab.newLabel}</Badge>
+            </div>
+          )}
+          <h3 className="font-display text-lg font-bold tracking-tight text-foreground">{activeTab.title}</h3>
+          <p className="mt-2 text-sm text-muted-foreground">{activeTab.body}</p>
+        </div>
+        <div className="mt-5 flex items-center justify-between">
+          {active === "partner" && partners.length > 0 ? (
+            <div className="-space-x-2 flex">
+              {partners.map((p) =>
+                p.profile_image_url ? (
+                  <img
+                    key={p.id}
+                    src={p.profile_image_url}
+                    alt=""
+                    className="size-9 rounded-full border-2 border-background object-cover"
+                  />
+                ) : (
+                  <div
+                    key={p.id}
+                    className={`grid size-9 place-items-center rounded-full border-2 border-background text-xs font-bold ${AVATAR_COLORS[p.id % AVATAR_COLORS.length]}`}
+                  >
+                    {avatarInitials(p)}
+                  </div>
+                ),
+              )}
+            </div>
+          ) : active === "estimate" ? (
+            <span className={cn("text-sm font-semibold", accent.text)}>{t("home.truEstimate.getStarted")}</span>
+          ) : (
+            <span />
+          )}
+          <ChevronRight className={cn("size-5 transition-transform group-hover:translate-x-1", accent.text)} />
+        </div>
+      </Link>
     </section>
   );
 }
@@ -419,7 +461,7 @@ function NewListings({ properties, listingType }: { properties: Property[]; list
             className={cn(
               "rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors",
               city === c
-                ? "border-primary bg-primary/10 text-primary"
+                ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-surface text-foreground hover:bg-surface-2",
             )}
           >

@@ -5,8 +5,6 @@ export const en = {
     loading: "Loading…",
     viewAll: "View all",
     signIn: "Sign in",
-    openMenu: "Open menu",
-    closeMenu: "Close menu",
     close: "Close",
     language: "Language",
   },

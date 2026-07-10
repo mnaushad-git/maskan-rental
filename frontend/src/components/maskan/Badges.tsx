@@ -5,14 +5,17 @@ import { useLanguage } from "@/lib/i18n/context";
 
 type Tone = "primary" | "secondary" | "ai" | "success" | "warning" | "info" | "neutral";
 
+// Solid, high-contrast fills — pale tinted badges (the old bg-x/10-style
+// pills) read as near-identical washed-out blobs at small sizes, especially
+// when "Verified" and "New" sit right next to each other on a card.
 const toneClass: Record<Tone, string> = {
-  primary: "bg-primary-soft text-accent-foreground",
-  secondary: "bg-secondary/10 text-secondary",
-  ai: "bg-ai-soft text-ai",
-  success: "bg-success/12 text-success",
-  warning: "bg-warning/15 text-warning-foreground",
-  info: "bg-info/10 text-info",
-  neutral: "bg-surface-2 text-muted-foreground",
+  primary: "bg-primary text-primary-foreground",
+  secondary: "bg-secondary text-secondary-foreground",
+  ai: "bg-ai text-ai-foreground",
+  success: "bg-success text-success-foreground",
+  warning: "bg-warning text-warning-foreground",
+  info: "bg-info text-info-foreground",
+  neutral: "bg-muted-foreground text-background",
 };
 
 export function Badge({
@@ -46,8 +49,10 @@ export function RecommendationBadge({ label }: { label: string }) {
     "Best Match": { tone: "ai", icon: <Sparkles className="size-3.5" /> },
     Verified: { tone: "success", icon: <ShieldCheck className="size-3.5" /> },
     Hot: { tone: "warning", icon: <Flame className="size-3.5" /> },
-    "Price Drop": { tone: "info", icon: <TrendingDown className="size-3.5" /> },
-    New: { tone: "primary", icon: <Star className="size-3.5" /> },
+    "Price Drop": { tone: "secondary", icon: <TrendingDown className="size-3.5" /> },
+    // Blue, not green — "New" sits directly next to "Verified" on every card,
+    // so it needs a hue that doesn't read as a paler version of the same badge.
+    New: { tone: "info", icon: <Star className="size-3.5" /> },
   };
   const cfg = map[label] ?? { tone: "neutral" as Tone, icon: null };
   return (

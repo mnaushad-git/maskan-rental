@@ -7,8 +7,6 @@ export const ar: TranslationDict = {
     loading: "جارٍ التحميل…",
     viewAll: "عرض الكل",
     signIn: "تسجيل الدخول",
-    openMenu: "فتح القائمة",
-    closeMenu: "إغلاق القائمة",
     close: "إغلاق",
     language: "اللغة",
   },

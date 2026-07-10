@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
-import { Check, ChevronDown, Globe, Home, Menu, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { Check, ChevronDown, Globe, Home } from "lucide-react";
 import { NavAuthButton } from "@/components/maskan/NavAuthButton";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage, type Language } from "@/lib/i18n/context";
@@ -91,11 +90,10 @@ export function LanguageSwitcher({ className }: { className?: string }) {
 }
 
 export function TopNav() {
-  const [open, setOpen] = useState(false);
   const { user } = useAuth();
-  const { t } = useLanguage();
   const { NAV_LINKS, MY_LEADS_LINK } = useNavLinks();
   const navLinks = user ? [...NAV_LINKS, MY_LEADS_LINK] : NAV_LINKS;
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
       <div className="container-page flex h-16 items-center justify-between">
@@ -115,45 +113,38 @@ export function TopNav() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
-          <LanguageSwitcher className="hidden sm:block" />
-          <NavAuthButton className="hidden md:inline-flex" />
-          <Button
-            variant="outline"
-            size="icon"
-            className="md:hidden"
-            aria-label={open ? t("common.closeMenu") : t("common.openMenu")}
-            onClick={() => setOpen((o) => !o)}
-          >
-            {open ? <X /> : <Menu />}
-          </Button>
+          <LanguageSwitcher />
+          <NavAuthButton />
         </div>
       </div>
 
-      {/* Mobile slide-down drawer */}
-      {open && (
-        <div className="absolute inset-x-0 top-full z-50 border-b border-border bg-background shadow-lg md:hidden">
-          <nav className="container-page flex flex-col gap-0.5 py-3">
-            {navLinks.map((l) => (
-              <Link
-                key={l.to}
-                to={l.to}
-                onClick={() => setOpen(false)}
-                className="flex items-center rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground hover:bg-surface hover:text-foreground"
-                activeProps={{
-                  className:
-                    "flex items-center rounded-xl px-3 py-3 text-sm font-medium bg-surface text-foreground",
-                }}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="container-page flex flex-col gap-3 border-t border-border py-3">
-            <LanguageSwitcher className="sm:hidden" />
-            <NavAuthButton className="w-full justify-center" />
-          </div>
-        </div>
-      )}
+      {/* Mobile nav — a horizontally scrollable strip instead of a hidden
+          hamburger drawer, so links stay visible without an extra tap. */}
+      <nav
+        className="flex gap-2 overflow-x-auto border-t border-border/60 px-4 py-2.5 md:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {navLinks.map((l) => {
+          // Built manually (not via TanStack Router's activeProps) — that prop
+          // merges its className into the base one rather than replacing it,
+          // which left conflicting bg-surface/bg-primary utilities fighting
+          // for the same element and rendered as a washed-out ghost pill.
+          const isActive = pathname === l.to || pathname.startsWith(`${l.to}/`);
+          return (
+            <Link
+              key={l.to}
+              to={l.to}
+              className={cn(
+                "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+                isActive
+                  ? "border-primary bg-primary font-semibold text-primary-foreground"
+                  : "border-border bg-surface text-foreground hover:bg-surface-2",
+              )}
+            >
+              {l.label}
+            </Link>
+          );
+        })}
+      </nav>
     </header>
   );
 }
