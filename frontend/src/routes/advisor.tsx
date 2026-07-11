@@ -647,7 +647,11 @@ function MarkdownBlock({ text }: { text: string }) {
       }
       nodes.push(
         <div key={`table-${i}`} className="my-3 overflow-x-auto rounded-xl border border-border">
-          <table className="w-full text-sm">
+          {/* min-w-max (column count is unknown — this renders whatever
+              table the AI returns) so the table scrolls instead of being
+              crushed into the container width; see the same fix in
+              areas.tsx for the fixed-column version. */}
+          <table className="w-full min-w-max text-sm">
             <thead className="bg-surface-2/60">
               <tr>
                 {header.map((h, j) => (

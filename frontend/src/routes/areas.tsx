@@ -674,7 +674,12 @@ function AreasPage() {
           {/* Table */}
           <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              {/* w-full alone caps the table at its container's width, which
+                  defeats overflow-x-auto above (nothing ever exceeds 100%, so
+                  it never scrolls) — a min-width lets 9 columns keep their
+                  natural size on narrow screens and scroll horizontally
+                  instead of being crushed unreadably into ~360px. */}
+              <table className="w-full min-w-[780px] text-sm">
                 <thead className="border-b border-border bg-surface text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 text-start font-semibold">{tAreas("table.district")}</th>

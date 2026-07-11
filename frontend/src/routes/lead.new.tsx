@@ -50,13 +50,16 @@ function NewLeadPage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">
-        <Lightbulb className="size-10 text-primary" />
-        <h1 className="text-xl font-bold">{t("leadNew.signInGate.heading")}</h1>
-        <p className="text-sm text-muted-foreground text-center max-w-sm">
-          {t("leadNew.signInGate.desc")}
-        </p>
-        <Button onClick={() => navigate({ to: "/auth" })}>{t("leadNew.signInGate.cta")}</Button>
+      <div className="min-h-screen bg-surface">
+        <TopNav />
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4">
+          <Lightbulb className="size-10 text-primary" />
+          <h1 className="text-xl font-bold">{t("leadNew.signInGate.heading")}</h1>
+          <p className="text-sm text-muted-foreground text-center max-w-sm">
+            {t("leadNew.signInGate.desc")}
+          </p>
+          <Button onClick={() => navigate({ to: "/auth" })}>{t("leadNew.signInGate.cta")}</Button>
+        </div>
       </div>
     );
   }
@@ -88,41 +91,44 @@ function NewLeadPage() {
 
   if (result) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
-        <div className="grid size-16 place-items-center rounded-full bg-success/10 text-success">
-          <CheckCircle className="size-8" />
-        </div>
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">{t("leadNew.success.heading")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t("leadNew.success.desc", { area: result.area_name, city: result.city })}
-          </p>
-        </div>
-        {result.suggestions.length > 0 && (
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-card">
-            <h2 className="mb-3 font-semibold">{t("leadNew.success.suggestedHeading")}</h2>
-            <div className="space-y-2">
-              {result.suggestions.map(s => (
-                <div key={s.id} className="rounded-lg border border-border p-3 text-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{s.property_title ?? t("leadNew.success.propertyFallback", { id: s.property_id })}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {s.bedrooms ? t("leadNew.success.bedroomsPrefix", { count: s.bedrooms }) : ""}
-                        {s.monthly_rent ? t("leadNew.success.perMonth", { amount: s.monthly_rent.toLocaleString() }) : ""}
-                      </p>
-                    </div>
-                    <Badge tone="primary" className="shrink-0">{t("leadNew.success.matchPct", { pct: Math.round(s.match_score) })}</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+      <div className="min-h-screen bg-surface">
+        <TopNav />
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4 py-12">
+          <div className="grid size-16 place-items-center rounded-full bg-success/10 text-success">
+            <CheckCircle className="size-8" />
           </div>
-        )}
-        <div className="flex flex-wrap justify-center gap-3">
-          <Button variant="outline" onClick={() => navigate({ to: "/search" })}>{t("leadNew.success.browseProperties")}</Button>
-          <Button variant="outline" onClick={() => navigate({ to: "/my-leads" })}>{t("leadNew.success.allMyLeads")}</Button>
-          <Button onClick={() => navigate({ to: "/lead/$leadId", params: { leadId: String(result.id) } })}>{t("leadNew.success.trackThisLead")}</Button>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold">{t("leadNew.success.heading")}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("leadNew.success.desc", { area: result.area_name, city: result.city })}
+            </p>
+          </div>
+          {result.suggestions.length > 0 && (
+            <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-card">
+              <h2 className="mb-3 font-semibold">{t("leadNew.success.suggestedHeading")}</h2>
+              <div className="space-y-2">
+                {result.suggestions.map(s => (
+                  <div key={s.id} className="rounded-lg border border-border p-3 text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{s.property_title ?? t("leadNew.success.propertyFallback", { id: s.property_id })}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {s.bedrooms ? t("leadNew.success.bedroomsPrefix", { count: s.bedrooms }) : ""}
+                          {s.monthly_rent ? t("leadNew.success.perMonth", { amount: s.monthly_rent.toLocaleString() }) : ""}
+                        </p>
+                      </div>
+                      <Badge tone="primary" className="shrink-0">{t("leadNew.success.matchPct", { pct: Math.round(s.match_score) })}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex flex-wrap justify-center gap-3">
+            <Button variant="outline" onClick={() => navigate({ to: "/search" })}>{t("leadNew.success.browseProperties")}</Button>
+            <Button variant="outline" onClick={() => navigate({ to: "/my-leads" })}>{t("leadNew.success.allMyLeads")}</Button>
+            <Button onClick={() => navigate({ to: "/lead/$leadId", params: { leadId: String(result.id) } })}>{t("leadNew.success.trackThisLead")}</Button>
+          </div>
         </div>
       </div>
     );

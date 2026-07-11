@@ -735,7 +735,7 @@ function Toggle({
       className={cn(
         "flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
         active
-          ? "border-primary bg-primary-soft text-accent-foreground"
+          ? "border-primary bg-primary text-primary-foreground"
           : "border-border bg-background text-muted-foreground hover:text-foreground",
       )}
     >

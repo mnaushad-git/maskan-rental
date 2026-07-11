@@ -149,7 +149,7 @@ export function ListingCategoryBar({
             onClick={() => setMoreOpen((v) => !v)}
             className={cn(
               "flex items-center gap-1 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors",
-              moreActive ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-foreground hover:bg-surface",
+              moreActive ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-surface",
             )}
           >
             {moreActive ? t(`propertyTypes.${propertyType}`) : t("listingCategories.more")}
@@ -177,7 +177,7 @@ export function ListingCategoryBar({
                       onClick={() => selectType(type)}
                       className={cn(
                         "flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-start text-xs font-medium transition-colors",
-                        active ? "bg-primary/10 text-primary" : "text-foreground hover:bg-surface-2",
+                        active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-surface-2",
                       )}
                     >
                       {Icon && <Icon className="size-3.5 shrink-0" />}
@@ -212,7 +212,7 @@ function CategoryChip({
       onClick={onClick}
       className={cn(
         "flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors",
-        active ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-foreground hover:bg-surface",
+        active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-surface",
       )}
     >
       {Icon && <Icon className="size-3.5" />}

@@ -115,7 +115,7 @@ function EstimatePage() {
                     className={cn(
                       "rounded-xl border px-3 py-2 text-sm font-semibold transition-colors",
                       city === c
-                        ? "border-primary bg-primary/10 text-primary"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-border bg-surface text-foreground hover:bg-surface-2",
                     )}
                   >
@@ -173,7 +173,7 @@ function EstimatePage() {
                     className={cn(
                       "flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors",
                       type === pt.label
-                        ? "border-primary bg-primary/10 text-primary"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-border bg-surface text-foreground hover:bg-surface-2",
                     )}
                   >

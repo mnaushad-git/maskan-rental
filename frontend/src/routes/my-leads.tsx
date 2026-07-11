@@ -42,14 +42,22 @@ function MyLeadsPage() {
   }, [user]);
 
   if (authLoading) {
-    return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">{t("myLeads.loading")}</p></div>;
+    return (
+      <div className="min-h-screen bg-surface">
+        <TopNav />
+        <div className="flex min-h-[60vh] items-center justify-center"><p className="text-sm text-muted-foreground">{t("myLeads.loading")}</p></div>
+      </div>
+    );
   }
 
   if (!user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">
-        <h1 className="text-xl font-bold">{t("myLeads.signInToView")}</h1>
-        <Button onClick={() => navigate({ to: "/auth" })}>{t("myLeads.signIn")}</Button>
+      <div className="min-h-screen bg-surface">
+        <TopNav />
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4">
+          <h1 className="text-xl font-bold">{t("myLeads.signInToView")}</h1>
+          <Button onClick={() => navigate({ to: "/auth" })}>{t("myLeads.signIn")}</Button>
+        </div>
       </div>
     );
   }

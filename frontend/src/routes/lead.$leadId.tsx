@@ -90,22 +90,33 @@ function CustomerLeadPage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">
-        <h1 className="text-xl font-bold">{t("leadDetail.signInToView")}</h1>
-        <Button onClick={() => navigate({ to: "/auth" })}>{t("leadDetail.signIn")}</Button>
+      <div className="min-h-screen bg-surface">
+        <TopNav />
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4">
+          <h1 className="text-xl font-bold">{t("leadDetail.signInToView")}</h1>
+          <Button onClick={() => navigate({ to: "/auth" })}>{t("leadDetail.signIn")}</Button>
+        </div>
       </div>
     );
   }
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">{t("leadDetail.loading")}</p></div>;
+    return (
+      <div className="min-h-screen bg-surface">
+        <TopNav />
+        <div className="flex min-h-[60vh] items-center justify-center"><p className="text-sm text-muted-foreground">{t("leadDetail.loading")}</p></div>
+      </div>
+    );
   }
 
   if (!lead) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-4">
-        <p className="text-sm text-muted-foreground">{t("leadDetail.notFound")}</p>
-        <Button variant="outline" onClick={() => navigate({ to: "/" })}>{t("leadDetail.goHome")}</Button>
+      <div className="min-h-screen bg-surface">
+        <TopNav />
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 px-4">
+          <p className="text-sm text-muted-foreground">{t("leadDetail.notFound")}</p>
+          <Button variant="outline" onClick={() => navigate({ to: "/" })}>{t("leadDetail.goHome")}</Button>
+        </div>
       </div>
     );
   }

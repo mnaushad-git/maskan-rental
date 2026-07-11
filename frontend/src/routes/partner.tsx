@@ -200,7 +200,7 @@ function PartnerDashboard() {
               className={cn(
                 "flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                 view === v
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
               )}
             >
@@ -256,7 +256,7 @@ function PartnerDashboard() {
                 className={cn(
                   "flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
                   view === v
-                    ? "bg-primary/10 text-primary"
+                    ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
                 )}
               >

@@ -982,12 +982,12 @@ function RentCalculator({ property }: { property: Property }) {
               className={cn(
                 "rounded-xl border px-3 py-3 text-center transition-colors",
                 freq === f.count
-                  ? "border-primary bg-primary/10 text-primary"
+                  ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-surface text-foreground hover:bg-surface-2",
               )}
             >
               <div className="text-sm font-semibold">{tProp(`rentCalculator.${f.key}`)}</div>
-              <div className="mt-0.5 text-[11px] text-muted-foreground">
+              <div className={cn("mt-0.5 text-[11px]", freq === f.count ? "text-primary-foreground/80" : "text-muted-foreground")}>
                 {tProp(f.count === 1 ? "rentCalculator.paymentPerYear" : "rentCalculator.paymentsPerYear", { count: f.count })}
               </div>
             </button>
@@ -1159,7 +1159,7 @@ function PurchaseCostBreakdown({ property }: { property: Property }) {
               className={cn(
                 "rounded-xl border px-3 py-3 text-center transition-colors",
                 downPct === pctOpt
-                  ? "border-primary bg-primary/10 text-primary"
+                  ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-surface text-foreground hover:bg-surface-2",
               )}
             >

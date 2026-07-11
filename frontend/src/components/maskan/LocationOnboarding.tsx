@@ -158,7 +158,7 @@ export function LocationOnboarding({
                     className={cn(
                       "rounded-xl border px-3 py-2 text-sm font-semibold transition-colors",
                       city === c
-                        ? "border-primary bg-primary/10 text-primary"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-border bg-surface text-foreground hover:bg-surface-2",
                     )}
                   >
@@ -199,7 +199,7 @@ export function LocationOnboarding({
                   className={cn(
                     "flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors",
                     propertyType === "Any"
-                      ? "border-primary bg-primary/10 text-primary"
+                      ? "border-primary bg-primary text-primary-foreground"
                       : "border-border bg-surface text-foreground hover:bg-surface-2",
                   )}
                 >
@@ -213,7 +213,7 @@ export function LocationOnboarding({
                     className={cn(
                       "flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors",
                       propertyType === pt
-                        ? "border-primary bg-primary/10 text-primary"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-border bg-surface text-foreground hover:bg-surface-2",
                     )}
                   >
