@@ -27,16 +27,13 @@ import { PropertyMapView } from "@/components/maskan/PropertyMapView";
 import {
   fetchProperties,
   fetchPublicPartners,
-  mapApiProperty,
   mapApiSearchProperty,
   type ApiProperty,
   type ApiPartnerPublic,
 } from "@/lib/api/maskan";
 import type { SearchProperty } from "@/lib/maskan-search-data";
 import type { ListingType } from "@/lib/listingCategories";
-import type { Property } from "@/lib/maskan-data";
 import { LocationOnboarding, hasSeenOnboarding } from "@/components/maskan/LocationOnboarding";
-import { PropertyCard } from "@/components/maskan/PropertyCard";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
 
@@ -91,11 +88,6 @@ function Index() {
     () => rawProperties.map(mapApiSearchProperty),
     [rawProperties],
   );
-  // Newest-first (backend orders by id desc) — reused for the "new listings" section below.
-  const fullProperties = useMemo<Property[]>(
-    () => rawProperties.map(mapApiProperty).filter((p) => p.listingType === filters.listingType),
-    [rawProperties, filters.listingType],
-  );
 
   const mapProperties = useMemo(() => {
     return properties.filter((p) => {
@@ -126,7 +118,6 @@ function Index() {
       />
       <HomeMapSection properties={mapProperties} loading={loading} filters={filters} />
       <FeaturesGrid partners={previewPartners} />
-      <NewListings properties={fullProperties} listingType={filters.listingType} />
       <Footer />
       {showOnboarding && (
         <LocationOnboarding
@@ -410,77 +401,6 @@ function FeaturesGrid({ partners }: { partners: ApiPartnerPublic[] }) {
           <ChevronRight className={cn("size-5 transition-transform group-hover:translate-x-1", accent.text)} />
         </div>
       </Link>
-    </section>
-  );
-}
-
-/* ------------------------------- New Listings ------------------------------ */
-const LISTING_CITIES = ["Riyadh", "Jeddah", "Dammam", "Khobar", "Madinah"];
-
-// Types with a lived-in feel (bedrooms/bathrooms) — kept separate from
-// commercial/land categories (Warehouse, Station, Land, ...) so this teaser
-// reads as "homes" even though the same city may have newer commercial
-// sample listings sorted ahead of them by id.
-const RESIDENTIAL_TYPES = new Set([
-  "Apartment", "Villa", "Penthouse", "Townhouse", "Big Flat", "Floor", "Chalet",
-]);
-
-function NewListings({ properties, listingType }: { properties: Property[]; listingType: ListingType }) {
-  const { t } = useLanguage();
-  const [city, setCity] = useState("Riyadh");
-  // Backend returns properties newest-first, so the first few per city are the latest listings.
-  const cityProperties = properties.filter((p) => p.city === city);
-  const residential = cityProperties.filter((p) => RESIDENTIAL_TYPES.has(p.type));
-  const listings = (residential.length > 0 ? residential : cityProperties).slice(0, 8);
-  const cityLabel = t(`cities.${city}`);
-
-  return (
-    <section className="container-page py-8 sm:py-10">
-      <div className="flex items-end justify-between gap-6">
-        <div>
-          <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">
-            {t("home.newListings.heading", { city: cityLabel })}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t(listingType === "sale" ? "home.newListings.subtitleSale" : "home.newListings.subtitle")}
-          </p>
-        </div>
-        <Button variant="ghost" size="sm" className="hidden md:inline-flex" asChild>
-          <Link to="/search" search={{ city, listingType } as never}>
-            {t("home.newListings.viewAllIn", { city: cityLabel })} <ArrowRight />
-          </Link>
-        </Button>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {LISTING_CITIES.map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => setCity(c)}
-            className={cn(
-              "rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors",
-              city === c
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-surface text-foreground hover:bg-surface-2",
-            )}
-          >
-            {t(`cities.${c}`)}
-          </button>
-        ))}
-      </div>
-
-      {listings.length === 0 ? (
-        <p className="mt-6 text-sm text-muted-foreground">
-          {t("home.newListings.empty", { city: cityLabel })}
-        </p>
-      ) : (
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {listings.map((p) => (
-            <PropertyCard key={p.id} p={p} />
-          ))}
-        </div>
-      )}
     </section>
   );
 }

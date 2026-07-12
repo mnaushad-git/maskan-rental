@@ -195,13 +195,6 @@ export const en = {
       body: "Get an instant rent estimate based on live listings and area averages across Saudi Arabia.",
       getStarted: "Get Started",
     },
-    newListings: {
-      heading: "New listings in {{city}}",
-      subtitle: "Recently added rental properties, updated live.",
-      subtitleSale: "Recently added properties for sale, updated live.",
-      viewAllIn: "View all in {{city}}",
-      empty: "No listings in {{city}} yet.",
-    },
   },
   furnishing: {
     Any: "Any",
