@@ -1,4 +1,7 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from anthropic import Anthropic, beta_tool
 from sqlalchemy import func, select
@@ -109,7 +112,36 @@ def _customer_tools(db: Session) -> list:
         ]
         if row.overview:
             lines.append(f"Overview: {row.overview}")
+        if row.lifestyle:
+            amenities = ", ".join(
+                f"{cat}: {info.get('count', 0)}" for cat, info in row.lifestyle.items() if info.get("count")
+            )
+            if amenities:
+                lines.append(f"Nearby amenities — {amenities}.")
         return "\n".join(lines)
+
+    @beta_tool
+    def top_areas_by_amenity(category: str, city: str | None = None, limit: int = 10) -> str:
+        """Find districts with the highest count of a nearby amenity category, from live place data.
+
+        Args:
+            category: One of: mosques, restaurants, gyms, malls, parks.
+            city: Filter by city, e.g. Riyadh.
+            limit: Max districts to return (default 10).
+        """
+        valid = {"mosques", "restaurants", "gyms", "malls", "parks"}
+        if category not in valid:
+            return f"Unknown category '{category}'. Valid categories: {', '.join(sorted(valid))}."
+        stmt = select(AreaIntelligence)
+        if city:
+            stmt = stmt.where(AreaIntelligence.city.ilike(f"%{city}%"))
+        rows = db.scalars(stmt).all()
+        scored = [(r, (r.lifestyle or {}).get(category, {}).get("count", 0)) for r in rows]
+        scored = [pair for pair in scored if pair[1]]
+        if not scored:
+            return f"No {category} data found for that city."
+        scored.sort(key=lambda pair: pair[1], reverse=True)
+        return "\n".join(f"{r.area_name}, {r.city} — {cnt} {category} nearby" for r, cnt in scored[:limit])
 
     @beta_tool
     def top_areas(city: str | None = None, limit: int = 10) -> str:
@@ -194,7 +226,7 @@ def _customer_tools(db: Session) -> list:
             )
         return "\n".join(lines)
 
-    return [search_listings, get_area_score, top_areas, find_mediators, rent_summary]
+    return [search_listings, get_area_score, top_areas, top_areas_by_amenity, find_mediators, rent_summary]
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
@@ -359,6 +391,38 @@ def _run_chat(system_prompt: str, tools: list, req: ChatRequest) -> ChatResponse
     return ChatResponse(reply=reply)
 
 
+def _stream_chat(system_prompt: str, tools: list, req: ChatRequest) -> StreamingResponse:
+    client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    messages = [{"role": m.role, "content": m.content} for m in req.history]
+    messages.append({"role": "user", "content": req.message})
+
+    def events():
+        try:
+            runner = client.beta.messages.tool_runner(
+                model="claude-sonnet-4-6",
+                max_tokens=1500,
+                system=system_prompt,
+                tools=tools,
+                messages=messages,
+                stream=True,
+            )
+            # Each iteration is one model turn (a tool call, or the final answer);
+            # the runner executes tool calls and feeds results back in between —
+            # we just forward whatever text each turn streams to the client.
+            for turn in runner:
+                for delta in turn.text_stream:
+                    yield f"data: {json.dumps({'type': 'text', 'delta': delta})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @router.post("/admin-chat", response_model=ChatResponse)
 def admin_ai_chat(
     req: ChatRequest,
@@ -385,3 +449,10 @@ def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"AI error: {exc}") from exc
+
+
+@router.post("/chat/stream")
+def ai_chat_stream(req: ChatRequest, db: Session = Depends(get_db)):
+    if not settings.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="AI service not configured — set ANTHROPIC_API_KEY")
+    return _stream_chat(_PERSONA, _customer_tools(db), req)

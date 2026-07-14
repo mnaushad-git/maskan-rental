@@ -13,7 +13,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { chatWithAdvisor, createLead, fetchProperty, mapApiProperty } from "@/lib/api/maskan";
+import { chatWithAdvisorStream, createLead, fetchProperty, mapApiProperty } from "@/lib/api/maskan";
 import type { Property } from "@/lib/maskan-data";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -215,14 +215,22 @@ function AdvisorPage() {
     }
 
     try {
-      const { reply } = await chatWithAdvisor(text, history);
+      let full = "";
+      await chatWithAdvisorStream(text, history, (delta) => {
+        full += delta;
+        const snapshot = full;
+        setMessages((prev) => [
+          ...prev.slice(0, -1),
+          { role: "ai", text: snapshot, loading: false, ts: Date.now() },
+        ]);
+      });
 
-      // Check for lead creation marker
-      const match = reply.match(LEAD_MARKER_RE);
+      // Check for lead creation marker (only meaningful once the full reply is in)
+      const match = full.match(LEAD_MARKER_RE);
       if (match) {
         try {
           const leadData = JSON.parse(match[1]) as LeadData;
-          const cleanText = reply.replace(LEAD_MARKER_RE, "").trimEnd();
+          const cleanText = full.replace(LEAD_MARKER_RE, "").trimEnd();
           setMessages((prev) => [
             ...prev.slice(0, -1),
             ...(cleanText ? [{ role: "ai" as const, text: cleanText, ts: Date.now() }] : []),
@@ -230,10 +238,10 @@ function AdvisorPage() {
           ]);
         } catch {
           // JSON parse failed — show raw reply
-          setMessages((prev) => [...prev.slice(0, -1), { role: "ai" as const, text: reply, ts: Date.now() }]);
+          setMessages((prev) => [...prev.slice(0, -1), { role: "ai" as const, text: full, ts: Date.now() }]);
         }
       } else {
-        setMessages((prev) => [...prev.slice(0, -1), { role: "ai" as const, text: reply, ts: Date.now() }]);
+        setMessages((prev) => [...prev.slice(0, -1), { role: "ai" as const, text: full, ts: Date.now() }]);
       }
     } catch {
       setMessages((prev) => [

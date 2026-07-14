@@ -494,6 +494,49 @@ export function chatWithAdvisor(
   });
 }
 
+// Streams the advisor's reply token-by-token via SSE instead of waiting for
+// the full response — the AI's tool-use round trips can take 10+ seconds,
+// so this is what makes the first words appear almost immediately.
+export async function chatWithAdvisorStream(
+  message: string,
+  history: Array<{ role: string; content: string }>,
+  onDelta: (text: string) => void,
+): Promise<void> {
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
+  const response = await fetch(`${API_BASE_URL}/ai/chat/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ message, history }),
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`Request failed (${response.status})`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() ?? "";
+    for (const evt of events) {
+      const line = evt.split("\n").find((l) => l.startsWith("data: "));
+      if (!line) continue;
+      const payload = JSON.parse(line.slice(6)) as
+        | { type: "text"; delta: string }
+        | { type: "done" }
+        | { type: "error"; message: string };
+      if (payload.type === "text") onDelta(payload.delta);
+      else if (payload.type === "error") throw new Error(payload.message);
+    }
+  }
+}
+
 export function adminAiChat(
   message: string,
   history: Array<{ role: string; content: string }>,
