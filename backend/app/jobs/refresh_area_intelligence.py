@@ -18,6 +18,9 @@ from app.models.area_intelligence import AreaIntelligence
 
 logger = logging.getLogger(__name__)
 
+# Arbitrary, must stay unique across jobs sharing app/core/locks.pg_advisory_lock.
+_LOCK_KEY = 7270002
+
 # City centre coordinates used for commute calculations
 CITY_CENTRES = {
     "riyadh": (24.6877, 46.7219),
@@ -282,17 +285,24 @@ def refresh_single_district(area_intelligence_id: int) -> None:
 
 def refresh_all() -> None:
     """Called nightly by cron. Refreshes all districts that have coordinates set."""
+    from app.core.locks import pg_advisory_lock
+
     db = SessionLocal()
     try:
-        rows = db.query(AreaIntelligence).filter(
-            AreaIntelligence.center_lat.isnot(None),
-            AreaIntelligence.center_lng.isnot(None),
-        ).all()
-        logger.info(f"Starting nightly refresh for {len(rows)} districts")
-        for row in rows:
-            _refresh_district(row, db)
-            time.sleep(0.5)  # respect Google API rate limits
-        logger.info("Nightly refresh complete")
+        with pg_advisory_lock(db, _LOCK_KEY) as acquired:
+            if not acquired:
+                logger.info("Nightly refresh already running on another worker, skipping")
+                return
+
+            rows = db.query(AreaIntelligence).filter(
+                AreaIntelligence.center_lat.isnot(None),
+                AreaIntelligence.center_lng.isnot(None),
+            ).all()
+            logger.info(f"Starting nightly refresh for {len(rows)} districts")
+            for row in rows:
+                _refresh_district(row, db)
+                time.sleep(0.5)  # respect Google API rate limits
+            logger.info("Nightly refresh complete")
     finally:
         db.close()
 

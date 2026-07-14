@@ -1,5 +1,8 @@
 from datetime import datetime, timezone
 
+# Arbitrary, must stay unique across jobs sharing app/core/locks.pg_advisory_lock.
+_LOCK_KEY = 7270001
+
 
 def expire_stale_assignments() -> None:
     """
@@ -7,39 +10,44 @@ def expire_stale_assignments() -> None:
     revert the lead to 'open', and trigger re-assignment.
     Runs every 30 minutes via APScheduler.
     """
+    from app.core.locks import pg_advisory_lock
     from app.db.session import SessionLocal
     from app.models.lead import Lead, LeadAssignment
 
     db = SessionLocal()
     reassign_jobs: list[tuple[int, list[int]]] = []
     try:
-        now = datetime.now(timezone.utc)
-        stale = (
-            db.query(LeadAssignment)
-            .filter(LeadAssignment.status == "pending", LeadAssignment.expires_at < now)
-            .all()
-        )
-        if not stale:
-            return
+        with pg_advisory_lock(db, _LOCK_KEY) as acquired:
+            if not acquired:
+                return  # another worker is already running this job
 
-        affected_lead_ids: set[int] = set()
-        for assignment in stale:
-            assignment.status = "expired"
-            affected_lead_ids.add(assignment.lead_id)
+            now = datetime.now(timezone.utc)
+            stale = (
+                db.query(LeadAssignment)
+                .filter(LeadAssignment.status == "pending", LeadAssignment.expires_at < now)
+                .all()
+            )
+            if not stale:
+                return
 
-        for lead_id in affected_lead_ids:
-            lead = db.get(Lead, lead_id)
-            if lead and lead.status in ("open", "assigned"):
-                lead.status = "open"
+            affected_lead_ids: set[int] = set()
+            for assignment in stale:
+                assignment.status = "expired"
+                affected_lead_ids.add(assignment.lead_id)
 
-        db.commit()
+            for lead_id in affected_lead_ids:
+                lead = db.get(Lead, lead_id)
+                if lead and lead.status in ("open", "assigned"):
+                    lead.status = "open"
 
-        # Collect re-assignment args while session is still open
-        for lead_id in affected_lead_ids:
-            lead = db.get(Lead, lead_id)
-            if lead and lead.status == "open":
-                already_tried = [a.mediator_id for a in lead.assignments if a.mediator_id]
-                reassign_jobs.append((lead_id, already_tried))
+            db.commit()
+
+            # Collect re-assignment args while session is still open
+            for lead_id in affected_lead_ids:
+                lead = db.get(Lead, lead_id)
+                if lead and lead.status == "open":
+                    already_tried = [a.mediator_id for a in lead.assignments if a.mediator_id]
+                    reassign_jobs.append((lead_id, already_tried))
     finally:
         db.close()
 
