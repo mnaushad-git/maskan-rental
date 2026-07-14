@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from anthropic import Anthropic
+from anthropic import Anthropic, beta_tool
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -17,13 +17,13 @@ router = APIRouter()
 _PERSONA = (
     "You are Maskan AI, the built-in rental advisor for the Maskan platform — "
     "a Saudi rental marketplace. "
-    "You ONLY answer using the real platform data provided below (properties, district scores, mediators). "
-    "Never invent listings, prices, scores, or mediators that are not in the data. "
-    "If the user asks about something not covered by the data, say so and suggest what IS available. "
+    "You have tools to look up live platform data (listings, district scores, mediators, rent averages). "
+    "ALWAYS call a tool to check real data before answering a question about listings, prices, areas, or "
+    "mediators — never invent them. If a tool returns no results, say so and suggest what to try instead. "
     "Quote monthly and annual rents in SAR. Be concise and practical.\n\n"
     "IMPORTANT — Clickable links in your responses:\n"
     "- When you mention a specific property by name, always format it as a markdown link: "
-    "[Property Title](/property/{id}) where {id} is the numeric ID shown in brackets in the data, e.g. [42].\n"
+    "[Property Title](/property/{id}) where {id} is the numeric ID shown in brackets in tool results, e.g. [42].\n"
     "- When you mention a district or area (e.g. Al Yasmin, Al Malqa), format it as: "
     "[Area Name](/areas?area=Area+Name) — replace spaces with + in the URL.\n"
     "- When you mention a city (e.g. Riyadh, Jeddah), format it as: "
@@ -34,105 +34,167 @@ _PERSONA = (
 )
 
 
-# ── Context builder ───────────────────────────────────────────────────────────
+# ── Customer-facing tools ──────────────────────────────────────────────────────
+# Each tool queries only what's needed for the question at hand, instead of the
+# old approach of dumping every listing/area/mediator into the prompt on every turn.
 
-def _build_context(db: Session) -> str:
-    lines: list[str] = ["=== MASKAN PLATFORM LIVE DATA ===\n"]
+def _customer_tools(db: Session) -> list:
+    @beta_tool
+    def search_listings(
+        city: str | None = None,
+        area: str | None = None,
+        listing_type: str | None = None,
+        max_monthly_rent: float | None = None,
+        min_bedrooms: int | None = None,
+    ) -> str:
+        """Search published property listings on the Maskan platform.
 
-    # ── 1. Properties grouped by area ────────────────────────────────────────
-    props = db.scalars(
-        select(Property)
-        .where(Property.status == "Published")
-        .order_by(Property.area, Property.monthly_rent)
-    ).all()
-
-    lines.append(f"AVAILABLE LISTINGS ({len(props)} published)\n")
-    by_area: dict[str, list[Property]] = {}
-    for p in props:
-        by_area.setdefault(f"{p.area}, {p.city}", []).append(p)
-
-    for area_label, area_props in by_area.items():
-        lines.append(f"\n{area_label} — {len(area_props)} listing(s):")
-        for p in area_props:
+        Args:
+            city: Filter by city, e.g. Riyadh, Jeddah.
+            area: Filter by district/area name, e.g. Al Yasmin.
+            listing_type: "rent" or "sale".
+            max_monthly_rent: Maximum monthly rent in SAR (rent listings only).
+            min_bedrooms: Minimum number of bedrooms.
+        """
+        stmt = select(Property).where(Property.status == "Published")
+        if city:
+            stmt = stmt.where(Property.city.ilike(f"%{city}%"))
+        if area:
+            stmt = stmt.where(Property.area.ilike(f"%{area}%"))
+        if listing_type:
+            stmt = stmt.where(Property.listing_type == listing_type)
+        if min_bedrooms is not None:
+            stmt = stmt.where(Property.bedrooms >= min_bedrooms)
+        if max_monthly_rent is not None:
+            stmt = stmt.where(Property.monthly_rent <= max_monthly_rent)
+        stmt = stmt.order_by(Property.monthly_rent).limit(20)
+        props = db.scalars(stmt).all()
+        if not props:
+            return "No matching published listings found."
+        lines = []
+        for p in props:
             beds = f"{p.bedrooms}BR" if p.bedrooms else "?"
             baths = f"{p.bathrooms}BA" if p.bathrooms else "?"
             size = f"{p.size_sq_m}m²" if p.size_sq_m else "size n/a"
-            monthly = round(p.monthly_rent / 12)
-            lines.append(
-                f"  • [{p.id}] {p.title} | {beds}/{baths} | {size} | "
-                f"SAR {monthly:,}/mo (SAR {int(p.monthly_rent):,}/yr)"
-            )
+            if p.listing_type == "sale" and p.sale_price:
+                price = f"SAR {int(p.sale_price):,} (sale)"
+            elif p.monthly_rent:
+                price = f"SAR {int(p.monthly_rent):,}/mo (SAR {round(p.monthly_rent * 12):,}/yr)"
+            else:
+                price = "price n/a"
+            lines.append(f"[{p.id}] {p.title} | {p.area}, {p.city} | {beds}/{baths} | {size} | {price}")
+        return "\n".join(lines)
 
-    # ── 2. District scores from platform intelligence ─────────────────────────
-    intel_rows = db.scalars(
-        select(AreaIntelligence).order_by(AreaIntelligence.area_score.desc().nulls_last())
-    ).all()
+    @beta_tool
+    def get_area_score(district: str) -> str:
+        """Get Maskan's platform intelligence score and overview for one district/area.
 
-    lines.append("\n\nDISTRICT SCORES (0–100, from Maskan platform intelligence)\n")
-    lines.append(f"{'District':<22} {'City':<10} {'Area':>5} {'School':>7} {'Health':>7} {'Traffic':>8} {'Family':>7}  Tags")
-    lines.append("-" * 80)
-    for r in intel_rows:
+        Args:
+            district: The district/area name, e.g. Al Yasmin, Al Malqa.
+        """
+        row = db.scalars(
+            select(AreaIntelligence).where(AreaIntelligence.area_name.ilike(f"%{district}%"))
+        ).first()
+        if not row:
+            return f"No intelligence data found for '{district}'."
+
         def fmt(v):
-            return f"{round(v)}" if v is not None else "  -"
-        tags = ", ".join(r.tags) if r.tags else ""
-        lines.append(
-            f"{r.area_name:<22} {r.city:<10} {fmt(r.area_score):>5} {fmt(r.school_score):>7} "
-            f"{fmt(r.healthcare_score):>7} {fmt(r.traffic_score):>8} {fmt(r.family_score):>7}  {tags}"
+            return f"{round(v)}" if v is not None else "n/a"
+
+        tags = ", ".join(row.tags) if row.tags else "none"
+        lines = [
+            f"{row.area_name}, {row.city} — Area score: {fmt(row.area_score)}, "
+            f"School: {fmt(row.school_score)}, Healthcare: {fmt(row.healthcare_score)}, "
+            f"Traffic: {fmt(row.traffic_score)}, Family: {fmt(row.family_score)}. Tags: {tags}."
+        ]
+        if row.overview:
+            lines.append(f"Overview: {row.overview}")
+        return "\n".join(lines)
+
+    @beta_tool
+    def top_areas(city: str | None = None, limit: int = 10) -> str:
+        """List the top-scoring districts by platform area score, optionally filtered by city.
+
+        Args:
+            city: Filter by city, e.g. Riyadh.
+            limit: Max number of districts to return (default 10).
+        """
+        stmt = select(AreaIntelligence).order_by(AreaIntelligence.area_score.desc().nulls_last()).limit(limit)
+        if city:
+            stmt = stmt.where(AreaIntelligence.city.ilike(f"%{city}%"))
+        rows = db.scalars(stmt).all()
+        if not rows:
+            return "No district data found."
+
+        def fmt(v):
+            return f"{round(v)}" if v is not None else "n/a"
+
+        return "\n".join(f"{r.area_name}, {r.city} — score {fmt(r.area_score)}" for r in rows)
+
+    @beta_tool
+    def find_mediators(area: str | None = None, city: str | None = None) -> str:
+        """Find active, verified mediators (partners) covering a given area or city.
+
+        Args:
+            area: District/area name.
+            city: City name.
+        """
+        stmt = (
+            select(Mediator)
+            .where(Mediator.subscription_status == "active", Mediator.is_verified.is_(True))
         )
-        if r.overview:
-            lines.append(f"  Overview: {r.overview}")
-
-    # ── 3. Verified mediators ─────────────────────────────────────────────────
-    mediators = db.scalars(
-        select(Mediator)
-        .where(Mediator.subscription_status == "active")
-        .order_by(Mediator.is_verified.desc())
-    ).all()
-
-    if mediators:
-        lines.append("\n\nACTIVE MEDIATORS ON PLATFORM\n")
-        for m in mediators:
-            verified = "✓ Verified" if m.is_verified else "Pending"
+        if area or city:
+            stmt = stmt.join(MediatorArea, MediatorArea.mediator_id == Mediator.id)
+            if area:
+                stmt = stmt.where(MediatorArea.area_name.ilike(f"%{area}%"))
+            if city:
+                stmt = stmt.where(MediatorArea.city.ilike(f"%{city}%"))
+        stmt = stmt.distinct().limit(15)
+        rows = db.scalars(stmt).all()
+        if not rows:
+            return "No verified active mediators found for that area."
+        lines = []
+        for m in rows:
             agency = f" ({m.agency_name})" if m.agency_name else ""
-            area_names = ", ".join(a.area_name for a in m.areas) if m.areas else "All areas"
-            lines.append(
-                f"  • License {m.license_number}{agency} | {verified} | "
-                f"Areas: {area_names} | Phone: {m.phone}"
+            covered = ", ".join(a.area_name for a in m.areas) if m.areas else "All areas"
+            lines.append(f"License {m.license_number}{agency} | Areas: {covered} | Phone: {m.phone}")
+        return "\n".join(lines)
+
+    @beta_tool
+    def rent_summary(area: str | None = None, city: str | None = None) -> str:
+        """Get average/min/max monthly rent and listing count for an area or city.
+
+        Args:
+            area: District/area name.
+            city: City name.
+        """
+        stmt = (
+            select(
+                Property.area, Property.city,
+                func.avg(Property.monthly_rent).label("avg_monthly"),
+                func.min(Property.monthly_rent).label("min_monthly"),
+                func.max(Property.monthly_rent).label("max_monthly"),
+                func.count(Property.id).label("count"),
             )
-    else:
-        lines.append("\n\nNo active mediators currently on platform.")
-
-    # ── 4. Rent averages per area ─────────────────────────────────────────────
-    avg_rows = db.execute(
-        select(
-            Property.area,
-            Property.city,
-            func.avg(Property.monthly_rent).label("avg_annual"),
-            func.min(Property.monthly_rent).label("min_annual"),
-            func.max(Property.monthly_rent).label("max_annual"),
-            func.count(Property.id).label("count"),
+            .where(Property.status == "Published", Property.listing_type == "rent")
+            .group_by(Property.area, Property.city)
         )
-        .where(Property.status == "Published")
-        .group_by(Property.area, Property.city)
-        .order_by(func.avg(Property.monthly_rent).desc())
-    ).all()
+        if area:
+            stmt = stmt.where(Property.area.ilike(f"%{area}%"))
+        if city:
+            stmt = stmt.where(Property.city.ilike(f"%{city}%"))
+        rows = db.execute(stmt).all()
+        if not rows:
+            return "No rent data found for that area/city."
+        lines = []
+        for r in rows:
+            lines.append(
+                f"{r.area}, {r.city} — avg SAR {round(r.avg_monthly):,}/mo, "
+                f"range SAR {round(r.min_monthly):,}-{round(r.max_monthly):,}/mo, {r.count} listings"
+            )
+        return "\n".join(lines)
 
-    lines.append("\n\nRENT SUMMARY BY DISTRICT\n")
-    lines.append(f"{'District':<22} {'City':<10} {'Avg/mo':>8} {'Min/mo':>8} {'Max/mo':>8} {'Listings':>9}")
-    lines.append("-" * 72)
-    for row in avg_rows:
-        avg_mo = round(row.avg_annual / 12)
-        min_mo = round(row.min_annual / 12)
-        max_mo = round(row.max_annual / 12)
-        lines.append(
-            f"{row.area:<22} {row.city:<10} "
-            f"SAR {avg_mo:>6,} "
-            f"SAR {min_mo:>6,} "
-            f"SAR {max_mo:>6,} "
-            f"{row.count:>9}"
-        )
-
-    return "\n".join(lines)
+    return [search_listings, get_area_score, top_areas, find_mediators, rent_summary]
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
@@ -159,81 +221,142 @@ def ai_status():
 
 _ADMIN_PERSONA = (
     "You are Maskan Admin AI, the internal operations assistant for the Maskan rental platform. "
-    "You have full visibility into platform data: all listings (every status), all leads, all partners, and user counts. "
+    "You have tools to look up platform data on demand: listings (any status), leads, partners, and user "
+    "counts. Call a tool whenever a question needs current data — never invent numbers.\n"
     "Your role is to help the admin:\n"
     "1. ANALYSE data — answer questions about leads, revenue, partner performance, listing health.\n"
-    "2. GUIDE creation — when the admin asks to create a listing, partner, or lead, extract all the details they provide "
-    "and return a JSON block at the end of your reply wrapped in <action> tags so the frontend can pre-fill the form. "
-    "Format: <action>{\"type\":\"create_listing\"|\"create_partner\"|\"create_lead\", \"data\":{...fields...}}</action>\n"
-    "3. HIGHLIGHT issues — flag listings with zero rent, leads stuck in pending_review, unverified partners, etc.\n"
-    "Be concise, use bullet points for data summaries, and always quote numbers from the data provided.\n"
-    "NEVER invent data not present in the context. If the admin asks for something not in the data, say so clearly."
+    "2. GUIDE creation — when the admin asks to create a listing, partner, or lead, extract all the details "
+    "they provide and return a JSON block at the end of your reply wrapped in <action> tags so the frontend "
+    "can pre-fill the form. Format: <action>{\"type\":\"create_listing\"|\"create_partner\"|\"create_lead\", "
+    "\"data\":{...fields...}}</action>\n"
+    "3. HIGHLIGHT issues — flag listings with zero rent, leads stuck in pending_review, unverified "
+    "partners, etc.\n"
+    "Be concise, use bullet points for data summaries, and always quote numbers from tool results.\n"
+    "NEVER invent data. If a tool returns nothing relevant, say so clearly."
 )
 
 
-def _build_admin_context(db: Session) -> str:
-    lines: list[str] = ["=== MASKAN ADMIN PLATFORM DATA ===\n"]
+def _admin_tools(db: Session) -> list:
+    @beta_tool
+    def query_properties(status: str | None = None, limit: int = 20) -> str:
+        """List properties, optionally filtered by status, most recent first.
 
-    # ── 1. Properties — all statuses ─────────────────────────────────────────
-    props = db.scalars(select(Property).order_by(Property.status, Property.id.desc())).all()
-    by_status: dict[str, list[Property]] = {}
-    for p in props:
-        by_status.setdefault(p.status, []).append(p)
-
-    lines.append(f"PROPERTIES — {len(props)} total\n")
-    for status, ps in by_status.items():
-        lines.append(f"  {status}: {len(ps)}")
-        for p in ps[:5]:
+        Args:
+            status: Listing status, e.g. "Published", "Pending Approval", "Rejected". Omit for all statuses.
+            limit: Max rows to return (default 20).
+        """
+        stmt = select(Property).order_by(Property.id.desc()).limit(limit)
+        if status:
+            stmt = stmt.where(Property.status == status)
+        props = db.scalars(stmt).all()
+        if not props:
+            return "No properties found."
+        lines = []
+        for p in props:
             rent = f"SAR {round(p.monthly_rent):,}/mo" if p.monthly_rent else "no rent set"
-            lines.append(f"    [{p.id}] {p.title} | {p.area}, {p.city} | {rent} | owner: {p.owner_name}")
-        if len(ps) > 5:
-            lines.append(f"    … and {len(ps)-5} more")
+            lines.append(f"[{p.id}] {p.title} | {p.status} | {p.area}, {p.city} | {rent} | owner: {p.owner_name}")
+        return "\n".join(lines)
 
-    # ── 2. Leads ─────────────────────────────────────────────────────────────
-    leads = db.scalars(select(Lead).order_by(Lead.created_at.desc())).all()
-    by_lead_status: dict[str, list[Lead]] = {}
-    for l in leads:
-        by_lead_status.setdefault(l.status, []).append(l)
+    @beta_tool
+    def query_leads(status: str | None = None, limit: int = 20) -> str:
+        """List leads, optionally filtered by status, most recent first.
 
-    lines.append(f"\nLEADS — {len(leads)} total\n")
-    for status, ls in by_lead_status.items():
-        lines.append(f"  {status}: {len(ls)}")
-        for l in ls[:3]:
-            lines.append(f"    [{l.id}] {l.customer_name} | {l.area_name}, {l.city} | {l.customer_phone}")
-        if len(ls) > 3:
-            lines.append(f"    … and {len(ls)-3} more")
-
-    # ── 3. Partners ───────────────────────────────────────────────────────────
-    partners = db.scalars(select(Mediator).order_by(Mediator.total_leads_accepted.desc())).all()
-    lines.append(f"\nPARTNERS — {len(partners)} total\n")
-    for m in partners:
-        verified = "✓ verified" if m.is_verified else "unverified"
-        areas = ", ".join(a.area_name for a in m.areas) if m.areas else "no areas"
-        lines.append(
-            f"  [{m.id}] {m.agency_name or 'N/A'} | {m.phone} | {verified} | "
-            f"sub: {m.subscription_status} | leads: {m.total_leads_accepted} | areas: {areas}"
+        Args:
+            status: Lead status, e.g. "pending_review", "active", "closed". Omit for all statuses.
+            limit: Max rows to return (default 20).
+        """
+        stmt = select(Lead).order_by(Lead.created_at.desc()).limit(limit)
+        if status:
+            stmt = stmt.where(Lead.status == status)
+        leads = db.scalars(stmt).all()
+        if not leads:
+            return "No leads found."
+        return "\n".join(
+            f"[{l.id}] {l.customer_name} | {l.status} | {l.area_name}, {l.city} | {l.customer_phone}"
+            for l in leads
         )
 
-    # ── 4. Users ──────────────────────────────────────────────────────────────
-    user_count = db.scalar(select(func.count(User.id))) or 0
-    lines.append(f"\nUSERS — {user_count} registered accounts")
+    @beta_tool
+    def query_partners(limit: int = 20) -> str:
+        """List partners (mediators) ranked by leads accepted, with verification and subscription status.
 
-    # ── 5. Rent averages ──────────────────────────────────────────────────────
-    avg_rows = db.execute(
-        select(
-            Property.area, Property.city,
-            func.avg(Property.monthly_rent).label("avg"),
-            func.count(Property.id).label("cnt"),
+        Args:
+            limit: Max rows to return (default 20).
+        """
+        stmt = select(Mediator).order_by(Mediator.total_leads_accepted.desc()).limit(limit)
+        partners = db.scalars(stmt).all()
+        if not partners:
+            return "No partners found."
+        lines = []
+        for m in partners:
+            verified = "verified" if m.is_verified else "unverified"
+            areas = ", ".join(a.area_name for a in m.areas) if m.areas else "no areas"
+            lines.append(
+                f"[{m.id}] {m.agency_name or 'N/A'} | {m.phone} | {verified} | "
+                f"sub: {m.subscription_status} | leads: {m.total_leads_accepted} | areas: {areas}"
+            )
+        return "\n".join(lines)
+
+    @beta_tool
+    def platform_counts() -> str:
+        """Get platform-wide counts: users, listings by status, leads by status."""
+        user_count = db.scalar(select(func.count(User.id))) or 0
+        prop_rows = db.execute(select(Property.status, func.count(Property.id)).group_by(Property.status)).all()
+        lead_rows = db.execute(select(Lead.status, func.count(Lead.id)).group_by(Lead.status)).all()
+        lines = [f"Users: {user_count}", "Listings by status:"]
+        lines += [f"  {status}: {count}" for status, count in prop_rows]
+        lines.append("Leads by status:")
+        lines += [f"  {status}: {count}" for status, count in lead_rows]
+        return "\n".join(lines)
+
+    @beta_tool
+    def rent_summary(area: str | None = None, city: str | None = None) -> str:
+        """Get average monthly rent and listing count for published rentals, by area or city.
+
+        Args:
+            area: District/area name.
+            city: City name.
+        """
+        stmt = (
+            select(
+                Property.area, Property.city,
+                func.avg(Property.monthly_rent).label("avg"),
+                func.count(Property.id).label("cnt"),
+            )
+            .where(Property.status == "Published", Property.listing_type == "rent")
+            .group_by(Property.area, Property.city)
         )
-        .where(Property.status == "Published")
-        .group_by(Property.area, Property.city)
-        .order_by(func.avg(Property.monthly_rent).desc())
-    ).all()
-    lines.append("\nRENT AVERAGES (Published only)\n")
-    for r in avg_rows:
-        lines.append(f"  {r.area}, {r.city} — avg SAR {round(r.avg):,}/mo ({r.cnt} listings)")
+        if area:
+            stmt = stmt.where(Property.area.ilike(f"%{area}%"))
+        if city:
+            stmt = stmt.where(Property.city.ilike(f"%{city}%"))
+        rows = db.execute(stmt).all()
+        if not rows:
+            return "No rent data found for that area/city."
+        return "\n".join(f"{r.area}, {r.city} — avg SAR {round(r.avg):,}/mo ({r.cnt} listings)" for r in rows)
 
-    return "\n".join(lines)
+    return [query_properties, query_leads, query_partners, platform_counts, rent_summary]
+
+
+def _run_chat(system_prompt: str, tools: list, req: ChatRequest) -> ChatResponse:
+    client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    messages = [{"role": m.role, "content": m.content} for m in req.history]
+    messages.append({"role": "user", "content": req.message})
+
+    runner = client.beta.messages.tool_runner(
+        model="claude-sonnet-4-6",
+        max_tokens=1500,
+        system=system_prompt,
+        tools=tools,
+        messages=messages,
+    )
+    final = None
+    for message in runner:
+        final = message
+    if final is None:
+        raise HTTPException(status_code=500, detail="AI error: no response generated")
+    reply = "".join(block.text for block in final.content if block.type == "text")
+    return ChatResponse(reply=reply)
 
 
 @router.post("/admin-chat", response_model=ChatResponse)
@@ -244,29 +367,10 @@ def admin_ai_chat(
 ):
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
-
     try:
-        context = _build_admin_context(db)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Context error: {exc}") from exc
-
-    system_prompt = f"{_ADMIN_PERSONA}\n\n{context}"
-
-    try:
-        client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-        messages = [{"role": m.role, "content": m.content} for m in req.history]
-        messages.append({"role": "user", "content": req.message})
-
-        with client.messages.stream(
-            model="claude-sonnet-4-6",
-            max_tokens=1500,
-            system=system_prompt,
-            messages=messages,
-        ) as stream:
-            response = stream.get_final_message()
-
-        reply = "".join(block.text for block in response.content if block.type == "text")
-        return ChatResponse(reply=reply)
+        return _run_chat(_ADMIN_PERSONA, _admin_tools(db), req)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"AI error: {exc}") from exc
 
@@ -275,28 +379,9 @@ def admin_ai_chat(
 def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured — set ANTHROPIC_API_KEY")
-
     try:
-        platform_context = _build_context(db)
+        return _run_chat(_PERSONA, _customer_tools(db), req)
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Context build error: {type(exc).__name__}: {exc}") from exc
-
-    system_prompt = f"{_PERSONA}\n\n{platform_context}"
-
-    try:
-        client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-        messages = [{"role": m.role, "content": m.content} for m in req.history]
-        messages.append({"role": "user", "content": req.message})
-
-        with client.messages.stream(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=system_prompt,
-            messages=messages,
-        ) as stream:
-            response = stream.get_final_message()
-
-        reply = "".join(block.text for block in response.content if block.type == "text")
-        return ChatResponse(reply=reply)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"AI call error: {type(exc).__name__}: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"AI error: {exc}") from exc

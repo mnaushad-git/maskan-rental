@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ router = APIRouter()
 
 @router.get("/", response_model=list[PropertyOut])
 def list_properties(
+    response: Response,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=1000),
     area: str | None = Query(default=None),
@@ -23,25 +24,50 @@ def list_properties(
     mediator_id: int | None = Query(default=None),
     listing_type: str | None = Query(default=None),
     property_type: str | None = Query(default=None),
+    furnished: str | None = Query(default=None),
+    min_bedrooms: int | None = Query(default=None, ge=0),
+    min_bathrooms: int | None = Query(default=None, ge=0),
+    min_monthly_rent: float | None = Query(default=None, ge=0),
+    max_monthly_rent: float | None = Query(default=None, ge=0),
+    min_sale_price: float | None = Query(default=None, ge=0),
+    max_sale_price: float | None = Query(default=None, ge=0),
     include_all: bool = Query(default=False),
     admin: User | None = Depends(get_optional_admin_user),
     db: Session = Depends(get_db),
 ):
     # Build filters first, then paginate — WHERE must be resolved before LIMIT
-    stmt = select(Property)
+    filters = []
     if not include_all or admin is None:
-        stmt = stmt.where(Property.status == "Published")
+        filters.append(Property.status == "Published")
     if area:
-        stmt = stmt.where(Property.area.ilike(f"%{area}%"))
+        filters.append(Property.area.ilike(f"%{area}%"))
     if city:
-        stmt = stmt.where(Property.city.ilike(f"%{city}%"))
+        filters.append(Property.city.ilike(f"%{city}%"))
     if mediator_id is not None:
-        stmt = stmt.where(Property.mediator_id == mediator_id)
+        filters.append(Property.mediator_id == mediator_id)
     if listing_type:
-        stmt = stmt.where(Property.listing_type == listing_type)
+        filters.append(Property.listing_type == listing_type)
     if property_type:
-        stmt = stmt.where(Property.property_type == property_type)
-    stmt = stmt.order_by(Property.id.desc()).offset(skip).limit(limit)
+        filters.append(Property.property_type == property_type)
+    if furnished:
+        filters.append(Property.furnished == furnished)
+    if min_bedrooms is not None:
+        filters.append(Property.bedrooms >= min_bedrooms)
+    if min_bathrooms is not None:
+        filters.append(Property.bathrooms >= min_bathrooms)
+    if min_monthly_rent is not None:
+        filters.append(Property.monthly_rent >= min_monthly_rent)
+    if max_monthly_rent is not None:
+        filters.append(Property.monthly_rent <= max_monthly_rent)
+    if min_sale_price is not None:
+        filters.append(Property.sale_price >= min_sale_price)
+    if max_sale_price is not None:
+        filters.append(Property.sale_price <= max_sale_price)
+
+    total = db.scalar(select(func.count()).select_from(Property).where(*filters)) or 0
+    response.headers["X-Total-Count"] = str(total)
+
+    stmt = select(Property).where(*filters).order_by(Property.id.desc()).offset(skip).limit(limit)
     return db.scalars(stmt).all()
 
 

@@ -22,7 +22,7 @@ def search_properties(
     db: Session = Depends(get_db),
 ):
     """Search properties with optional filters."""
-    filters = []
+    filters = [Property.status == "Published"]
 
     if q:
         filters.append(

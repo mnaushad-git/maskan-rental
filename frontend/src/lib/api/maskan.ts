@@ -282,6 +282,58 @@ export function fetchProperties() {
   return requestJson<ApiProperty[]>("/properties/?limit=500");
 }
 
+export type PropertySearchFilters = {
+  listingType?: string;
+  city?: string;
+  area?: string;
+  propertyType?: string;
+  furnished?: string;
+  minBedrooms?: number;
+  minBathrooms?: number;
+  minMonthlyRent?: number;
+  maxMonthlyRent?: number;
+  minSalePrice?: number;
+  maxSalePrice?: number;
+};
+
+// Server-side filtered + paginated property search. Unlike fetchProperties()
+// (a flat capped batch meant for small datasets), this scales past the
+// catalog's total size — filtering happens in Postgres, not the browser.
+export async function fetchPropertiesPaged(
+  filters: PropertySearchFilters,
+  skip: number,
+  limit: number,
+): Promise<{ data: ApiProperty[]; total: number }> {
+  const params = new URLSearchParams();
+  params.set("skip", String(skip));
+  params.set("limit", String(limit));
+  if (filters.listingType) params.set("listing_type", filters.listingType);
+  if (filters.city) params.set("city", filters.city);
+  if (filters.area) params.set("area", filters.area);
+  if (filters.propertyType) params.set("property_type", filters.propertyType);
+  if (filters.furnished) params.set("furnished", filters.furnished);
+  if (filters.minBedrooms != null) params.set("min_bedrooms", String(filters.minBedrooms));
+  if (filters.minBathrooms != null) params.set("min_bathrooms", String(filters.minBathrooms));
+  if (filters.minMonthlyRent != null) params.set("min_monthly_rent", String(filters.minMonthlyRent));
+  if (filters.maxMonthlyRent != null) params.set("max_monthly_rent", String(filters.maxMonthlyRent));
+  if (filters.minSalePrice != null) params.set("min_sale_price", String(filters.minSalePrice));
+  if (filters.maxSalePrice != null) params.set("max_sale_price", String(filters.maxSalePrice));
+
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
+  const response = await fetch(`${API_BASE_URL}/properties/?${params.toString()}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Request failed (${response.status})`);
+  }
+  const data = await response.json() as ApiProperty[];
+  const total = Number(response.headers.get("X-Total-Count") ?? data.length);
+  return { data, total };
+}
+
 export function fetchProperty(id: number) {
   return requestJson<ApiProperty>(`/properties/${id}`);
 }

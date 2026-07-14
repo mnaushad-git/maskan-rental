@@ -29,8 +29,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/maskan/Badges";
-import { ScoreRing } from "@/components/maskan/ScoreIndicator";
-import { fetchProperties, fetchSavedProperties, saveProperty, deleteSavedProperty, mapApiSearchProperty, fetchAreaIntelligenceList, fetchAreas, enrichPropertiesWithScores, type ApiAreaIntelligenceSummary, type ApiAreaSummary } from "@/lib/api/maskan";
+import { fetchPropertiesPaged, fetchSavedProperties, saveProperty, deleteSavedProperty, mapApiSearchProperty, fetchAreaIntelligenceList, fetchAreas, enrichPropertiesWithScores, type ApiAreaIntelligenceSummary, type ApiAreaSummary, type PropertySearchFilters } from "@/lib/api/maskan";
 import { PropertyMapView } from "@/components/maskan/PropertyMapView";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -121,52 +120,106 @@ function SearchPage() {
   const [compare, setCompare] = useState<string[]>([]);
   // Maps property id (string) → saved-record id (number) for API delete calls
   const [savedMap, setSavedMap] = useState<Record<string, number>>({});
-  const [properties, setProperties] = useState<SearchProperty[]>([]);
+  const [rawProperties, setRawProperties] = useState<SearchProperty[]>([]);
+  const [total, setTotal] = useState(0);
+  const [skip, setSkip] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [intel, setIntel] = useState<{ list: ApiAreaIntelligenceSummary[]; avgMap: Record<string, number> }>({ list: [], avgMap: {} });
 
+  const PAGE_SIZE = 60;
+
+  // Translate the UI filter state into server-side query params. Amenities
+  // (parking/balcony/gym/pool) aren't real DB columns yet — those stay
+  // client-side, filtered on whatever page is currently loaded.
+  function buildServerFilters(f: Filters): PropertySearchFilters {
+    const out: PropertySearchFilters = { listingType: f.listingType };
+    if (f.city !== "Any") out.city = f.city;
+    if (f.district !== "Any") out.area = f.district;
+    if (f.type !== "Any") out.propertyType = f.type;
+    if (f.furnishing !== "Any") out.furnished = f.furnishing;
+    if (f.bedrooms > 0) out.minBedrooms = f.bedrooms;
+    if (f.bathrooms > 0) out.minBathrooms = f.bathrooms;
+    if (f.listingType === "sale") {
+      if (f.minRent > 0) out.minSalePrice = f.minRent;
+      if (f.maxRent < 30_000_000) out.maxSalePrice = f.maxRent;
+    } else {
+      // Filters.minRent/maxRent are annual (matches the UI's "price" convention);
+      // the API's rent filters are monthly (matches the DB column directly).
+      if (f.minRent > 0) out.minMonthlyRent = f.minRent / 12;
+      if (f.maxRent < 500_000) out.maxMonthlyRent = f.maxRent / 12;
+    }
+    return out;
+  }
+
+  // Saved-properties list only depends on the logged-in user, not on search filters.
   useEffect(() => {
     let cancelled = false;
-
-    async function loadAll() {
-      try {
-        setLoading(true);
-        setError(null);
-        const [data, savedList] = await Promise.all([
-          fetchProperties(),
-          user ? fetchSavedProperties(user.id) : Promise.resolve([]),
-        ]);
+    if (!user) {
+      setSavedMap({});
+      return;
+    }
+    fetchSavedProperties(user.id)
+      .then((savedList) => {
         if (cancelled) return;
-        const mapped = data.map(mapApiSearchProperty);
-        setProperties(mapped);
         const map: Record<string, number> = {};
         for (const s of savedList) map[String(s.property_id)] = s.id;
         setSavedMap(map);
-        setLoading(false);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
-        // Enrich scores with area intel in the background (non-blocking)
-        const [intelList, areaList] = await Promise.all([
-          fetchAreaIntelligenceList().catch((): ApiAreaIntelligenceSummary[] => []),
-          fetchAreas().catch((): ApiAreaSummary[] => []),
-        ]);
+  // Area intelligence is used only to enrich scores — fetch once, not per filter change.
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetchAreaIntelligenceList().catch((): ApiAreaIntelligenceSummary[] => []),
+      fetchAreas().catch((): ApiAreaSummary[] => []),
+    ]).then(([intelList, areaList]) => {
+      if (cancelled) return;
+      const avgMap: Record<string, number> = {};
+      for (const a of areaList) avgMap[a.name.toLowerCase()] = a.average_rent;
+      setIntel({ list: intelList, avgMap });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Fetch the first page from the server whenever a server-backed filter changes.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError(null);
+        const { data, total: totalCount } = await fetchPropertiesPaged(buildServerFilters(filters), 0, PAGE_SIZE);
         if (cancelled) return;
-        const avgMap: Record<string, number> = {};
-        for (const a of areaList) avgMap[a.name.toLowerCase()] = a.average_rent;
-        setProperties((prev) => enrichPropertiesWithScores(prev, intelList, avgMap));
+        setRawProperties(data.map(mapApiSearchProperty));
+        setTotal(totalCount);
+        setSkip(data.length);
+        setLoading(false);
       } catch {
         if (!cancelled) {
           setError(tSearch("errorLoading"));
-          setProperties([]);
+          setRawProperties([]);
+          setTotal(0);
+          setSkip(0);
           setLoading(false);
         }
       }
     }
 
-    void loadAll();
+    void load();
 
     // Re-fetch silently when admin switches tabs back to the user portal
     function onVisible() {
-      if (!document.hidden && !cancelled) void loadAll();
+      if (!document.hidden && !cancelled) void load();
     }
     document.addEventListener("visibilitychange", onVisible);
 
@@ -176,18 +229,31 @@ function SearchPage() {
     };
     // tSearch intentionally omitted — switching language shouldn't re-fetch listings.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [filters.listingType, filters.city, filters.district, filters.type, filters.furnishing, filters.bedrooms, filters.bathrooms, filters.minRent, filters.maxRent]);
+
+  async function loadMore() {
+    if (loadingMore || rawProperties.length >= total) return;
+    setLoadingMore(true);
+    try {
+      const { data } = await fetchPropertiesPaged(buildServerFilters(filters), skip, PAGE_SIZE);
+      setRawProperties((prev) => [...prev, ...data.map(mapApiSearchProperty)]);
+      setSkip((s) => s + data.length);
+    } catch {
+      // Silent — the "Load more" button just stays available for a retry.
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  const properties = useMemo(
+    () => enrichPropertiesWithScores(rawProperties, intel.list, intel.avgMap),
+    [rawProperties, intel],
+  );
 
   const results = useMemo(() => {
+    // Only amenity filters remain client-side — everything else was already
+    // applied server-side, so the loaded page is already the right set.
     const list = properties.filter((p) => {
-      if (p.listingType !== filters.listingType) return false;
-      if (filters.city !== "Any" && p.city !== filters.city) return false;
-      if (filters.district !== "Any" && p.district !== filters.district) return false;
-      if (p.price < filters.minRent || p.price > filters.maxRent) return false;
-      if (filters.bedrooms && p.bedrooms < filters.bedrooms) return false;
-      if (filters.bathrooms && p.bathrooms < filters.bathrooms) return false;
-      if (filters.type !== "Any" && p.type !== filters.type) return false;
-      if (filters.furnishing !== "Any" && p.furnished !== filters.furnishing) return false;
       if (filters.parking && !p.amenities.parking) return false;
       if (filters.balcony && !p.amenities.balcony) return false;
       if (filters.gym && !p.amenities.gym) return false;
@@ -200,7 +266,9 @@ function SearchPage() {
     if (sort === "price-desc") sorted.sort((a, b) => b.price - a.price);
     if (sort === "value") sorted.sort((a, b) => b.rentalScore - a.rentalScore);
     return sorted;
-  }, [filters, properties, sort]);
+  }, [filters.parking, filters.balcony, filters.gym, filters.pool, properties, sort]);
+
+  const hasMore = rawProperties.length < total;
 
   const toggleCompare = (id: string) =>
     setCompare((c) =>
@@ -264,7 +332,7 @@ function SearchPage() {
         />
 
         <ResultsHeader
-          count={results.length}
+          count={total}
           listingType={filters.listingType}
           sort={sort}
           setSort={setSort}
@@ -305,20 +373,29 @@ function SearchPage() {
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
           <FiltersPanel filters={filters} setFilters={setFilters} />
-          {view === "map" ? (
-            <PropertyMapView properties={results} />
-          ) : (
-            <ResultsPanel
-              results={results}
-              view={view}
-              compare={compare}
-              savedMap={savedMap}
-              city={filters.city}
-              district={filters.district}
-              onToggleCompare={toggleCompare}
-              onToggleSave={toggleSave}
-            />
-          )}
+          <div>
+            {view === "map" ? (
+              <PropertyMapView properties={results} />
+            ) : (
+              <ResultsPanel
+                results={results}
+                view={view}
+                compare={compare}
+                savedMap={savedMap}
+                city={filters.city}
+                district={filters.district}
+                onToggleCompare={toggleCompare}
+                onToggleSave={toggleSave}
+              />
+            )}
+            {hasMore && (
+              <div className="mt-6 flex justify-center">
+                <Button variant="outline" onClick={() => void loadMore()} disabled={loadingMore}>
+                  {loadingMore ? tSearch("loadingListings") : tSearch("loadMore")}
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -896,7 +973,6 @@ function ResultCard({
                 <MapPin className="size-3.5" /> {p.district}, {p.city}
               </p>
             </div>
-            <ScoreRing score={p.matchScore} />
           </div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -912,12 +988,6 @@ function ResultCard({
             <span className="inline-flex items-center gap-1.5">
               <Sofa className="size-4" /> {t(`furnishing.${p.furnished}`)}
             </span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 rounded-xl bg-surface p-3 text-center">
-            <Mini label={tSearch("priceMini")} value={p.rentalScore} tone="primary" />
-            <Mini label={tSearch("areaMini")} value={p.areaScore} tone="secondary" />
-            <Mini label={tSearch("scoreMini")} value={p.matchScore} tone="ai" />
           </div>
 
           {!isList && <AiRecBox reasons={p.reasons} />}
@@ -971,27 +1041,6 @@ function ResultCard({
           </a>
         </div>
       )}
-    </div>
-  );
-}
-
-function Mini({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "primary" | "secondary" | "ai";
-}) {
-  const color =
-    tone === "primary" ? "text-primary" : tone === "secondary" ? "text-secondary" : "text-ai";
-  return (
-    <div>
-      <div className={cn("font-display text-lg font-bold tabular-nums", color)}>{value}</div>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
     </div>
   );
 }

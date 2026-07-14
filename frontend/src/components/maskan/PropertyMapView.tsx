@@ -207,9 +207,8 @@ export function PropertyMapView({
 
       const isSale = p.listingType === "sale";
       const color = isSale ? "#D97706" : "#16A34A";
-      const priceLabel = isSale
-        ? formatPinPrice(p.price)
-        : `${formatPinPrice(p.price / 12)}/mo`;
+      // p.price is already the annual figure for both rent and sale listings.
+      const priceLabel = formatPinPrice(p.price);
       // Small pin-style tag (rounded badge + downward pointer), matching a
       // classic map-pin look rather than a large pill.
       const html = `
