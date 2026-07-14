@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PropertyBase(BaseModel):
@@ -94,7 +94,11 @@ class PropertyOut(PropertyBase):
 
     id: int
     created_at: datetime
-    images: list[ListingImageOut] = []
+    # ORM relationship is named `listing_images`, not `images` — without this
+    # alias, from_attributes silently falls back to the [] default instead
+    # of raising, so every response's images list was empty regardless of
+    # actual data.
+    images: list[ListingImageOut] = Field(default=[], validation_alias="listing_images")
     mediator_phone: str | None = None
     mediator_profile_image_url: str | None = None
     mediator_agent_name: str | None = None
