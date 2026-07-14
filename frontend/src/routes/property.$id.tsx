@@ -39,7 +39,6 @@ import { PropertyCard } from "@/components/maskan/PropertyCard";
 import {
   fetchProperties, fetchProperty, fetchAreas, fetchAreaIntelligence,
   fetchSavedProperties, saveProperty, deleteSavedProperty, updateSavedProperty, mapApiProperty,
-  computePropertyScore,
   type ApiAreaIntelligence,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
@@ -84,13 +83,6 @@ function PropertyDetail() {
   // District rent averages don't mean anything against a one-time sale price —
   // only feed them into the score/comparison logic for rent listings.
   const effectiveAreaAvgMonthly = isSale ? null : areaAvgMonthly;
-
-  const propertyScore = useMemo(
-    () => property
-      ? computePropertyScore(isSale ? 0 : property.price / 12, property.bedrooms, areaIntel?.area_score, effectiveAreaAvgMonthly ?? undefined)
-      : 72,
-    [property, areaIntel, effectiveAreaAvgMonthly, isSale],
-  );
 
   useEffect(() => {
     let cancelled = false;
@@ -164,14 +156,14 @@ function PropertyDetail() {
             <FairRent property={property} areaAvgMonthly={areaAvgMonthly} />
           )}
           {isSale ? <PurchaseCostBreakdown property={property} /> : <RentCalculator property={property} />}
-          <AreaSummary property={property} areaIntel={areaIntel} />
+          <AreaSummary property={property} />
           <NearbyPlaces areaIntel={areaIntel} district={property.district} />
           <ComparableListings currentId={property.id} properties={properties} />
           <AiSummary property={property} areaIntel={areaIntel} areaAvgMonthly={effectiveAreaAvgMonthly} />
         </main>
 
         <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-          <ActionsCard property={property} propertyScore={propertyScore} />
+          <ActionsCard property={property} />
           <LandlordCard agentName={property.agent} agentPhone={property.agentPhone} agentProfileImage={property.agentProfileImage} mediatorId={property.mediatorId} />
         </aside>
       </div>
@@ -528,52 +520,20 @@ function PurchasePriceInsight({ property }: { property: Property }) {
   );
 }
 
-const SCORE_KEYS = ["areaScore", "schoolScore", "trafficScore", "healthcareScore", "familyScore"] as const;
-const SCORE_WHAT_IT_COVERS_KEYS: Record<(typeof SCORE_KEYS)[number], string> = {
-  areaScore: "whatItCoversArea",
-  schoolScore: "whatItCoversSchool",
-  trafficScore: "whatItCoversTraffic",
-  healthcareScore: "whatItCoversHealthcare",
-  familyScore: "whatItCoversFamily",
-};
-
 /* ----------------------------- Area Summary ------------------------------ */
-function AreaSummary({ property, areaIntel }: { property: Property; areaIntel: ApiAreaIntelligence | null }) {
+function AreaSummary({ property }: { property: Property }) {
   const tProp = usePropT();
-  const scores = areaIntel ? [
-    { key: "areaScore" as const,       value: Math.round(areaIntel.area_score ?? 75) },
-    { key: "schoolScore" as const,     value: Math.round(areaIntel.school_score ?? 75) },
-    { key: "trafficScore" as const,    value: Math.round(areaIntel.traffic_score ?? 75) },
-    { key: "healthcareScore" as const, value: Math.round(areaIntel.healthcare_score ?? 75) },
-    { key: "familyScore" as const,     value: Math.round(areaIntel.family_score ?? 75) },
-  ] : null;
 
   return (
     <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="font-display text-2xl font-bold tracking-tight">{property.district} {tProp("areaSummary.titleSuffix")}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {areaIntel
-              ? tProp("areaSummary.scoresLoaded", { minutes: areaIntel.commute_minutes_to_center })
-              : tProp("areaSummary.scoresLoading")}
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{tProp("areaSummary.scoresLoading")}</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" asChild><a href="/areas">{tProp("areaSummary.exploreArea")}</a></Button>
-          <Button variant="ghost" size="sm" asChild><Link to="/methodology">{tProp("areaSummary.howScoresWork")}</Link></Button>
-        </div>
-      </div>
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {(scores ?? SCORE_KEYS.map((key) => ({ key, value: 75 }))).map((s) => (
-          <div key={s.key} className="rounded-xl border border-border p-4 text-center">
-            <div className="mx-auto"><ScoreRing score={s.value} size={64} /></div>
-            <div className="mt-2 text-sm font-semibold">{tProp(`areaSummary.${s.key}`)}</div>
-            <div className="mt-1 text-[10px] leading-tight text-muted-foreground">
-              {tProp(`areaSummary.${SCORE_WHAT_IT_COVERS_KEYS[s.key]}`)}
-            </div>
-          </div>
-        ))}
+        <Button variant="outline" size="sm" asChild>
+          <a href="/areas"><MapPin className="size-4" /> {tProp("areaSummary.exploreArea")}</a>
+        </Button>
       </div>
     </section>
   );
@@ -1276,7 +1236,7 @@ function PurchaseCostBreakdown({ property }: { property: Property }) {
 
 // ── ActionsCard ───────────────────────────────────────────────────────────────
 
-function ActionsCard({ property, propertyScore }: { property: Property; propertyScore?: number }) {
+function ActionsCard({ property }: { property: Property }) {
   const { t } = useLanguage();
   const tProp = usePropT();
   const { user } = useAuth();
@@ -1314,17 +1274,14 @@ function ActionsCard({ property, propertyScore }: { property: Property; property
   return (
     <>
       <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-xs text-muted-foreground">
-              {isSale ? t("propertyCard.salePrice") : t("propertyCard.annualRent")}
-            </div>
-            <div className="font-display text-2xl font-bold tracking-tight">SAR {formatSAR(property.price)}</div>
-            {!isSale && (
-              <div className="text-xs text-muted-foreground">{tProp("actions.perMonth", { amount: formatSAR(Math.round(property.price / 12)) })}</div>
-            )}
+        <div>
+          <div className="text-xs text-muted-foreground">
+            {isSale ? t("propertyCard.salePrice") : t("propertyCard.annualRent")}
           </div>
-          <ScoreRing score={propertyScore ?? property.matchScore} />
+          <div className="font-display text-2xl font-bold tracking-tight">SAR {formatSAR(property.price)}</div>
+          {!isSale && (
+            <div className="text-xs text-muted-foreground">{tProp("actions.perMonth", { amount: formatSAR(Math.round(property.price / 12)) })}</div>
+          )}
         </div>
         <div className="mt-5 space-y-2.5">
           <Button variant="hero" size="lg" className="w-full" onClick={() => setShowContact(true)}>

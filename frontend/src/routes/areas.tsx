@@ -8,6 +8,7 @@ import {
   Compass,
   GraduationCap,
   Hospital,
+  Info,
   Map as MapIcon,
   MapPin,
   Search,
@@ -592,6 +593,13 @@ function AreasPage() {
             <h1 className="text-2xl font-bold tracking-tight">{tAreas("heading")}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {tAreas("subtitle")}
+            </p>
+            <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Info className="size-3.5 shrink-0" />
+              {tAreas("methodologyNote")}{" "}
+              <Link to="/methodology" className="font-medium text-primary hover:underline">
+                {tAreas("methodologyLinkLabel")}
+              </Link>
             </p>
           </div>
           <Badge tone="ai">

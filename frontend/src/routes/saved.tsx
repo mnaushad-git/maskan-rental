@@ -24,7 +24,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/maskan/Badges";
-import { ScoreRing } from "@/components/maskan/ScoreIndicator";
 import {
   deleteSavedProperty,
   fetchSavedProperties,
@@ -428,7 +427,6 @@ function SavedCard({
             <MapPin className="size-3.5" /> {p.district}, {p.city}
           </p>
         </div>
-        <ScoreRing score={item.rentalScore} />
       </div>
 
       {/* Stats grid */}

@@ -8,7 +8,6 @@ import { saveProperty } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { RecommendationBadge, StatusBadge } from "./Badges";
-import { ScoreRing } from "./ScoreIndicator";
 
 export function PropertyCard({ p }: { p: Property }) {
   const { user } = useAuth();
@@ -83,7 +82,6 @@ export function PropertyCard({ p }: { p: Property }) {
                 {p.district}, {p.city}
               </p>
             </div>
-            <ScoreRing score={p.matchScore} />
           </div>
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
