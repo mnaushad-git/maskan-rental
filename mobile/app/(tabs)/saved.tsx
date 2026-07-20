@@ -1,11 +1,12 @@
 import { useCallback, useState } from "react";
-import { View, Text, FlatList, ActivityIndicator, Pressable } from "react-native";
+import { View, Text, FlatList, ActivityIndicator, Pressable, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { fetchSavedProperties, mapApiSearchProperty, type ApiSavedProperty } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { PropertyCard } from "@/components/PropertyCard";
+import { ErrorState } from "@/components/ErrorState";
 import type { Property } from "@/lib/maskan-data";
 
 function toUiProperty(saved: ApiSavedProperty): Property {
@@ -24,10 +25,10 @@ function toUiProperty(saved: ApiSavedProperty): Property {
     image: p.image,
     images: [p.image],
     matchScore: p.matchScore,
-    badges: ["Verified"],
+    badges: p.isVerified ? ["Verified"] : [],
     status: "Available",
     pricePerSqm: p.area > 0 ? Math.round(p.price / p.area) : 0,
-    agent: "Maskan Agent",
+    agent: "myHome Agent",
     agentPhone: p.agentPhone,
     agentProfileImage: null,
     mediatorId: null,
@@ -40,25 +41,39 @@ export default function SavedScreen() {
   const router = useRouter();
   const [saved, setSaved] = useState<ApiSavedProperty[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
+  const load = useCallback(
+    (isRefresh: boolean) => {
       if (!user) {
         setLoading(false);
         return;
       }
-      setLoading(true);
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
+      setError(false);
       fetchSavedProperties(user.id)
         .then(setSaved)
-        .catch(() => setSaved([]))
-        .finally(() => setLoading(false));
-    }, [user]),
+        .catch(() => setError(true))
+        .finally(() => {
+          setLoading(false);
+          setRefreshing(false);
+        });
+    },
+    [user],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      load(false);
+    }, [load]),
   );
 
   if (authLoading || loading) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator color="#16A34A" />
+        <ActivityIndicator color="#2563EB" />
       </SafeAreaView>
     );
   }
@@ -74,6 +89,14 @@ export default function SavedScreen() {
     );
   }
 
+  if (error && saved.length === 0) {
+    return (
+      <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
+        <ErrorState onRetry={() => load(false)} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
       <FlatList
@@ -81,6 +104,7 @@ export default function SavedScreen() {
         keyExtractor={(s) => String(s.id)}
         contentContainerClassName="gap-4 p-4"
         renderItem={({ item }) => <PropertyCard p={toUiProperty(item)} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#2563EB" />}
         ListEmptyComponent={
           <View className="items-center py-16">
             <Text className="text-sm text-muted-foreground">{t("saved.empty.heading")}</Text>

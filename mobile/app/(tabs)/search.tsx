@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import { View, Text, FlatList, ActivityIndicator, Pressable } from "react-native";
+import { useMemo, useState } from "react";
+import { View, Text, FlatList, ActivityIndicator, Pressable, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { List, Map as MapIcon } from "lucide-react-native";
 import { fetchProperties, mapApiSearchProperty, type ApiProperty } from "@/lib/api/maskan";
 import type { SearchProperty } from "@/lib/maskan-search-data";
 import { useLanguage } from "@/lib/i18n/context";
+import { useFetch } from "@/lib/useFetch";
 import { SearchBar, type SearchBarFilters } from "@/components/SearchBar";
 import { PropertyMapView } from "@/components/PropertyMapView";
 import { PropertyCard } from "@/components/PropertyCard";
+import { ErrorState } from "@/components/ErrorState";
 import type { Property } from "@/lib/maskan-data";
 
 function toUiProperty(p: SearchProperty): Property {
@@ -26,10 +28,10 @@ function toUiProperty(p: SearchProperty): Property {
     image: p.image,
     images: [p.image],
     matchScore: p.matchScore,
-    badges: ["Verified"],
+    badges: p.isVerified ? ["Verified"] : [],
     status: "Available",
     pricePerSqm: p.area > 0 ? Math.round(p.price / p.area) : 0,
-    agent: "Maskan Agent",
+    agent: "myHome Agent",
     agentPhone: p.agentPhone,
     agentProfileImage: null,
     mediatorId: null,
@@ -40,8 +42,6 @@ export default function SearchScreen() {
   const { t } = useLanguage();
   const rawParams = useLocalSearchParams();
   const params = rawParams as Partial<Record<keyof SearchBarFilters, string>>;
-  const [all, setAll] = useState<SearchProperty[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<SearchBarFilters | null>(() =>
     params.listingType
       ? {
@@ -56,12 +56,11 @@ export default function SearchScreen() {
   );
   const [view, setView] = useState<"list" | "map">("list");
 
-  useEffect(() => {
-    fetchProperties()
-      .then((raw: ApiProperty[]) => setAll(raw.map(mapApiSearchProperty)))
-      .catch(() => setAll([]))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data, loading, error, refreshing, refresh } = useFetch<SearchProperty[]>(
+    () => fetchProperties().then((raw: ApiProperty[]) => raw.map(mapApiSearchProperty)),
+    [],
+  );
+  const all = data ?? [];
 
   const results = useMemo(() => {
     if (!filters) return all;
@@ -92,15 +91,21 @@ export default function SearchScreen() {
           <View className="flex-row gap-1">
             <Pressable
               onPress={() => setView("list")}
+              accessibilityRole="button"
+              accessibilityLabel={t("search.listView")}
+              accessibilityState={{ selected: view === "list" }}
               className={`size-9 items-center justify-center rounded-lg ${view === "list" ? "bg-primary-soft" : ""}`}
             >
-              <List size={18} color={view === "list" ? "#16A34A" : "#64748B"} />
+              <List size={18} color={view === "list" ? "#2563EB" : "#79716B"} />
             </Pressable>
             <Pressable
               onPress={() => setView("map")}
+              accessibilityRole="button"
+              accessibilityLabel={t("search.mapView")}
+              accessibilityState={{ selected: view === "map" }}
               className={`size-9 items-center justify-center rounded-lg ${view === "map" ? "bg-primary-soft" : ""}`}
             >
-              <MapIcon size={18} color={view === "map" ? "#16A34A" : "#64748B"} />
+              <MapIcon size={18} color={view === "map" ? "#2563EB" : "#79716B"} />
             </Pressable>
           </View>
         </View>
@@ -108,8 +113,10 @@ export default function SearchScreen() {
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#16A34A" />
+          <ActivityIndicator color="#2563EB" />
         </View>
+      ) : error && all.length === 0 ? (
+        <ErrorState onRetry={refresh} />
       ) : view === "map" ? (
         <View className="flex-1 px-4 pb-4">
           <PropertyMapView properties={results} style={{ flex: 1 }} />
@@ -120,6 +127,7 @@ export default function SearchScreen() {
           keyExtractor={(p) => p.id}
           contentContainerClassName="gap-4 p-4 pt-0"
           renderItem={({ item }) => <PropertyCard p={toUiProperty(item)} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#2563EB" />}
           ListEmptyComponent={
             <View className="items-center py-16">
               <Text className="text-sm text-muted-foreground">{t("search.noMatchesTitle")}</Text>

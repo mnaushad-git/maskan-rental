@@ -6,13 +6,14 @@ export default function TabLayout() {
   const { t } = useLanguage();
 
   return (
-    <Tabs screenOptions={{ tabBarActiveTintColor: "#16A34A", headerShown: true }}>
+    <Tabs screenOptions={{ tabBarActiveTintColor: "#2563EB", headerShown: true }}>
       <Tabs.Screen
         name="index"
         options={{
           title: t("common.brand"),
           tabBarLabel: t("nav.home"),
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+          headerShown: false,
         }}
       />
       <Tabs.Screen

@@ -5,28 +5,26 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Mirrors frontend/src/styles.css (oklch tokens converted to hex —
-        // RN's style engine can't parse oklch()). Keep in sync by eye when
-        // the web theme changes; primary/sale match the map-pin colors in
-        // frontend/src/components/maskan/PropertyMapView.tsx exactly.
-        primary: "#16A34A",
+        // myHome brand palette: royal-blue primary + gold accent, cream surfaces.
+        // Update by eye if the brand palette changes again.
+        primary: "#2563EB",
         "primary-foreground": "#FFFFFF",
-        "primary-soft": "#DCFCE7",
-        secondary: "#2563EB",
+        "primary-soft": "#DBEAFE",
+        secondary: "#B45309",
         "secondary-foreground": "#FFFFFF",
-        sale: "#D97706",
-        background: "#FFFFFF",
-        foreground: "#0F172A",
-        surface: "#F8FAFC",
-        "surface-2": "#F1F5F9",
-        border: "#E2E8F0",
-        "muted-foreground": "#64748B",
+        sale: "#0F766E",
+        background: "#FFFCF7",
+        foreground: "#2B211A",
+        surface: "#FDF6EC",
+        "surface-2": "#F5EAD9",
+        border: "#E7D9C4",
+        "muted-foreground": "#79716B",
         destructive: "#DC2626",
-        success: "#16A34A",
+        success: "#15803D",
         "success-foreground": "#FFFFFF",
-        warning: "#D97706",
+        warning: "#B45309",
         "warning-foreground": "#451A03",
-        info: "#2563EB",
+        info: "#0369A1",
         "info-foreground": "#FFFFFF",
         ai: "#7C3AED",
         "ai-soft": "#EDE9FE",

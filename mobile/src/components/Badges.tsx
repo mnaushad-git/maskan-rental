@@ -48,10 +48,10 @@ export function RecommendationBadge({ label }: { label: string }) {
   const { t } = useLanguage();
   const map: Record<string, { tone: Tone; icon: ReactNode }> = {
     "Best Match": { tone: "ai", icon: <Sparkles size={14} color="#7C3AED" /> },
-    Verified: { tone: "success", icon: <ShieldCheck size={14} color="#16A34A" /> },
-    Hot: { tone: "warning", icon: <Flame size={14} color="#D97706" /> },
-    "Price Drop": { tone: "info", icon: <TrendingDown size={14} color="#2563EB" /> },
-    New: { tone: "primary", icon: <Star size={14} color="#0F172A" /> },
+    Verified: { tone: "success", icon: <ShieldCheck size={14} color="#15803D" /> },
+    Hot: { tone: "warning", icon: <Flame size={14} color="#B45309" /> },
+    "Price Drop": { tone: "info", icon: <TrendingDown size={14} color="#0369A1" /> },
+    New: { tone: "primary", icon: <Star size={14} color="#2B211A" /> },
   };
   const cfg = map[label] ?? { tone: "neutral" as Tone, icon: null };
   return (

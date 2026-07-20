@@ -1,20 +1,20 @@
 {
   "expo": {
-    "name": "Maskan",
-    "slug": "maskan-rental",
+    "name": "myHome",
+    "slug": "myhome-rental",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "maskan",
+    "scheme": "myhome",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.maskanai.mobile"
+      "bundleIdentifier": "com.myhome.mobile"
     },
     "android": {
-      "package": "com.maskanai.mobile",
+      "package": "com.myhome.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FDF6EC",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -22,7 +22,7 @@
       "predictiveBackGestureEnabled": false,
       "config": {
         "googleMaps": {
-          "apiKey": "REPLACE_WITH_GOOGLE_MAPS_API_KEY"
+          "apiKey": "AIzaSyCs6CmxbPuxb8lemZvxZW5-gA1p9PP6HvE"
         }
       }
     },
@@ -38,10 +38,16 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#FDF6EC"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "myHome uses your location to show nearby rentals and sales on the map."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

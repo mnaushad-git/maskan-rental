@@ -60,15 +60,17 @@ export type SearchBarFilters = {
 export function SearchBar({
   onSearch,
   onListingTypeChange,
+  initialListingType = "rent",
 }: {
   onSearch?: (filters: SearchBarFilters) => void;
   onListingTypeChange?: (v: ListingType) => void;
+  initialListingType?: ListingType;
 }) {
   const { t } = useLanguage();
   const router = useRouter();
   const locationOptions = buildLocationOptions((city) => t(`cities.${city}`));
   const [location, setLocation] = useState<LocationOption | null>(null);
-  const [listingType, setListingType] = useState<ListingType>("rent");
+  const [listingType, setListingType] = useState<ListingType>(initialListingType);
   const [propertyType, setPropertyType] = useState("Any");
   const [budgetIdx, setBudgetIdx] = useState(0);
   const [openModal, setOpenModal] = useState<"location" | "type" | "budget" | null>(null);
@@ -112,7 +114,7 @@ export function SearchBar({
           onPress={() => switchListingType("rent")}
           className={`flex-row items-center gap-1.5 rounded-lg px-4 py-2 ${listingType === "rent" ? "bg-primary" : ""}`}
         >
-          <DoorOpen size={16} color={listingType === "rent" ? "#FFFFFF" : "#64748B"} />
+          <DoorOpen size={16} color={listingType === "rent" ? "#FFFFFF" : "#79716B"} />
           <Text className={`text-sm font-semibold ${listingType === "rent" ? "text-primary-foreground" : "text-muted-foreground"}`}>
             {t("listingCategories.rent")}
           </Text>
@@ -121,7 +123,7 @@ export function SearchBar({
           onPress={() => switchListingType("sale")}
           className={`flex-row items-center gap-1.5 rounded-lg px-4 py-2 ${listingType === "sale" ? "bg-primary" : ""}`}
         >
-          <Key size={16} color={listingType === "sale" ? "#FFFFFF" : "#64748B"} />
+          <Key size={16} color={listingType === "sale" ? "#FFFFFF" : "#79716B"} />
           <Text className={`text-sm font-semibold ${listingType === "sale" ? "text-primary-foreground" : "text-muted-foreground"}`}>
             {t("listingCategories.sale")}
           </Text>
@@ -132,7 +134,7 @@ export function SearchBar({
         label={t("searchBar.location")}
         value={location?.label ?? t("searchBar.cityOrDistrict")}
         onPress={() => setOpenModal("location")}
-        icon={<MapPin size={18} color="#64748B" />}
+        icon={<MapPin size={18} color="#79716B" />}
       />
       <View className="flex-row">
         <SelectField
@@ -148,8 +150,13 @@ export function SearchBar({
       </View>
 
       <View className="flex-row gap-2 p-1 pt-2">
-        <Pressable className="w-11 items-center justify-center rounded-lg border border-border py-2.5" onPress={handleSearch}>
-          <SlidersHorizontal size={18} color="#0F172A" />
+        <Pressable
+          className="w-11 items-center justify-center rounded-lg border border-border py-2.5"
+          onPress={handleSearch}
+          accessibilityRole="button"
+          accessibilityLabel={t("searchBar.allFilters")}
+        >
+          <SlidersHorizontal size={18} color="#2B211A" />
         </Pressable>
         <Pressable className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg bg-primary py-2.5" onPress={handleSearch}>
           <Search size={16} color="#FFFFFF" />

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.api.deps import get_admin_user, get_db, get_mediator_user, get_optional_admin_user
+from app.core.geo import coords_for
 from app.models.listing_image import ListingImage
 from app.models.mediator import Mediator
 from app.models.property import Property
@@ -31,6 +32,10 @@ def list_properties(
     max_monthly_rent: float | None = Query(default=None, ge=0),
     min_sale_price: float | None = Query(default=None, ge=0),
     max_sale_price: float | None = Query(default=None, ge=0),
+    min_lat: float | None = Query(default=None),
+    max_lat: float | None = Query(default=None),
+    min_lng: float | None = Query(default=None),
+    max_lng: float | None = Query(default=None),
     include_all: bool = Query(default=False),
     admin: User | None = Depends(get_optional_admin_user),
     db: Session = Depends(get_db),
@@ -63,6 +68,9 @@ def list_properties(
         filters.append(Property.sale_price >= min_sale_price)
     if max_sale_price is not None:
         filters.append(Property.sale_price <= max_sale_price)
+    if min_lat is not None and max_lat is not None and min_lng is not None and max_lng is not None:
+        filters.append(Property.latitude.between(min_lat, max_lat))
+        filters.append(Property.longitude.between(min_lng, max_lng))
 
     total = db.scalar(select(func.count()).select_from(Property).where(*filters)) or 0
     response.headers["X-Total-Count"] = str(total)
@@ -95,7 +103,11 @@ def bulk_import_properties(
             if exists:
                 skipped += 1
                 continue
-        db.add(Property(**p.model_dump()))
+        prop = Property(**p.model_dump())
+        db.add(prop)
+        db.flush()
+        if prop.latitude is None or prop.longitude is None:
+            prop.latitude, prop.longitude = coords_for(prop.area, prop.city, prop.id)
         inserted += 1
     db.commit()
     return {"inserted": inserted, "skipped": skipped, "total": len(payload)}
@@ -125,6 +137,8 @@ def create_partner_property(
         mediator_id=mediator.id,
     )
     db.add(prop)
+    db.flush()
+    prop.latitude, prop.longitude = coords_for(prop.area, prop.city, prop.id)
     db.commit()
     db.refresh(prop)
     return prop
@@ -171,6 +185,9 @@ def create_property(
 ):
     property_obj = Property(**payload.model_dump())
     db.add(property_obj)
+    db.flush()
+    if property_obj.latitude is None or property_obj.longitude is None:
+        property_obj.latitude, property_obj.longitude = coords_for(property_obj.area, property_obj.city, property_obj.id)
     db.commit()
     db.refresh(property_obj)
     return property_obj

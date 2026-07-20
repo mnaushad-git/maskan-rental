@@ -27,6 +27,8 @@ class Property(Base):
     property_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     furnished: Mapped[str | None] = mapped_column(String(50), nullable=True)
     mediator_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("mediators.id", ondelete="SET NULL"), nullable=True, index=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     mediator = relationship("Mediator", foreign_keys=[mediator_id], lazy="joined")
@@ -49,3 +51,8 @@ class Property(Base):
         if not m:
             return self.owner_name
         return m.agency_name or self.owner_name
+
+    @property
+    def mediator_is_verified(self) -> bool:
+        m = self.mediator
+        return bool(m.is_verified) if m else False

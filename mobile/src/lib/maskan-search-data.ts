@@ -15,14 +15,10 @@ export type SearchProperty = {
   rentalScore: number;
   areaScore: number;
   matchScore: number;
-  amenities: {
-    parking: boolean;
-    balcony: boolean;
-    gym: boolean;
-    pool: boolean;
-  };
-  reasons: string[];
+  isVerified: boolean;
   agentPhone: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export const districtsByCity: Record<string, string[]> = {

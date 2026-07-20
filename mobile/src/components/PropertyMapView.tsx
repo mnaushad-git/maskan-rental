@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, Image, Pressable, type ViewStyle } from "react-native";
+import { View, Text, Pressable, type ViewStyle } from "react-native";
+import { Image } from "expo-image";
 import MapView, { Marker, type Region } from "react-native-maps";
 import { Link } from "expo-router";
 import { BedDouble, Bath, MapPin, ExternalLink, X } from "lucide-react-native";
@@ -8,6 +9,8 @@ import { formatSAR } from "@/lib/maskan-data";
 import { CITY_CENTERS, DISTRICT_COORDS } from "@/lib/geo";
 import { useLanguage } from "@/lib/i18n/context";
 
+// Fallback for any property the backend hasn't backfilled real coordinates
+// for yet — derives an approximate district-center pin, same as the server does.
 function getCoords(p: SearchProperty): [number, number] {
   return DISTRICT_COORDS[`${p.district}|${p.city}`] ?? CITY_CENTERS[p.city] ?? CITY_CENTERS.Riyadh;
 }
@@ -15,6 +18,12 @@ function getCoords(p: SearchProperty): [number, number] {
 function jitter(val: number, seed: number, scale = 0.007): number {
   const x = Math.sin(seed * 127.1) * 43758.5453;
   return val + (x - Math.floor(x) - 0.5) * scale;
+}
+
+function pinFor(p: SearchProperty, i: number): [number, number] {
+  if (p.latitude != null && p.longitude != null) return [p.latitude, p.longitude];
+  const [baseLat, baseLng] = getCoords(p);
+  return [jitter(baseLat, Number(p.id) * 3 + i), jitter(baseLng, Number(p.id) * 7 + i + 13)];
 }
 
 function formatPinPrice(n: number): string {
@@ -28,10 +37,7 @@ function regionFor(properties: SearchProperty[]): Region {
     const [lat, lng] = CITY_CENTERS.Riyadh;
     return { latitude: lat, longitude: lng, latitudeDelta: 0.3, longitudeDelta: 0.3 };
   }
-  const points = properties.map((p, i) => {
-    const [baseLat, baseLng] = getCoords(p);
-    return [jitter(baseLat, Number(p.id) * 3 + i), jitter(baseLng, Number(p.id) * 7 + i + 13)] as const;
-  });
+  const points = properties.map((p, i) => pinFor(p, i));
   const lats = points.map((p) => p[0]);
   const lngs = points.map((p) => p[1]);
   const minLat = Math.min(...lats);
@@ -46,39 +52,107 @@ function regionFor(properties: SearchProperty[]): Region {
   };
 }
 
+export type MapSearchBounds = { minLat: number; maxLat: number; minLng: number; maxLng: number };
+
+const REGION_SEARCH_DEBOUNCE_MS = 500;
+
 export function PropertyMapView({
   properties,
   style,
+  chromeless = false,
+  onSelectedChange,
+  onRegionSearch,
 }: {
   properties: SearchProperty[];
   style?: ViewStyle;
+  // Full-screen mode: drop the rounded border and the built-in count badge
+  // (the home screen's floating header shows the count instead).
+  chromeless?: boolean;
+  // Lets a chromeless host (e.g. the home screen) know a marker's preview
+  // card is open, so it can raise the map above any overlay that would
+  // otherwise cover the card (see HomeSheet).
+  onSelectedChange?: (p: SearchProperty | null) => void;
+  // Search-as-you-move-the-map: called (debounced) with the currently visible
+  // bounds whenever the user pans/zooms, so the host can refetch and swap in
+  // only the properties within view. Omit to keep the old fixed-list behavior.
+  onRegionSearch?: (bounds: MapSearchBounds) => void;
 }) {
   const { t } = useLanguage();
   const mapRef = useRef<MapView>(null);
   const [selected, setSelected] = useState<SearchProperty | null>(null);
   const initialRegion = useMemo(() => regionFor(properties), []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Guards against PropertyMapView's own camera moves being misread as a user
+  // pan (which would immediately re-trigger onRegionSearch and fight the
+  // filter-driven re-fit below), and against a region-search-driven property
+  // update re-triggering that re-fit and yanking the camera out from under
+  // the user right after they just panned it. Both start `true` so the
+  // automatic onRegionChangeComplete react-native-maps fires on mount is ignored.
+  const programmaticMove = useRef(true);
+  const suppressNextAutoFit = useRef(true);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Re-fit the viewport only when the result set actually changes (e.g. a
   // filter or search) — a controlled `region` prop would re-center on every
   // render and fight the user's own pan/zoom gestures.
   useEffect(() => {
+    if (suppressNextAutoFit.current) {
+      suppressNextAutoFit.current = false;
+      return;
+    }
+    programmaticMove.current = true;
     mapRef.current?.animateToRegion(regionFor(properties), 300);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [properties]);
 
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
+
+  function handleRegionChangeComplete(region: Region) {
+    if (programmaticMove.current) {
+      programmaticMove.current = false;
+      return;
+    }
+    if (!onRegionSearch) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      suppressNextAutoFit.current = true;
+      onRegionSearch({
+        minLat: region.latitude - region.latitudeDelta / 2,
+        maxLat: region.latitude + region.latitudeDelta / 2,
+        minLng: region.longitude - region.longitudeDelta / 2,
+        maxLng: region.longitude + region.longitudeDelta / 2,
+      });
+    }, REGION_SEARCH_DEBOUNCE_MS);
+  }
+
   return (
-    <View className="relative overflow-hidden rounded-2xl border border-border" style={style ?? { height: 320 }}>
-      <MapView ref={mapRef} style={{ flex: 1 }} initialRegion={initialRegion}>
+    <View
+      className={chromeless ? "relative overflow-hidden" : "relative overflow-hidden rounded-2xl border border-border"}
+      style={style ?? { height: 320 }}
+    >
+      <MapView
+        ref={mapRef}
+        style={{ flex: 1 }}
+        initialRegion={initialRegion}
+        onRegionChangeComplete={handleRegionChangeComplete}
+      >
         {properties.map((p, i) => {
-          const [baseLat, baseLng] = getCoords(p);
-          const lat = jitter(baseLat, Number(p.id) * 3 + i);
-          const lng = jitter(baseLng, Number(p.id) * 7 + i + 13);
+          const [lat, lng] = pinFor(p, i);
           const isSale = p.listingType === "sale";
-          const color = isSale ? "#D97706" : "#16A34A";
+          const color = isSale ? "#0F766E" : "#2563EB";
           const priceLabel = isSale ? formatPinPrice(p.price) : `${formatPinPrice(p.price / 12)}/mo`;
 
           return (
-            <Marker key={p.id} coordinate={{ latitude: lat, longitude: lng }} onPress={() => setSelected(p)}>
+            <Marker
+              key={p.id}
+              coordinate={{ latitude: lat, longitude: lng }}
+              onPress={() => {
+                setSelected(p);
+                onSelectedChange?.(p);
+              }}
+            >
               <View className="items-center">
                 <View
                   className="rounded-md border-2 border-white px-1.5 py-1 shadow-card"
@@ -105,24 +179,31 @@ export function PropertyMapView({
         })}
       </MapView>
 
-      <View className="absolute start-3 top-3 flex-row items-center gap-1 rounded-xl border border-border bg-background/95 px-3 py-1.5">
-        <MapPin size={14} color="#16A34A" />
-        <Text className="text-xs font-semibold text-foreground">
-          {t(properties.length === 1 ? "map.propertyCountSingular" : "map.propertyCountPlural", {
-            count: properties.length,
-          })}
-        </Text>
-      </View>
+      {!chromeless && (
+        <View className="absolute start-3 top-3 flex-row items-center gap-1 rounded-xl border border-border bg-background/95 px-3 py-1.5">
+          <MapPin size={14} color="#2563EB" />
+          <Text className="text-xs font-semibold text-foreground">
+            {t(properties.length === 1 ? "map.propertyCountSingular" : "map.propertyCountPlural", {
+              count: properties.length,
+            })}
+          </Text>
+        </View>
+      )}
 
       {selected && (
         <View className="absolute inset-x-3 bottom-4 overflow-hidden rounded-2xl border border-border bg-background shadow-elevated">
           <View className="relative aspect-[16/7] overflow-hidden bg-surface-2">
-            <Image source={{ uri: selected.image }} className="size-full" resizeMode="cover" />
+            <Image source={{ uri: selected.image }} className="size-full" contentFit="cover" />
             <Pressable
-              onPress={() => setSelected(null)}
+              onPress={() => {
+                setSelected(null);
+                onSelectedChange?.(null);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t("common.close")}
               className="absolute end-2 top-2 size-7 items-center justify-center rounded-full bg-background/90"
             >
-              <X size={14} color="#0F172A" />
+              <X size={14} color="#2B211A" />
             </Pressable>
           </View>
           <View className="p-4">
@@ -130,20 +211,21 @@ export function PropertyMapView({
               {selected.title}
             </Text>
             <View className="mt-0.5 flex-row items-center gap-1">
-              <MapPin size={12} color="#64748B" />
+              <MapPin size={12} color="#79716B" />
               <Text className="text-xs text-muted-foreground">
                 {selected.district}, {selected.city}
               </Text>
             </View>
+            <Text className="mt-1 text-[11px] text-muted-foreground">{t("map.approxLocation")}</Text>
             <View className="mt-2 flex-row items-center gap-3">
               <View className="flex-row items-center gap-1">
-                <BedDouble size={14} color="#64748B" />
+                <BedDouble size={14} color="#79716B" />
                 <Text className="text-xs text-muted-foreground">
                   {selected.bedrooms} {t("map.bedroomsAbbr")}
                 </Text>
               </View>
               <View className="flex-row items-center gap-1">
-                <Bath size={14} color="#64748B" />
+                <Bath size={14} color="#79716B" />
                 <Text className="text-xs text-muted-foreground">
                   {selected.bathrooms} {t("map.bathroomsAbbr")}
                 </Text>

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { View, Text, Image, Pressable, Linking } from "react-native";
+import { View, Text, Pressable, Linking } from "react-native";
+import { Image } from "expo-image";
 import { Link, useRouter } from "expo-router";
 import { Bath, BedDouble, Heart, MapPin, Maximize, Phone, MessageCircle } from "lucide-react-native";
 import type { Property } from "@/lib/maskan-data";
@@ -44,7 +45,7 @@ export function PropertyCard({ p }: { p: Property }) {
       <Link href={{ pathname: "/property/[id]", params: { id: p.id } }} asChild>
         <Pressable>
           <View className="relative aspect-[4/3] overflow-hidden bg-surface-2">
-            <Image source={{ uri: p.image }} className="size-full" resizeMode="cover" />
+            <Image source={{ uri: p.image }} className="size-full" contentFit="cover" />
             <View className="absolute inset-x-3 top-3 flex-row items-start justify-between gap-2">
               <View className="flex-row flex-wrap gap-1.5">
                 {p.badges.slice(0, 2).map((b) => (
@@ -57,7 +58,7 @@ export function PropertyCard({ p }: { p: Property }) {
                 disabled={saving}
                 className="size-9 items-center justify-center rounded-full bg-background/95 shadow-card"
               >
-                <Heart size={16} color={saved ? "#DC2626" : "#0F172A"} fill={saved ? "#DC2626" : "none"} />
+                <Heart size={16} color={saved ? "#DC2626" : "#2B211A"} fill={saved ? "#DC2626" : "none"} />
               </Pressable>
             </View>
             <View className="absolute bottom-3 start-3">
@@ -72,7 +73,7 @@ export function PropertyCard({ p }: { p: Property }) {
                   {p.title}
                 </Text>
                 <View className="mt-1 flex-row items-center gap-1">
-                  <MapPin size={14} color="#64748B" />
+                  <MapPin size={14} color="#79716B" />
                   <Text className="text-sm text-muted-foreground">
                     {p.district}, {p.city}
                   </Text>
@@ -83,15 +84,15 @@ export function PropertyCard({ p }: { p: Property }) {
 
             <View className="flex-row items-center gap-4">
               <View className="flex-row items-center gap-1.5">
-                <BedDouble size={16} color="#64748B" />
+                <BedDouble size={16} color="#79716B" />
                 <Text className="text-sm text-muted-foreground">{p.bedrooms}</Text>
               </View>
               <View className="flex-row items-center gap-1.5">
-                <Bath size={16} color="#64748B" />
+                <Bath size={16} color="#79716B" />
                 <Text className="text-sm text-muted-foreground">{p.bathrooms}</Text>
               </View>
               <View className="flex-row items-center gap-1.5">
-                <Maximize size={16} color="#64748B" />
+                <Maximize size={16} color="#79716B" />
                 <Text className="text-sm text-muted-foreground">{p.area} m²</Text>
               </View>
             </View>
@@ -120,7 +121,7 @@ export function PropertyCard({ p }: { p: Property }) {
             onPress={() => Linking.openURL(`tel:${p.agentPhone}`)}
             className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg border border-border py-2"
           >
-            <Phone size={14} color="#0F172A" />
+            <Phone size={14} color="#2B211A" />
             <Text className="text-xs font-medium text-foreground">{t("propertyCard.call")}</Text>
           </Pressable>
           <Pressable

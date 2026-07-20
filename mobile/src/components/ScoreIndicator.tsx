@@ -1,7 +1,7 @@
 import { View, Text } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
-const TONE_COLORS = { primary: "#16A34A", secondary: "#2563EB", warning: "#D97706" };
+const TONE_COLORS = { primary: "#2563EB", secondary: "#B45309", warning: "#B45309" };
 
 export function ScoreRing({ score, size = 56 }: { score: number; size?: number }) {
   const radius = (size - 8) / 2;
@@ -12,7 +12,7 @@ export function ScoreRing({ score, size = 56 }: { score: number; size?: number }
   return (
     <View style={{ width: size, height: size }} accessibilityLabel={`Property score ${score} of 100`}>
       <Svg width={size} height={size} style={{ transform: [{ rotate: "-90deg" }] }}>
-        <Circle cx={size / 2} cy={size / 2} r={radius} strokeWidth={4} stroke="#F1F5F9" fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={radius} strokeWidth={4} stroke="#F5EAD9" fill="none" />
         <Circle
           cx={size / 2}
           cy={size / 2}

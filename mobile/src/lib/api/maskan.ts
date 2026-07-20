@@ -1,15 +1,20 @@
-import { Image } from "react-native";
+import { Image, type ImageSourcePropType } from "react-native";
 import type { Property as UiProperty } from "@/lib/maskan-data";
 import type { SearchProperty as UiSearchProperty } from "@/lib/maskan-search-data";
 import { readStoredToken, clearStoredAuth } from "@/lib/auth-storage";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
 
+function resolveLocalImage(mod: ImageSourcePropType): string {
+  if (typeof Image.resolveAssetSource === "function") return Image.resolveAssetSource(mod).uri;
+  return typeof mod === "string" ? mod : (mod as { uri: string; default?: string }).default ?? (mod as { uri: string }).uri;
+}
+
 const PROPERTY_IMAGES = [
-  Image.resolveAssetSource(require("../../assets/prop-1.jpg")).uri,
-  Image.resolveAssetSource(require("../../assets/prop-2.jpg")).uri,
-  Image.resolveAssetSource(require("../../assets/prop-3.jpg")).uri,
-  Image.resolveAssetSource(require("../../assets/prop-4.jpg")).uri,
+  resolveLocalImage(require("../../assets/prop-1.jpg")),
+  resolveLocalImage(require("../../assets/prop-2.jpg")),
+  resolveLocalImage(require("../../assets/prop-3.jpg")),
+  resolveLocalImage(require("../../assets/prop-4.jpg")),
 ];
 
 export class UnauthorizedError extends Error {
@@ -57,8 +62,11 @@ export type ApiProperty = {
   mediator_phone: string | null;
   mediator_profile_image_url: string | null;
   mediator_agent_name: string | null;
+  mediator_is_verified: boolean;
   property_type: string | null;
   furnished: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export type AuthUser = {
@@ -142,6 +150,16 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
   const imageUrls = (property.images ?? []).map((i) => i.url);
   const primaryImage = imageUrls[0] ?? property.image_url ?? imageForProperty(property.id);
 
+  // Only claim what's actually backed by data: "Verified" reflects the
+  // listing's mediator having a verified profile (not applied to every
+  // listing regardless of status), and "New" reflects real listing age.
+  const badges: UiProperty["badges"] = [];
+  if (property.mediator_is_verified) badges.push("Verified");
+  if (matchScore >= 90) badges.push("Best Match");
+  const createdAtMs = Date.parse(property.created_at);
+  const isRecent = !Number.isNaN(createdAtMs) && Date.now() - createdAtMs < 14 * 24 * 60 * 60 * 1000;
+  if (isRecent && !badges.includes("Best Match")) badges.push("New");
+
   return {
     id: String(property.id),
     title: property.title,
@@ -156,10 +174,10 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     image: primaryImage,
     images: imageUrls.length > 0 ? imageUrls : [primaryImage],
     matchScore,
-    badges: ["Verified", matchScore >= 90 ? "Best Match" : "New"],
+    badges,
     status: property.status === "Published" ? "Available" : property.status === "Suspended" ? "Reserved" : "Available",
     pricePerSqm: estimatedArea > 0 ? Math.round(displayPrice / estimatedArea) : 0,
-    agent: property.mediator_agent_name ?? property.owner_name ?? "Maskan Agent",
+    agent: property.mediator_agent_name ?? property.owner_name ?? "myHome Agent",
     agentPhone: property.mediator_phone ?? null,
     agentProfileImage: property.mediator_profile_image_url ?? null,
     mediatorId: property.mediator_id ?? null,
@@ -185,19 +203,10 @@ export function mapApiSearchProperty(property: ApiProperty): UiSearchProperty {
     rentalScore: estimateRentalScore(property),
     areaScore: estimateAreaScore(property),
     matchScore: uiProperty.matchScore,
-    amenities: {
-      parking: true,
-      balcony: (property.bedrooms ?? 0) >= 2,
-      gym: (property.bedrooms ?? 0) >= 3,
-      pool: (property.bedrooms ?? 0) >= 3,
-    },
-    reasons: [
-      "Verified listing",
-      `${property.area} location`,
-      property.description ? "Detailed description available" : "Fresh inventory",
-      "Good rental value",
-    ],
+    isVerified: property.mediator_is_verified,
     agentPhone: property.mediator_phone ?? null,
+    latitude: property.latitude,
+    longitude: property.longitude,
   };
 }
 
@@ -241,6 +250,26 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function fetchProperties() {
   return requestJson<ApiProperty[]>("/properties/?limit=500");
+}
+
+export type MapBounds = {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+};
+
+// Search-as-you-move-the-map: only the properties whose (district-derived)
+// pin falls within the currently visible map region.
+export function fetchPropertiesInBounds(bounds: MapBounds) {
+  const params = new URLSearchParams({
+    limit: "500",
+    min_lat: String(bounds.minLat),
+    max_lat: String(bounds.maxLat),
+    min_lng: String(bounds.minLng),
+    max_lng: String(bounds.maxLng),
+  });
+  return requestJson<ApiProperty[]>(`/properties/?${params.toString()}`);
 }
 
 export function fetchProperty(id: number) {
@@ -346,4 +375,251 @@ export function createLead(payload: {
   requirements_note?: string;
 }) {
   return requestJson<ApiLeadDetail>("/leads/", { method: "POST", body: JSON.stringify(payload) });
+}
+
+// ── My leads ────────────────────────────────────────────────────────────────
+export type ApiLeadSummary = {
+  id: number;
+  area_name: string;
+  city: string;
+  status: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_email: string;
+  max_budget: number | null;
+  bedrooms_needed: number | null;
+  created_at: string;
+};
+
+export type ApiLeadMessage = {
+  id: number;
+  lead_id: number;
+  sender_user_id: number | null;
+  sender_role: string; // "customer" | "mediator" | "admin"
+  content: string;
+  is_read: boolean;
+  created_at: string;
+};
+
+export function fetchMyLeads() {
+  return requestJson<ApiLeadSummary[]>("/leads/my");
+}
+
+export function fetchLead(id: number) {
+  return requestJson<ApiLeadDetail>(`/leads/${id}`);
+}
+
+export function fetchLeadMessages(id: number) {
+  return requestJson<ApiLeadMessage[]>(`/leads/${id}/messages`);
+}
+
+export function sendLeadMessage(id: number, content: string) {
+  return requestJson<ApiLeadMessage>(`/leads/${id}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  });
+}
+
+export function markLeadMessagesRead(id: number) {
+  return requestJson<void>(`/leads/${id}/messages/read`, { method: "POST" });
+}
+
+// ── Area intelligence / averages ──────────────────────────────────────────────
+export type ApiAreaSummary = {
+  name: string;
+  city: string;
+  property_count: number;
+  average_rent: number; // monthly average in SAR
+};
+
+export function fetchAreas() {
+  return requestJson<ApiAreaSummary[]>("/areas/");
+}
+
+export type ApiSchool = { name: string; type: string; rating: number; distance_km: number };
+export type ApiHospital = { name: string; tier: string; rating: number; distance_km: number };
+export type ApiLifestylePlace = { name: string; rating?: number; distance_km: number };
+export type ApiLifestyleCategory = { count: number; avg_rating: number | null; places?: ApiLifestylePlace[] };
+export type ApiLifestyle = {
+  restaurants?: ApiLifestyleCategory;
+  gyms?: ApiLifestyleCategory;
+  mosques?: ApiLifestyleCategory;
+  malls?: ApiLifestyleCategory;
+  parks?: ApiLifestyleCategory;
+};
+export type ApiRentTrendPoint = { year: string; avg_rent_annual: number };
+
+export type ApiAreaIntelligenceSummary = {
+  area_name: string;
+  city: string;
+  school_score: number | null;
+  healthcare_score: number | null;
+  lifestyle_score: number | null;
+  traffic_score: number | null;
+  family_score: number | null;
+  area_score: number | null;
+  tags: string[];
+  overview: string | null;
+  last_refreshed_at: string | null;
+};
+
+export type ApiAreaIntelligence = ApiAreaIntelligenceSummary & {
+  id: number;
+  center_lat: number | null;
+  center_lng: number | null;
+  schools: ApiSchool[];
+  hospitals: ApiHospital[];
+  lifestyle: ApiLifestyle;
+  commute_minutes_to_center: number | null;
+  rent_trend: ApiRentTrendPoint[];
+  market_notes: string[];
+};
+
+export function fetchAreaIntelligenceList() {
+  return requestJson<ApiAreaIntelligenceSummary[]>("/areas/intelligence");
+}
+
+export function fetchAreaIntelligence(areaName: string, city?: string) {
+  const q = city ? `?city=${encodeURIComponent(city)}` : "";
+  return requestJson<ApiAreaIntelligence>(`/areas/${encodeURIComponent(areaName)}/intelligence${q}`);
+}
+
+// ── AI advisor ────────────────────────────────────────────────────────────────
+export function chatWithAdvisor(
+  message: string,
+  history: Array<{ role: string; content: string }>,
+) {
+  return requestJson<{ reply: string }>("/ai/chat", {
+    method: "POST",
+    body: JSON.stringify({ message, history }),
+  });
+}
+
+type StreamHandlers = {
+  onDelta: (text: string) => void;
+  onDone: () => void;
+  onError: (message: string) => void;
+};
+
+// The advisor's tool-using replies take 20–40s and, on the non-streaming
+// endpoint, arrive all at once — long enough to trip okhttp's read timeout on
+// Android. The SSE endpoint streams text deltas as they're generated, keeping
+// the socket active. RN's fetch can't read a streaming body, so we use XHR and
+// parse `data: {…}\n\n` events out of the growing responseText.
+export function streamAdvisorChat(
+  message: string,
+  history: Array<{ role: string; content: string }>,
+  handlers: StreamHandlers,
+): () => void {
+  let cancelled = false;
+  let finished = false;
+  const xhr = new XMLHttpRequest();
+
+  const finish = (fn: () => void) => {
+    if (finished || cancelled) return;
+    finished = true;
+    fn();
+  };
+
+  let processed = 0;
+  const consume = (upTo: number) => {
+    const parts = xhr.responseText.split("\n\n");
+    for (let i = processed; i < upTo; i++) {
+      const line = parts[i].trim();
+      if (!line.startsWith("data:")) continue;
+      try {
+        const evt = JSON.parse(line.slice(5).trim());
+        if (evt.type === "text") handlers.onDelta(evt.delta);
+        else if (evt.type === "done") finish(handlers.onDone);
+        else if (evt.type === "error") finish(() => handlers.onError(evt.message));
+      } catch {
+        /* incomplete / non-JSON line — ignore */
+      }
+    }
+    processed = upTo;
+  };
+
+  readStoredToken().then((token) => {
+    if (cancelled) return;
+    xhr.open("POST", `${API_BASE_URL}/ai/chat/stream`);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    // Process only complete events (all but the trailing, possibly-partial chunk).
+    xhr.onprogress = () => consume(xhr.responseText.split("\n\n").length - 1);
+    xhr.onload = () => {
+      consume(xhr.responseText.split("\n\n").length);
+      finish(handlers.onDone);
+    };
+    xhr.onerror = () => finish(() => handlers.onError("network"));
+    xhr.ontimeout = () => finish(() => handlers.onError("timeout"));
+    xhr.send(JSON.stringify({ message, history }));
+  });
+
+  return () => {
+    cancelled = true;
+    try {
+      xhr.abort();
+    } catch {
+      /* already closed */
+    }
+  };
+}
+
+// ── Mediators / agent profile ─────────────────────────────────────────────────
+export type ApiPartnerArea = {
+  id: number;
+  mediator_id: number;
+  area_name: string;
+  city: string;
+  created_at: string;
+};
+
+export type ApiPartnerPublic = {
+  id: number;
+  agency_name: string | null;
+  phone: string;
+  bio: string | null;
+  profile_image_url: string | null;
+  is_verified: boolean;
+  total_leads_accepted: number;
+  created_at: string;
+  areas: ApiPartnerArea[];
+};
+
+export function fetchPublicPartner(id: number) {
+  return requestJson<ApiPartnerPublic>(`/mediators/${id}/public`);
+}
+
+export function fetchPublicPartners(city?: string) {
+  const q = city ? `?city=${encodeURIComponent(city)}` : "";
+  return requestJson<ApiPartnerPublic[]>(`/mediators/public${q}`);
+}
+
+export function fetchPropertiesByMediator(mediatorId: number) {
+  return requestJson<ApiProperty[]>(`/properties/?mediator_id=${mediatorId}&limit=50`);
+}
+
+export type ApiReview = {
+  id: number;
+  mediator_id: number;
+  user_id: number | null;
+  rating: number;
+  comment: string | null;
+  reviewer_name: string | null;
+  status: string;
+  created_at: string;
+};
+
+export type ApiReviewSummary = {
+  avg_rating: number | null;
+  review_count: number;
+  distribution: Record<string, number>;
+};
+
+export function fetchMediatorReviews(mediatorId: number) {
+  return requestJson<ApiReview[]>(`/reviews/mediator/${mediatorId}`);
+}
+
+export function fetchMediatorReviewSummary(mediatorId: number) {
+  return requestJson<ApiReviewSummary>(`/reviews/mediator/${mediatorId}/summary`);
 }

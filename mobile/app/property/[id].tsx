@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
-import { View, Text, Image, ScrollView, ActivityIndicator, Pressable, Linking, Dimensions } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Linking, Dimensions } from "react-native";
+import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { BedDouble, Bath, Maximize, MapPin, Phone, MessageCircle, Heart, FileText } from "lucide-react-native";
+import { BedDouble, Bath, Maximize, MapPin, Phone, MessageCircle, Heart, FileText, ChevronRight } from "lucide-react-native";
 import { fetchProperty, mapApiProperty, saveProperty } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
 import type { Property } from "@/lib/maskan-data";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
+import { ErrorState } from "@/components/ErrorState";
 
 const { width } = Dimensions.get("window");
 
@@ -21,17 +23,23 @@ export default function PropertyDetailScreen() {
   const [error, setError] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!id || Number.isNaN(Number(id))) {
       setError(true);
       setLoading(false);
       return;
     }
+    setLoading(true);
+    setError(false);
     fetchProperty(Number(id))
       .then((raw) => setProperty(mapApiProperty(raw)))
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   async function handleSave() {
     if (!user) {
@@ -50,7 +58,7 @@ export default function PropertyDetailScreen() {
   if (loading) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator color="#16A34A" />
+        <ActivityIndicator color="#2563EB" />
       </SafeAreaView>
     );
   }
@@ -58,7 +66,7 @@ export default function PropertyDetailScreen() {
   if (error || !property) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center bg-background p-6">
-        <Text className="text-center text-sm text-muted-foreground">{t("property.unableToLoad")}</Text>
+        <ErrorState onRetry={load} />
       </SafeAreaView>
     );
   }
@@ -72,13 +80,13 @@ export default function PropertyDetailScreen() {
     <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
       <Stack.Screen options={{ title: property.title }} />
       <ScrollView>
-        <Image source={{ uri: property.image }} style={{ width, height: width * 0.7 }} resizeMode="cover" />
+        <Image source={{ uri: property.image }} style={{ width, height: width * 0.7 }} contentFit="cover" />
 
         <View className="gap-4 p-5">
           <View>
             <Text className="font-bold text-xl text-foreground">{property.title}</Text>
             <View className="mt-1 flex-row items-center gap-1">
-              <MapPin size={14} color="#64748B" />
+              <MapPin size={14} color="#79716B" />
               <Text className="text-sm text-muted-foreground">
                 {property.district}, {property.city}
               </Text>
@@ -87,15 +95,15 @@ export default function PropertyDetailScreen() {
 
           <View className="flex-row items-center gap-5 border-y border-border py-4">
             <View className="flex-row items-center gap-1.5">
-              <BedDouble size={18} color="#0F172A" />
+              <BedDouble size={18} color="#2B211A" />
               <Text className="text-sm text-foreground">{property.bedrooms} {t("property.summary.bedrooms")}</Text>
             </View>
             <View className="flex-row items-center gap-1.5">
-              <Bath size={18} color="#0F172A" />
+              <Bath size={18} color="#2B211A" />
               <Text className="text-sm text-foreground">{property.bathrooms} {t("property.summary.bathrooms")}</Text>
             </View>
             <View className="flex-row items-center gap-1.5">
-              <Maximize size={18} color="#0F172A" />
+              <Maximize size={18} color="#2B211A" />
               <Text className="text-sm text-foreground">{property.area} m²</Text>
             </View>
           </View>
@@ -112,9 +120,12 @@ export default function PropertyDetailScreen() {
             </View>
             <Pressable
               onPress={handleSave}
+              accessibilityRole="button"
+              accessibilityLabel={t(saved ? "property.actions.saved" : "property.actions.save")}
+              accessibilityState={{ selected: saved }}
               className="size-11 items-center justify-center rounded-full border border-border"
             >
-              <Heart size={18} color={saved ? "#DC2626" : "#0F172A"} fill={saved ? "#DC2626" : "none"} />
+              <Heart size={18} color={saved ? "#DC2626" : "#2B211A"} fill={saved ? "#DC2626" : "none"} />
             </Pressable>
           </View>
 
@@ -124,7 +135,7 @@ export default function PropertyDetailScreen() {
                 onPress={() => Linking.openURL(`tel:${property.agentPhone}`)}
                 className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg border border-border py-3"
               >
-                <Phone size={16} color="#0F172A" />
+                <Phone size={16} color="#2B211A" />
                 <Text className="text-sm font-medium text-foreground">{t("propertyCard.call")}</Text>
               </Pressable>
             )}
@@ -142,10 +153,17 @@ export default function PropertyDetailScreen() {
             )}
           </View>
 
-          <View className="rounded-xl border border-border p-4">
-            <Text className="text-sm font-semibold text-foreground">{t("property.landlord.listedBy")}</Text>
-            <Text className="mt-1 text-sm text-muted-foreground">{property.agent}</Text>
-          </View>
+          <Pressable
+            onPress={() => property.mediatorId && router.push(`/agent/${property.mediatorId}`)}
+            disabled={!property.mediatorId}
+            className="flex-row items-center justify-between rounded-xl border border-border p-4"
+          >
+            <View>
+              <Text className="text-sm font-semibold text-foreground">{t("property.landlord.listedBy")}</Text>
+              <Text className="mt-1 text-sm text-muted-foreground">{property.agent}</Text>
+            </View>
+            {property.mediatorId ? <ChevronRight size={18} color="#A8A29E" /> : null}
+          </Pressable>
 
           <Pressable
             onPress={() => router.push("/lead/new")}

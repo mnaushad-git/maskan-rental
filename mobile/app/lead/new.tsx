@@ -92,7 +92,7 @@ export default function LeadNewScreen() {
             label={t("leadNew.city")}
             value={t(`cities.${city}`)}
             onPress={() => setOpenModal("city")}
-            icon={<MapPin size={18} color="#64748B" />}
+            icon={<MapPin size={18} color="#79716B" />}
           />
           <View className="border-t border-border">
             <SelectField

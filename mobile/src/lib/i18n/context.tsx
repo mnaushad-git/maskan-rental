@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { I18nManager } from "react-native";
+import { reloadAppAsync } from "expo";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Updates from "expo-updates";
 import { en } from "./en";
 import { ar } from "./ar";
 
@@ -13,7 +13,10 @@ const STORAGE_KEY = "maskan_lang";
 type Ctx = {
   lang: Language;
   /** Persists the choice and flips native layout direction — requires an app
-   * reload to take full effect, so this triggers one via expo-updates. */
+   * reload to take full effect, so this triggers one via `expo`'s
+   * reloadAppAsync (works in both dev and release, unlike expo-updates'
+   * reloadAsync which requires EAS Update to be configured, or DevSettings'
+   * reload which is dev-only and undefined in release builds). */
   setLang: (l: Language) => Promise<void>;
   dir: "ltr" | "rtl";
   t: (path: string, vars?: Record<string, string | number>) => string;
@@ -52,7 +55,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       I18nManager.allowRTL(shouldBeRTL);
       I18nManager.forceRTL(shouldBeRTL);
       // Layout direction only fully applies after a reload.
-      await Updates.reloadAsync();
+      await reloadAppAsync("Language changed");
     }
   }
 

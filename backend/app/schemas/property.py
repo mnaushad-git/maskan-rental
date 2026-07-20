@@ -21,6 +21,8 @@ class PropertyBase(BaseModel):
     mediator_id: int | None = None
     property_type: str | None = None
     furnished: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class PropertyCreate(PropertyBase):
@@ -62,6 +64,8 @@ class PropertyUpdate(BaseModel):
     mediator_id: int | None = None
     property_type: str | None = None
     furnished: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class PartnerPropertyUpdate(BaseModel):
@@ -102,3 +106,4 @@ class PropertyOut(PropertyBase):
     mediator_phone: str | None = None
     mediator_profile_image_url: str | None = None
     mediator_agent_name: str | None = None
+    mediator_is_verified: bool = False
