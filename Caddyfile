@@ -17,9 +17,23 @@
 
 	# API → FastAPI backend. The /api prefix is preserved (not stripped),
 	# matching the router prefixes in backend/app/main.py.
+	#
+	# keepalive caps how long Caddy holds an idle upstream connection open —
+	# on a small test VM, releasing these after a minute matters more than
+	# the small latency win of reusing a long-idle connection.
 	@api path /api/*
-	reverse_proxy @api backend:8000
+	reverse_proxy @api backend:8000 {
+		transport http {
+			keepalive 1m
+			keepalive_idle_conns 10
+		}
+	}
 
 	# Everything else → server-rendered frontend.
-	reverse_proxy frontend:8080
+	reverse_proxy frontend:8080 {
+		transport http {
+			keepalive 1m
+			keepalive_idle_conns 10
+		}
+	}
 }
