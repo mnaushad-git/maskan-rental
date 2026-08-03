@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { View, Text, FlatList, ActivityIndicator, Pressable, RefreshControl } from "react-native";
+import { View, Text, FlatList, Pressable, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
-import { List, Map as MapIcon } from "lucide-react-native";
+import { List, Map as MapIcon, SearchX } from "lucide-react-native";
 import { fetchProperties, mapApiSearchProperty, type ApiProperty } from "@/lib/api/maskan";
 import type { SearchProperty } from "@/lib/maskan-search-data";
 import { useLanguage } from "@/lib/i18n/context";
@@ -11,6 +11,8 @@ import { SearchBar, type SearchBarFilters } from "@/components/SearchBar";
 import { PropertyMapView } from "@/components/PropertyMapView";
 import { PropertyCard } from "@/components/PropertyCard";
 import { ErrorState } from "@/components/ErrorState";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PropertyCardSkeleton } from "@/components/ui/Skeleton";
 import type { Property } from "@/lib/maskan-data";
 
 function toUiProperty(p: SearchProperty): Property {
@@ -112,8 +114,10 @@ export default function SearchScreen() {
       </View>
 
       {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#2563EB" />
+        <View className="flex-1 gap-4 p-4 pt-0">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <PropertyCardSkeleton key={i} />
+          ))}
         </View>
       ) : error && all.length === 0 ? (
         <ErrorState onRetry={refresh} />
@@ -129,9 +133,11 @@ export default function SearchScreen() {
           renderItem={({ item }) => <PropertyCard p={toUiProperty(item)} />}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#2563EB" />}
           ListEmptyComponent={
-            <View className="items-center py-16">
-              <Text className="text-sm text-muted-foreground">{t("search.noMatchesTitle")}</Text>
-            </View>
+            <EmptyState
+              icon={<SearchX size={32} color="#79716B" />}
+              title={t("search.noMatchesTitle")}
+              description={t("search.noMatchesDesc")}
+            />
           }
         />
       )}

@@ -29,6 +29,34 @@ module.exports = {
         ai: "#7C3AED",
         "ai-soft": "#EDE9FE",
       },
+      // Radius scale — same shape as the web app's --radius-{sm..4xl} tokens
+      // (frontend/src/styles.css), so a "lg" card reads as the same relative
+      // roundedness on both platforms even though the two apps have their
+      // own base unit (web's base radius is 14px; mobile's is 16px — chosen
+      // to look right against RN's typically-larger touch targets).
+      borderRadius: {
+        sm: 12,
+        md: 14,
+        lg: 16,
+        xl: 20,
+        "2xl": 24,
+        "3xl": 28,
+        "4xl": 32,
+      },
+      // Font-size scale with paired line-heights — RN has no CSS line-height
+      // default the way browsers do, so text reads cramped without setting
+      // this explicitly everywhere. Values in px (NativeWind maps these to
+      // RN's unitless line-height as px, not em).
+      fontSize: {
+        xs: ["12px", { lineHeight: "16px" }],
+        sm: ["14px", { lineHeight: "20px" }],
+        base: ["16px", { lineHeight: "24px" }],
+        lg: ["18px", { lineHeight: "26px" }],
+        xl: ["20px", { lineHeight: "28px" }],
+        "2xl": ["24px", { lineHeight: "32px" }],
+        "3xl": ["30px", { lineHeight: "38px" }],
+        "4xl": ["36px", { lineHeight: "44px" }],
+      },
     },
   },
   plugins: [],
