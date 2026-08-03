@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 _pwd = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 from app.api.deps import get_admin_user, get_current_user, get_db, get_mediator_user
+from app.core.cache import CacheService
 from app.core.config import settings
 from app.models.mediator import Mediator, MediatorArea
 from app.models.user import User
@@ -23,6 +24,13 @@ from app.schemas.mediator import (
 )
 
 router = APIRouter()
+
+_PUBLIC_PROFILE_NAMESPACE = "mediator-public"
+_PUBLIC_PROFILE_TTL_SECONDS = 300
+
+
+def _invalidate_public_profile_cache(mediator_id: int) -> None:
+    CacheService().delete(_PUBLIC_PROFILE_NAMESPACE, str(mediator_id))
 
 
 # ── Registration ──────────────────────────────────────────────────────────────
@@ -81,6 +89,7 @@ def update_my_mediator_profile(
         setattr(mediator, field, value)
     db.commit()
     db.refresh(mediator)
+    _invalidate_public_profile_cache(mediator.id)
     return mediator
 
 
@@ -109,6 +118,7 @@ def subscribe_mediator(
     mediator.moyasar_card_token = "mock_card_token_replace_with_real"
     db.commit()
     db.refresh(mediator)
+    _invalidate_public_profile_cache(mediator.id)
 
     return {
         "status": "active",
@@ -136,6 +146,7 @@ def renew_subscription(
     mediator.subscription_status = "active"
     db.commit()
     db.refresh(mediator)
+    _invalidate_public_profile_cache(mediator.id)
     return {"status": "renewed", "subscription_expires_at": mediator.subscription_expires_at}
 
 
@@ -209,10 +220,18 @@ def list_public_mediators(
 @router.get("/{mediator_id}/public", response_model=MediatorPublicOut)
 def get_public_mediator(mediator_id: int, db: Session = Depends(get_db)):
     """Return a single partner's public profile. No auth required."""
-    mediator = db.get(Mediator, mediator_id)
-    if not mediator or mediator.subscription_status != "active":
+    cache = CacheService()
+
+    def _load():
+        mediator = db.get(Mediator, mediator_id)
+        if not mediator or mediator.subscription_status != "active":
+            return None
+        return MediatorPublicOut.model_validate(mediator, from_attributes=True).model_dump(mode="json")
+
+    cached = cache.get_or_set(_PUBLIC_PROFILE_NAMESPACE, str(mediator_id), _PUBLIC_PROFILE_TTL_SECONDS, _load)
+    if cached is None:
         raise HTTPException(status_code=404, detail="Partner not found.")
-    return mediator
+    return cached
 
 
 # ── Admin endpoints ───────────────────────────────────────────────────────────
@@ -245,6 +264,7 @@ def admin_update_mediator(
         setattr(mediator, field, value)
     db.commit()
     db.refresh(mediator)
+    _invalidate_public_profile_cache(mediator.id)
     return mediator
 
 
@@ -261,6 +281,7 @@ def admin_approve_mediator(
     mediator.approval_status = "approved"
     mediator.is_verified = True
     db.commit()
+    _invalidate_public_profile_cache(mediator.id)
     db.refresh(mediator)
     return mediator
 
@@ -279,6 +300,7 @@ def admin_reject_mediator(
     mediator.is_verified = False
     db.commit()
     db.refresh(mediator)
+    _invalidate_public_profile_cache(mediator.id)
     return mediator
 
 

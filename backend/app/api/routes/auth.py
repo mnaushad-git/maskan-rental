@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.core.config import settings
+from app.core.rate_limit import rate_limit_dependency
 from app.models.user import User
 from passlib.context import CryptContext
 
@@ -79,7 +80,12 @@ def create_access_token(user_id: int) -> str:
     return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
 
-@router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/signup",
+    response_model=AuthResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit_dependency("signup", limit=5, window_seconds=3600))],
+)
 def signup(body: SignupRequest, db: Session = Depends(get_db)):
     existing_user = db.scalar(select(User).where(User.email == body.email))
     if existing_user:
@@ -106,7 +112,11 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post(
+    "/login",
+    response_model=AuthResponse,
+    dependencies=[Depends(rate_limit_dependency("login", limit=10, window_seconds=300))],
+)
 def login(body: LoginRequest, db: Session = Depends(get_db)):
     """Authenticate a user and return a token."""
     user = db.scalar(select(User).where(User.email == body.email))

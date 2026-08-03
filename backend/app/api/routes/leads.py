@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_admin_user, get_current_user, get_db, get_mediator_user
 from app.core.config import settings
+from app.core.idempotency import IdempotencyConflict, IdempotencyStore
 from app.models.lead import Lead, LeadAssignment, LeadMessage, LeadSuggestion
 from app.models.mediator import Mediator, MediatorArea
 from app.models.payment import Payment
@@ -108,9 +109,27 @@ def _generate_suggestions_task(lead_id: int) -> None:
 def create_lead(
     body: LeadCreate,
     background_tasks: BackgroundTasks,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
+    """A client that times out and retries lead creation (or double-taps
+    submit) must not create two leads. If `Idempotency-Key` is supplied, a
+    repeat request with the same key + body replays the original response
+    instead of creating a second lead; a repeat with the same key but a
+    different body is rejected as a client error."""
+    idempotency = IdempotencyStore()
+    fingerprint_payload = body.model_dump(mode="json")
+    if idempotency_key:
+        try:
+            existing = idempotency.begin("lead-create", idempotency_key, fingerprint_payload)
+        except IdempotencyConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        if existing is not None:
+            response.status_code = existing.status_code
+            return existing.body
+
     lead = Lead(
         customer_user_id=current_user.id,
         customer_name=body.customer_name,
@@ -130,6 +149,11 @@ def create_lead(
     db.commit()
     db.refresh(lead)
     background_tasks.add_task(_generate_suggestions_task, lead.id)
+
+    if idempotency_key:
+        result_body = LeadDetailOut.model_validate(lead, from_attributes=True).model_dump(mode="json")
+        idempotency.complete("lead-create", idempotency_key, fingerprint_payload, status_code=201, body=result_body)
+
     return lead
 
 

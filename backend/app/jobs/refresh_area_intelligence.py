@@ -265,6 +265,11 @@ def _refresh_district(row: AreaIntelligence, db) -> None:
         row.last_refreshed_at = datetime.now(timezone.utc)
         db.commit()
 
+        from app.core.cache import CacheService
+        cache = CacheService()
+        cache.delete("area-intel", "list")
+        cache.delete("area-intel-detail", f"{row.area_name.lower()}:{(row.city or '').lower()}")
+
         logger.info(f"Refreshed: {row.area_name} ({row.city}) — area={area_score}, family={family_score}")
 
     except Exception as exc:

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_admin_user, get_db
 from app.core.config import settings
+from app.core.rate_limit import rate_limit_dependency
 from app.models.lead import Lead
 from app.models.property import Property
 from app.models.area_intelligence import AreaIntelligence
@@ -423,7 +424,11 @@ def _stream_chat(system_prompt: str, tools: list, req: ChatRequest) -> Streaming
     )
 
 
-@router.post("/admin-chat", response_model=ChatResponse)
+@router.post(
+    "/admin-chat",
+    response_model=ChatResponse,
+    dependencies=[Depends(rate_limit_dependency("ai_admin_chat", limit=30, window_seconds=600, by_user=True))],
+)
 def admin_ai_chat(
     req: ChatRequest,
     db: Session = Depends(get_db),
@@ -439,7 +444,11 @@ def admin_ai_chat(
         raise HTTPException(status_code=500, detail=f"AI error: {exc}") from exc
 
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post(
+    "/chat",
+    response_model=ChatResponse,
+    dependencies=[Depends(rate_limit_dependency("ai_chat", limit=20, window_seconds=600))],
+)
 def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured — set ANTHROPIC_API_KEY")
@@ -451,7 +460,10 @@ def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"AI error: {exc}") from exc
 
 
-@router.post("/chat/stream")
+@router.post(
+    "/chat/stream",
+    dependencies=[Depends(rate_limit_dependency("ai_chat", limit=20, window_seconds=600))],
+)
 def ai_chat_stream(req: ChatRequest, db: Session = Depends(get_db)):
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured — set ANTHROPIC_API_KEY")
