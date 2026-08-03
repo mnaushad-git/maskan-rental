@@ -5,6 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.core.redis_client import is_redis_available
 
 logger = logging.getLogger("app.health")
 
@@ -33,6 +34,11 @@ def readiness_check(response: Response, db: Session = Depends(get_db)):
         logger.warning("Readiness check: database unavailable: %s", exc)
         checks["database"] = "error"
         healthy = False
+
+    # Redis is optional infrastructure — reported for visibility but never
+    # blocks readiness. Every Redis-backed feature (cache/rate-limit/lock/
+    # idempotency) already degrades gracefully on its own when it's down.
+    checks["redis"] = "ok" if is_redis_available() else "unavailable"
 
     if not healthy:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE

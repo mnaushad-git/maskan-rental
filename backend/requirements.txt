@@ -12,7 +12,9 @@ passlib[bcrypt]==1.7.4
 python-jose[cryptography]==3.3.0
 anthropic
 apscheduler==3.10.4
+redis==5.2.1
 
 # Dev/test only
 pytest==8.3.4
 pytest-cov==6.0.0
+fakeredis==2.26.2

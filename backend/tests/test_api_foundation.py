@@ -37,3 +37,5 @@ def test_readiness_reports_database_ok(client):
     body = resp.json()
     assert body["status"] == "ready"
     assert body["checks"]["database"] == "ok"
+    # Redis is optional infra: reported for visibility, never blocks readiness.
+    assert body["checks"]["redis"] in {"ok", "unavailable"}

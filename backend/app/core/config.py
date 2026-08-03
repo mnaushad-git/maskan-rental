@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     # Comma-separated admin emails, e.g. ADMIN_EMAILS=admin@example.com,ops@maskan.sa
     ADMIN_EMAILS: str = ""
 
+    # ── Redis (cache, rate limiting, locks, idempotency) ──────────────────────
+    # Optional by design: every Redis-backed feature must degrade gracefully
+    # (cache miss / rate-limit fail-open / lock not acquired) when this is
+    # unset or the server is unreachable — Postgres remains the system of
+    # record and Redis is never required for correctness.
+    REDIS_URL: str | None = None
+    CACHE_VERSION: str = "v1"
+
     @property
     def admin_emails(self) -> list[str]:
         return [e.strip() for e in self.ADMIN_EMAILS.split(",") if e.strip()]
