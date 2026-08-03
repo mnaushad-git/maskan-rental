@@ -3,11 +3,13 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from anthropic import Anthropic, beta_tool
+from anthropic import beta_tool
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_admin_user, get_db
+from app.core.ai import gateway
+from app.core.ai.prompts import ADMIN_ADVISOR, CUSTOMER_ADVISOR, PromptDefinition
 from app.core.config import settings
 from app.core.rate_limit import rate_limit_dependency
 from app.models.lead import Lead
@@ -17,25 +19,6 @@ from app.models.mediator import Mediator, MediatorArea
 from app.models.user import User
 
 router = APIRouter()
-
-_PERSONA = (
-    "You are Maskan AI, the built-in rental advisor for the Maskan platform — "
-    "a Saudi rental marketplace. "
-    "You have tools to look up live platform data (listings, district scores, mediators, rent averages). "
-    "ALWAYS call a tool to check real data before answering a question about listings, prices, areas, or "
-    "mediators — never invent them. If a tool returns no results, say so and suggest what to try instead. "
-    "Quote monthly and annual rents in SAR. Be concise and practical.\n\n"
-    "IMPORTANT — Clickable links in your responses:\n"
-    "- When you mention a specific property by name, always format it as a markdown link: "
-    "[Property Title](/property/{id}) where {id} is the numeric ID shown in brackets in tool results, e.g. [42].\n"
-    "- When you mention a district or area (e.g. Al Yasmin, Al Malqa), format it as: "
-    "[Area Name](/areas?area=Area+Name) — replace spaces with + in the URL.\n"
-    "- When you mention a city (e.g. Riyadh, Jeddah), format it as: "
-    "[City Name](/search?city=City+Name).\n"
-    "- When you mention a mediator, format it as a search link: "
-    "[Mediator Name or License](/search?city=City+Name).\n"
-    "Always use these link formats so customers can navigate directly to relevant pages."
-)
 
 
 # ── Customer-facing tools ──────────────────────────────────────────────────────
@@ -252,21 +235,6 @@ def ai_status():
     return {"key_set": bool(key), "key_prefix": key[:12] if key else ""}
 
 
-_ADMIN_PERSONA = (
-    "You are Maskan Admin AI, the internal operations assistant for the Maskan rental platform. "
-    "You have tools to look up platform data on demand: listings (any status), leads, partners, and user "
-    "counts. Call a tool whenever a question needs current data — never invent numbers.\n"
-    "Your role is to help the admin:\n"
-    "1. ANALYSE data — answer questions about leads, revenue, partner performance, listing health.\n"
-    "2. GUIDE creation — when the admin asks to create a listing, partner, or lead, extract all the details "
-    "they provide and return a JSON block at the end of your reply wrapped in <action> tags so the frontend "
-    "can pre-fill the form. Format: <action>{\"type\":\"create_listing\"|\"create_partner\"|\"create_lead\", "
-    "\"data\":{...fields...}}</action>\n"
-    "3. HIGHLIGHT issues — flag listings with zero rent, leads stuck in pending_review, unverified "
-    "partners, etc.\n"
-    "Be concise, use bullet points for data summaries, and always quote numbers from tool results.\n"
-    "NEVER invent data. If a tool returns nothing relevant, say so clearly."
-)
 
 
 def _admin_tools(db: Session) -> list:
@@ -371,38 +339,44 @@ def _admin_tools(db: Session) -> list:
     return [query_properties, query_leads, query_partners, platform_counts, rent_summary]
 
 
-def _run_chat(system_prompt: str, tools: list, req: ChatRequest) -> ChatResponse:
-    client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+def _run_chat(feature: str, prompt: PromptDefinition, tools: list, req: ChatRequest, user_id: int | None = None) -> ChatResponse:
     messages = [{"role": m.role, "content": m.content} for m in req.history]
     messages.append({"role": "user", "content": req.message})
 
-    runner = client.beta.messages.tool_runner(
-        model="claude-sonnet-4-6",
-        max_tokens=1500,
-        system=system_prompt,
-        tools=tools,
-        messages=messages,
-    )
-    final = None
-    for message in runner:
-        final = message
-    if final is None:
-        raise HTTPException(status_code=500, detail="AI error: no response generated")
-    reply = "".join(block.text for block in final.content if block.type == "text")
-    return ChatResponse(reply=reply)
+    status = "error"
+    result = None
+    try:
+        result = gateway.run_chat(model=gateway.DEFAULT_MODEL, system=prompt.template, tools=tools, messages=messages)
+        status = "ok"
+        return ChatResponse(reply=result.reply)
+    finally:
+        gateway.log_ai_call(
+            feature=feature,
+            model=gateway.DEFAULT_MODEL,
+            prompt=prompt,
+            latency_ms=result.latency_ms if result else 0.0,
+            status=status,
+            user_id=user_id,
+            input_tokens=result.input_tokens if result else None,
+            output_tokens=result.output_tokens if result else None,
+        )
 
 
-def _stream_chat(system_prompt: str, tools: list, req: ChatRequest) -> StreamingResponse:
-    client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+def _stream_chat(feature: str, prompt: PromptDefinition, tools: list, req: ChatRequest, user_id: int | None = None) -> StreamingResponse:
+    import time
+
+    client = gateway.get_client()
     messages = [{"role": m.role, "content": m.content} for m in req.history]
     messages.append({"role": "user", "content": req.message})
 
     def events():
+        started = time.monotonic()
+        status = "error"
         try:
             runner = client.beta.messages.tool_runner(
-                model="claude-sonnet-4-6",
+                model=gateway.DEFAULT_MODEL,
                 max_tokens=1500,
-                system=system_prompt,
+                system=prompt.template,
                 tools=tools,
                 messages=messages,
                 stream=True,
@@ -413,9 +387,22 @@ def _stream_chat(system_prompt: str, tools: list, req: ChatRequest) -> Streaming
             for turn in runner:
                 for delta in turn.text_stream:
                     yield f"data: {json.dumps({'type': 'text', 'delta': delta})}\n\n"
+            status = "ok"
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
         except Exception as exc:
             yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        finally:
+            # Token usage isn't reliably extractable mid-stream from the tool
+            # runner, so the streaming path logs latency/status only — the
+            # non-streaming path (_run_chat) is the one with full token/cost data.
+            gateway.log_ai_call(
+                feature=feature,
+                model=gateway.DEFAULT_MODEL,
+                prompt=prompt,
+                latency_ms=(time.monotonic() - started) * 1000,
+                status=status,
+                user_id=user_id,
+            )
 
     return StreamingResponse(
         events(),
@@ -432,12 +419,12 @@ def _stream_chat(system_prompt: str, tools: list, req: ChatRequest) -> Streaming
 def admin_ai_chat(
     req: ChatRequest,
     db: Session = Depends(get_db),
-    _admin: User = Depends(get_admin_user),
+    admin: User = Depends(get_admin_user),
 ):
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured")
     try:
-        return _run_chat(_ADMIN_PERSONA, _admin_tools(db), req)
+        return _run_chat("admin_chat", ADMIN_ADVISOR, _admin_tools(db), req, user_id=admin.id)
     except HTTPException:
         raise
     except Exception as exc:
@@ -453,7 +440,7 @@ def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured — set ANTHROPIC_API_KEY")
     try:
-        return _run_chat(_PERSONA, _customer_tools(db), req)
+        return _run_chat("customer_chat", CUSTOMER_ADVISOR, _customer_tools(db), req)
     except HTTPException:
         raise
     except Exception as exc:
@@ -467,4 +454,4 @@ def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
 def ai_chat_stream(req: ChatRequest, db: Session = Depends(get_db)):
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured — set ANTHROPIC_API_KEY")
-    return _stream_chat(_PERSONA, _customer_tools(db), req)
+    return _stream_chat("customer_chat_stream", CUSTOMER_ADVISOR, _customer_tools(db), req)

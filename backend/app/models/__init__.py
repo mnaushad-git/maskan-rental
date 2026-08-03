@@ -9,6 +9,7 @@ from app.models.lead import Lead, LeadAssignment, LeadMessage, LeadSuggestion
 from app.models.payment import Payment
 from app.models.review import Review
 from app.models.outbox_event import OutboxEvent
+from app.models.ai_call_log import AICallLog
 
 __all__ = [
     "User",
@@ -26,4 +27,5 @@ __all__ = [
     "Payment",
     "Review",
     "OutboxEvent",
+    "AICallLog",
 ]
