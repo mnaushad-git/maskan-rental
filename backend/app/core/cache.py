@@ -18,6 +18,7 @@ import redis
 
 from app.core.config import settings
 from app.core.distributed_lock import redis_lock
+from app.core.metrics import record_cache_event
 from app.core.redis_client import get_redis_client
 
 logger = logging.getLogger("app.cache")
@@ -61,11 +62,14 @@ class CacheService:
         except redis.RedisError as exc:
             logger.warning("cache.get(%s/%s): Redis error, treating as miss: %s", namespace, key, exc)
             stats.errors += 1
+            record_cache_event("error")
             return default
         if raw is None:
             stats.misses += 1
+            record_cache_event("miss")
             return default
         stats.hits += 1
+        record_cache_event("hit")
         return json.loads(raw)
 
     def set(self, namespace: str, key: str, value: Any, ttl_seconds: int) -> bool:
@@ -75,10 +79,12 @@ class CacheService:
         try:
             client.set(self._key(namespace, key), json.dumps(value, default=str), ex=ttl_seconds)
             stats.sets += 1
+            record_cache_event("set")
             return True
         except redis.RedisError as exc:
             logger.warning("cache.set(%s/%s): Redis error, skipping cache write: %s", namespace, key, exc)
             stats.errors += 1
+            record_cache_event("error")
             return False
 
     def delete(self, namespace: str, key: str) -> None:
@@ -87,9 +93,11 @@ class CacheService:
             return
         try:
             client.delete(self._key(namespace, key))
+            record_cache_event("invalidate")
         except redis.RedisError as exc:
             logger.warning("cache.delete(%s/%s): Redis error: %s", namespace, key, exc)
             stats.errors += 1
+            record_cache_event("error")
 
     def delete_namespace(self, namespace: str) -> int:
         """Bulk-invalidate every key under a namespace (e.g. after a mediator
@@ -104,9 +112,11 @@ class CacheService:
             for k in client.scan_iter(match=pattern, count=200):
                 client.delete(k)
                 deleted += 1
+            record_cache_event("invalidate")
         except redis.RedisError as exc:
             logger.warning("cache.delete_namespace(%s): Redis error: %s", namespace, exc)
             stats.errors += 1
+            record_cache_event("error")
         return deleted
 
     def get_or_set(

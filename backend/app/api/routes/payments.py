@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_admin_user, get_db
 from app.core.cache import CacheService
 from app.core.config import settings
+from app.core.metrics import payment_webhooks_total
 from app.core.outbox import EventType, record_event
 from app.models.mediator import Mediator
 from app.models.payment import Payment
@@ -63,6 +64,8 @@ async def moyasar_webhook(
         existing = db.query(Payment).filter(Payment.gateway_payment_id == gateway_payment_id).first()
         if existing and existing.status == "paid":
             return {"status": "already_processed"}
+
+    payment_webhooks_total.labels(event_type=event_type or "unknown").inc()
 
     if event_type == "payment.paid":
         _handle_payment_paid(data, db)

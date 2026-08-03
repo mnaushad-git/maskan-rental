@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from app.api.deps import get_admin_user, get_db, get_mediator_user, get_optional_admin_user
 from app.core.geo import coords_for
+from app.core.metrics import properties_published_total
 from app.core.outbox import EventType, record_event
 from app.models.listing_image import ListingImage
 from app.models.mediator import Mediator
@@ -211,6 +212,7 @@ def create_property(
             aggregate_id=property_obj.id,
             payload={"property_id": property_obj.id},
         )
+        properties_published_total.inc()
     db.commit()
     db.refresh(property_obj)
     return property_obj
@@ -240,6 +242,7 @@ def update_property(
     )
     if previous_status != "Published" and property_obj.status == "Published":
         record_event(db, event_type=EventType.PROPERTY_PUBLISHED, aggregate_type="property", aggregate_id=property_obj.id, payload={"property_id": property_obj.id})
+        properties_published_total.inc()
     elif previous_status == "Published" and property_obj.status != "Published":
         record_event(db, event_type=EventType.PROPERTY_UNPUBLISHED, aggregate_type="property", aggregate_id=property_obj.id, payload={"property_id": property_obj.id})
 

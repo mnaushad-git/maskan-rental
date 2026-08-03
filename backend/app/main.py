@@ -1,14 +1,18 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
-from app.core.middleware import RequestIDMiddleware
+from app.core.logging_config import configure_logging
+from app.core.middleware import MetricsMiddleware, RequestIDMiddleware
 import app.models  # noqa: F401 — registers all SQLAlchemy models before any mapper is configured
 from app.api.routes import properties, search, analytics, areas, auth, users, saved_searches, saved_properties, ai, health
 from app.api.routes import area_intelligence, mediators, leads, payments, reviews
+
+configure_logging()
 
 
 def _run_outbox_publisher() -> None:
@@ -53,8 +57,18 @@ app.add_middleware(
     expose_headers=["X-Total-Count", "X-Request-ID"],
 )
 app.add_middleware(RequestIDMiddleware)
+app.add_middleware(MetricsMiddleware)
 
 register_exception_handlers(app)
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    """Prometheus scrape endpoint. Deliberately at the root, not under
+    `/api`, since it's ops surface rather than product API — kept off the
+    OpenAPI schema for the same reason. Internal-only in production (not
+    proxied publicly by Caddy)."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 # Routers — each is mounted twice: at the legacy unversioned `/api/...` path
 # (existing clients keep working unmodified) and at `/api/v1/...` (the path

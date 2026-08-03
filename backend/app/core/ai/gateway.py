@@ -21,6 +21,7 @@ from anthropic import Anthropic
 
 from app.core.ai.prompts import PromptDefinition
 from app.core.config import settings
+from app.core.metrics import record_ai_call
 from app.core.request_context import get_request_id
 from app.db.session import SessionLocal
 from app.models.ai_call_log import AICallLog
@@ -107,6 +108,9 @@ def log_ai_call(
     """Best-effort logging — runs in its own DB session so it can never
     interfere with (or be rolled back by) the request's own transaction, and
     never raises: a logging failure must not turn into a 500 for the user."""
+    cost = estimate_cost_usd(model, input_tokens, output_tokens)
+    record_ai_call(feature=feature, status=status, latency_ms=latency_ms, input_tokens=input_tokens, output_tokens=output_tokens, cost_usd=cost)
+
     db = SessionLocal()
     try:
         db.add(
@@ -120,7 +124,7 @@ def log_ai_call(
                 output_tokens=output_tokens,
                 latency_ms=latency_ms,
                 status=status,
-                cost_estimate_usd=estimate_cost_usd(model, input_tokens, output_tokens),
+                cost_estimate_usd=cost,
                 trace_id=get_request_id(),
             )
         )

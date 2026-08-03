@@ -8,6 +8,7 @@ from app.api.deps import get_admin_user, get_current_user, get_db, get_mediator_
 from app.core.config import settings
 from app.core.idempotency import IdempotencyConflict, IdempotencyStore
 from app.core.jobs import enqueue
+from app.core.metrics import leads_created_total
 from app.core.outbox import EventType, record_event
 from app.models.lead import Lead, LeadAssignment, LeadMessage
 from app.models.mediator import Mediator, MediatorArea
@@ -115,6 +116,7 @@ def create_lead(
     )
     db.commit()
     db.refresh(lead)
+    leads_created_total.inc()
     enqueue(generate_lead_suggestions, lead.id)
 
     if idempotency_key:

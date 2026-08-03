@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.core.metrics import record_search
 from app.core.search import SearchQuery, get_search_provider
 
 router = APIRouter()
@@ -22,6 +23,7 @@ def search_properties(
     result = provider.search_properties(
         SearchQuery(q=q, area=area, city=city, min_price=min_price, max_price=max_price, limit=limit)
     )
+    record_search(endpoint="search", duration_ms=result.query_time_ms, result_count=len(result.items))
     return {
         "query": q,
         "area": area,

@@ -12,6 +12,7 @@ see `app.core.jobs.enqueue()`, which is how every call site submits work; it
 falls back to running the task inline if the broker is unreachable.
 """
 from celery import Celery
+from celery.signals import task_failure, task_retry, task_success
 
 from app.core.config import settings
 
@@ -61,3 +62,21 @@ celery_app.conf.update(
     result_expires=24 * 60 * 60,
     timezone="Asia/Riyadh",
 )
+
+
+@task_success.connect
+def _on_task_success(sender=None, **kwargs):
+    from app.core.metrics import record_job_execution
+    record_job_execution(task=sender.name if sender else "unknown", outcome="success")
+
+
+@task_failure.connect
+def _on_task_failure(sender=None, **kwargs):
+    from app.core.metrics import record_job_execution
+    record_job_execution(task=sender.name if sender else "unknown", outcome="failure")
+
+
+@task_retry.connect
+def _on_task_retry(sender=None, **kwargs):
+    from app.core.metrics import record_job_execution
+    record_job_execution(task=sender.name if sender else "unknown", outcome="retry")

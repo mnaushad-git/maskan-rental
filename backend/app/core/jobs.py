@@ -12,6 +12,7 @@ import logging
 
 from celery import Task
 
+from app.core.metrics import record_job_execution
 from app.core.redis_client import is_redis_available
 from app.core.request_context import get_request_id
 
@@ -27,10 +28,13 @@ def enqueue(task: Task, *args, **kwargs):
     connection-retry machinery is tuned for a worker's long-lived connection,
     not for "fail fast inside an HTTP request", so letting a request-path
     call hit that machinery on every request while the broker is down would
-    make the degraded mode itself slow."""
+    make the degraded mode itself slow. Task success/failure/retry outcomes
+    are recorded separately via Celery signal handlers (see celery_app.py) —
+    those fire the same way whether the task ran inline or on a real worker."""
     request_id = get_request_id()
     if not is_redis_available():
         logger.warning("enqueue(%s): broker unavailable (trace_id=%s), running inline instead", task.name, request_id)
+        record_job_execution(task=task.name, outcome="inline_fallback")
         return task.apply(args=args, kwargs=kwargs)
 
     try:
@@ -42,4 +46,5 @@ def enqueue(task: Task, *args, **kwargs):
             request_id,
             exc,
         )
+        record_job_execution(task=task.name, outcome="inline_fallback")
         return task.apply(args=args, kwargs=kwargs)

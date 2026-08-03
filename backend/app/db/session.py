@@ -18,3 +18,7 @@ engine = create_engine(
     pool_pre_ping=True,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+from app.core.db_metrics import register_engine_metrics  # noqa: E402
+
+register_engine_metrics(engine)
