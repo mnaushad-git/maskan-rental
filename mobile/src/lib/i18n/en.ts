@@ -578,6 +578,8 @@ export const en = {
     newChat: "New chat",
     inputPlaceholder: "Ask about areas, rent fairness… or say 'I want to find a 3BR in Al Yasmin'",
     send: "Send",
+    stop: "Stop generating",
+    retry: "Retry",
     footerDisclaimer:
       "myHome AI answers based on live platform data. You can also ask it to create a lead request.",
     errorReachingAI: "Sorry, I couldn't reach the AI service. Please try again.",

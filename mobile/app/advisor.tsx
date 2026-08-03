@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -10,8 +10,8 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack } from "expo-router";
-import { Send, Sparkles, Plus } from "lucide-react-native";
+import { Stack, useRouter } from "expo-router";
+import { Send, Sparkles, Plus, Square, RotateCcw } from "lucide-react-native";
 import Markdown from "react-native-markdown-display";
 import { streamAdvisorChat } from "@/lib/api/maskan";
 import { useLanguage } from "@/lib/i18n/context";
@@ -42,10 +42,19 @@ const mdStyles = {
 
 export default function AdvisorScreen() {
   const { t } = useLanguage();
+  const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
+  // The cancel fn streamAdvisorChat returns — captured so Stop and unmount
+  // cleanup can abort an in-flight request instead of leaking it.
+  const abortRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => abortRef.current?.();
+  }, []);
 
   const suggestions = [
     t("advisor.suggested.q1"),
@@ -63,10 +72,11 @@ export default function AdvisorScreen() {
     setMessages([...messages, { role: "user", content }, { role: "assistant", content: "" }]);
     setDraft("");
     setBusy(true);
+    setLastFailedMessage(null);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
 
     let errored = false;
-    streamAdvisorChat(content, history, {
+    abortRef.current = streamAdvisorChat(content, history, {
       onDelta: (delta) => {
         setMessages((prev) => {
           const copy = [...prev];
@@ -77,11 +87,13 @@ export default function AdvisorScreen() {
       },
       onDone: () => {
         setBusy(false);
+        abortRef.current = null;
         // If nothing streamed (e.g. immediate failure), show the fallback.
         setMessages((prev) => {
           const copy = [...prev];
           if (copy[assistantIndex] && copy[assistantIndex].content === "" && !errored) {
             copy[assistantIndex] = { role: "assistant", content: t("advisor.errorReachingAI") };
+            setLastFailedMessage(content);
           }
           return copy;
         });
@@ -89,6 +101,8 @@ export default function AdvisorScreen() {
       onError: () => {
         errored = true;
         setBusy(false);
+        abortRef.current = null;
+        setLastFailedMessage(content);
         setMessages((prev) => {
           const copy = [...prev];
           if (copy[assistantIndex]) copy[assistantIndex] = { role: "assistant", content: t("advisor.errorReachingAI") };
@@ -96,6 +110,20 @@ export default function AdvisorScreen() {
         });
       },
     });
+  }
+
+  function stop() {
+    abortRef.current?.();
+    abortRef.current = null;
+    setBusy(false);
+  }
+
+  function handleLinkPress(url: string): boolean {
+    if (url.startsWith("/")) {
+      router.push(url as never);
+      return false; // handled ourselves — don't let the library also try Linking.openURL
+    }
+    return true; // external link — let the library open it normally
   }
 
   return (
@@ -150,7 +178,7 @@ export default function AdvisorScreen() {
                   {m.role === "user" ? (
                     <Text className="text-sm leading-5 text-primary-foreground">{m.content}</Text>
                   ) : (
-                    <Markdown style={mdStyles} onLinkPress={() => false}>
+                    <Markdown style={mdStyles} onLinkPress={handleLinkPress}>
                       {m.content}
                     </Markdown>
                   )}
@@ -162,6 +190,17 @@ export default function AdvisorScreen() {
             <View className="self-start rounded-2xl border border-border bg-card px-4 py-3">
               <ActivityIndicator color="#2563EB" size="small" />
             </View>
+          )}
+          {!busy && lastFailedMessage && (
+            <Pressable
+              onPress={() => send(lastFailedMessage)}
+              accessibilityRole="button"
+              accessibilityLabel={t("advisor.retry")}
+              className="mt-1 flex-row items-center gap-1.5 self-start rounded-full border border-border bg-card px-3.5 py-2"
+            >
+              <RotateCcw size={14} color="#2563EB" />
+              <Text className="text-sm font-medium text-primary">{t("advisor.retry")}</Text>
+            </Pressable>
           )}
         </ScrollView>
 
@@ -175,16 +214,27 @@ export default function AdvisorScreen() {
               className="flex-1 rounded-full border border-border bg-card px-4 py-2.5 text-sm text-foreground"
               multiline
             />
-            <Pressable
-              onPress={() => send(draft)}
-              disabled={!draft.trim() || busy}
-              accessibilityRole="button"
-              accessibilityLabel={t("advisor.send")}
-              className="size-11 items-center justify-center rounded-full bg-primary"
-              style={{ opacity: !draft.trim() || busy ? 0.4 : 1 }}
-            >
-              <Send size={18} color="#FFFFFF" />
-            </Pressable>
+            {busy ? (
+              <Pressable
+                onPress={stop}
+                accessibilityRole="button"
+                accessibilityLabel={t("advisor.stop")}
+                className="size-11 items-center justify-center rounded-full bg-destructive"
+              >
+                <Square size={16} color="#FFFFFF" fill="#FFFFFF" />
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => send(draft)}
+                disabled={!draft.trim()}
+                accessibilityRole="button"
+                accessibilityLabel={t("advisor.send")}
+                className="size-11 items-center justify-center rounded-full bg-primary"
+                style={{ opacity: !draft.trim() ? 0.4 : 1 }}
+              >
+                <Send size={18} color="#FFFFFF" />
+              </Pressable>
+            )}
           </View>
           <Text className="px-1 text-[11px] text-muted-foreground">{t("advisor.footerDisclaimer")}</Text>
         </View>
