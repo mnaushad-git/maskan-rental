@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge, RecommendationBadge, StatusBadge } from "@/components/maskan/Badges";
 import { ScoreRing, ScoreBar } from "@/components/maskan/ScoreIndicator";
 import { PropertyCard } from "@/components/maskan/PropertyCard";
@@ -125,7 +126,26 @@ function PropertyDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  if (loading) return <div className="container-page py-12 text-sm text-muted-foreground">{tProp("loading")}</div>;
+  if (loading) {
+    return (
+      <div className="container-page py-8">
+        <Skeleton className="aspect-[16/9] w-full rounded-2xl md:aspect-[21/9]" />
+        <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-2/3" />
+            <Skeleton className="h-5 w-1/3" />
+            <div className="flex gap-4">
+              <Skeleton className="h-5 w-16" />
+              <Skeleton className="h-5 w-16" />
+              <Skeleton className="h-5 w-20" />
+            </div>
+            <Skeleton className="h-32 w-full rounded-xl" />
+          </div>
+          <Skeleton className="h-64 w-full rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
   if (error || !property) {
     return (
       <div className="container-page py-12">

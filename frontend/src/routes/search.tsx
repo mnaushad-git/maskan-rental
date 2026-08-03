@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/maskan/Badges";
 import { fetchPropertiesPaged, fetchSavedProperties, saveProperty, deleteSavedProperty, mapApiSearchProperty, fetchAreaIntelligenceList, fetchAreas, enrichPropertiesWithScores, type ApiAreaIntelligenceSummary, type ApiAreaSummary, type PropertySearchFilters } from "@/lib/api/maskan";
 import { PropertyMapView } from "@/components/maskan/PropertyMapView";
@@ -340,9 +341,6 @@ function SearchPage() {
           setView={setView}
         />
 
-        {loading && (
-          <p className="mt-3 text-sm text-muted-foreground">{tSearch("loadingListings")}</p>
-        )}
         {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
         {/* Mobile-only filter trigger bar */}
@@ -384,6 +382,7 @@ function SearchPage() {
                 savedMap={savedMap}
                 city={filters.city}
                 district={filters.district}
+                loading={loading}
                 onToggleCompare={toggleCompare}
                 onToggleSave={toggleSave}
               />
@@ -823,6 +822,30 @@ function Toggle({
 }
 
 /* -------------------------------- Results -------------------------------- */
+function ResultCardSkeleton({ variant }: { variant: "grid" | "list" }) {
+  const isList = variant === "list";
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-2xl border border-border bg-card shadow-card",
+        isList ? "grid grid-cols-1 gap-0 md:grid-cols-[240px_1fr]" : "flex flex-col",
+      )}
+    >
+      <Skeleton className={cn("shrink-0 rounded-none", isList ? "aspect-[4/3] md:aspect-auto md:h-full" : "aspect-[4/3]")} />
+      <div className="flex min-w-0 flex-col gap-3 p-5">
+        <Skeleton className="h-5 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+        <div className="flex gap-4">
+          <Skeleton className="h-4 w-12" />
+          <Skeleton className="h-4 w-12" />
+          <Skeleton className="h-4 w-16" />
+        </div>
+        <Skeleton className="h-6 w-1/3" />
+      </div>
+    </div>
+  );
+}
+
 function ResultsPanel({
   results,
   view,
@@ -830,6 +853,7 @@ function ResultsPanel({
   savedMap,
   city,
   district,
+  loading,
   onToggleCompare,
   onToggleSave,
 }: {
@@ -839,12 +863,23 @@ function ResultsPanel({
   savedMap: Record<string, number>;
   city: string;
   district: string;
+  loading: boolean;
   onToggleCompare: (id: string) => void;
   onToggleSave: (id: string) => void | Promise<void>;
 }) {
   const tSearch = useSearchT();
   const leadCity = city !== "Any" ? city : "Riyadh";
   const leadArea = district !== "Any" ? district : "";
+
+  if (loading && results.length === 0) {
+    return (
+      <div className={cn("grid gap-5", view === "grid" ? "sm:grid-cols-2 xl:grid-cols-3" : "grid-cols-1")}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <ResultCardSkeleton key={i} variant={view === "map" ? "grid" : view} />
+        ))}
+      </div>
+    );
+  }
 
   if (results.length === 0) {
     return (
