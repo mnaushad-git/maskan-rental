@@ -1,12 +1,8 @@
-from fastapi import APIRouter, Query
-from sqlalchemy import and_, select
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from fastapi import Depends
-
 from app.api.deps import get_db
-from app.models.property import Property
-from app.schemas.property import PropertyOut
+from app.core.search import SearchQuery, get_search_provider
 
 router = APIRouter()
 
@@ -22,30 +18,26 @@ def search_properties(
     db: Session = Depends(get_db),
 ):
     """Search properties with optional filters."""
-    filters = [Property.status == "Published"]
-
-    if q:
-        filters.append(
-            (Property.title.ilike(f"%{q}%")) | (Property.description.ilike(f"%{q}%"))
-        )
-    if area:
-        filters.append(Property.area.ilike(f"%{area}%"))
-    if city:
-        filters.append(Property.city.ilike(f"%{city}%"))
-    if min_price is not None:
-        filters.append(Property.monthly_rent >= min_price)
-    if max_price is not None:
-        filters.append(Property.monthly_rent <= max_price)
-
-    stmt = select(Property).order_by(Property.id.desc()).limit(limit)
-    if filters:
-        stmt = stmt.where(and_(*filters))
-
-    results = db.scalars(stmt).all()
+    provider = get_search_provider(db)
+    result = provider.search_properties(
+        SearchQuery(q=q, area=area, city=city, min_price=min_price, max_price=max_price, limit=limit)
+    )
     return {
         "query": q,
         "area": area,
         "city": city,
-        "count": len(results),
-        "results": [PropertyOut.model_validate(item).model_dump() for item in results],
+        "count": len(result.items),
+        "results": result.items,
     }
+
+
+@router.get("/autocomplete")
+def autocomplete(
+    q: str = Query(default="", min_length=1, description="City/area name prefix"),
+    limit: int = Query(default=8, ge=1, le=20),
+    db: Session = Depends(get_db),
+):
+    """City/district name suggestions as the user types in the search bar."""
+    provider = get_search_provider(db)
+    suggestions = provider.autocomplete_locations(q, limit=limit)
+    return [{"label": s.label, "kind": s.kind, "city": s.city} for s in suggestions]
