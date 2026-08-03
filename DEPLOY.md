@@ -288,10 +288,20 @@ build progress. This is normal. The first time takes 15–25 minutes.
 When it finishes you will see something like:
 ```
 ✔ Container maskanrental-db-1        Started
+✔ Container maskanrental-redis-1     Started
 ✔ Container maskanrental-backend-1   Started
+✔ Container maskanrental-worker-1    Started
 ✔ Container maskanrental-frontend-1  Started
 ✔ Container maskanrental-caddy-1     Started
 ```
+
+`redis` is the cache/rate-limiting/job-queue backend and `worker` is the
+Celery process that handles background jobs (lead matching, area-
+intelligence refresh, the outbox publisher) — both internal-only, no new
+Caddy route needed. If the app were somehow started without them, it would
+keep working in a degraded mode (no caching/rate-limiting, jobs run inline
+in the `backend` container) rather than failing — but they should normally
+come up healthy alongside everything else.
 
 ### Check everything is running
 
@@ -299,7 +309,14 @@ When it finishes you will see something like:
 docker compose -f docker-compose.prod.yml ps
 ```
 
-All four services should show **"running"** status.
+All six services should show **"running"** (db/redis/backend/worker should
+also show **"healthy"**).
+
+To split background job processing into one container per queue later
+(e.g. once AI generation or notification volume grows), duplicate the
+`worker` service in docker-compose.prod.yml with a different `-Q` flag per
+copy (e.g. `-Q ai` for an AI-only worker) — the queue routing already exists
+in app/core/celery_app.py, so no application code changes are needed.
 
 ---
 

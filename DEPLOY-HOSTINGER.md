@@ -216,7 +216,7 @@ docker compose -f docker-compose.hostinger.yml --env-file .env.production up -d 
 The first run downloads and compiles everything — takes 15–25 minutes.
 A lot of text will scroll by; this is normal.
 
-When finished, check that all three services are running:
+When finished, check that all services are running:
 
 ```bash
 docker compose -f docker-compose.hostinger.yml ps
@@ -225,10 +225,20 @@ docker compose -f docker-compose.hostinger.yml ps
 You should see:
 ```
 NAME                          STATUS
-maskanrental-db-1             running
-maskanrental-backend-1        running
+maskanrental-db-1             running (healthy)
+maskanrental-redis-1          running (healthy)
+maskanrental-backend-1        running (healthy)
+maskanrental-worker-1         running (healthy)
 maskanrental-frontend-1       running
 ```
+
+`redis` backs the cache/rate-limiting/job-queue infrastructure and `worker`
+processes background jobs (lead matching, area-intelligence refresh, the
+outbox publisher) — both are internal-only, nothing new to open in Nginx.
+If either shows `unhealthy` after a minute, check its logs (`docker compose
+-f docker-compose.hostinger.yml logs redis` / `logs worker`) — but note the
+app keeps working without them (degraded: no caching/rate-limiting, jobs run
+inline in the `backend` container instead), so this is not launch-blocking.
 
 ### Verify the app is listening internally
 
@@ -241,6 +251,13 @@ If you see HTML output — the frontend is up.
 curl http://localhost:8000/api/health
 ```
 If you see `{"status":"ok"}` — the backend is up.
+
+```bash
+curl http://localhost:8000/api/health/ready
+```
+Shows `{"status":"ready","checks":{"database":"ok","redis":"ok"}}` once both
+dependencies are reachable — `redis: "unavailable"` here is informational
+only and never blocks readiness.
 
 ---
 

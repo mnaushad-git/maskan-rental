@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
 
   # ── PostgreSQL ──────────────────────────────────────────────────────────────
@@ -15,6 +21,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    logging: *default-logging
+
+  # ── Redis (cache, rate limiting, locks, idempotency, Celery broker) ─────────
+  # Internal-only: no `ports:` mapping — Nginx and the outside world never see
+  # this port. Only other containers on the compose network can reach it.
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 256m
+    logging: *default-logging
 
   # ── FastAPI backend ─────────────────────────────────────────────────────────
   backend:
@@ -25,11 +49,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       ENV: production
       API_HOST: "0.0.0.0"
       API_PORT: "8000"
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME:-maskan}
+      REDIS_URL: redis://redis:6379/0
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
       SECRET_KEY: ${SECRET_KEY}
       ACCESS_TOKEN_EXPIRE_MINUTES: "43200"
@@ -44,10 +71,56 @@ services:
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
     command: >
       sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *default-logging
     # Exposed on localhost only — Nginx proxies /api/* here.
     # Not accessible from the internet directly.
     ports:
       - "127.0.0.1:8000:8000"
+
+  # ── Celery worker — all queues (single consolidated worker at this scale;
+  #    see DEPLOY.md for how to split into one container per queue later) ────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ENV: production
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME:-maskan}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ADMIN_EMAILS: ${ADMIN_EMAILS}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      FROM_EMAIL: ${FROM_EMAIL:-no-reply@maskan.sa}
+      MOYASAR_PUBLISHABLE_KEY: ${MOYASAR_PUBLISHABLE_KEY:-}
+      MOYASAR_SECRET_KEY: ${MOYASAR_SECRET_KEY:-}
+      MOYASAR_WEBHOOK_SECRET: ${MOYASAR_WEBHOOK_SECRET:-}
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+    command: >
+      celery -A app.core.celery_app worker
+      -Q default,notifications,data_ingestion,ai,analytics,payments,scheduled_jobs
+      -l info --concurrency=2
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.core.celery_app inspect ping | grep -q OK"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    mem_limit: 512m
+    logging: *default-logging
 
   # ── React / TanStack Start SSR frontend ────────────────────────────────────
   frontend:
@@ -63,6 +136,7 @@ services:
     environment:
       PORT: "8080"
       INTERNAL_API_URL: "http://backend:8000/api"
+    logging: *default-logging
     # Exposed on localhost only — Nginx proxies all non-API traffic here.
     # Caddy is NOT used; the existing Nginx on the server handles SSL.
     ports:
@@ -70,3 +144,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
