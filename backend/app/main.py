@@ -4,8 +4,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.errors import register_exception_handlers
+from app.core.middleware import RequestIDMiddleware
 import app.models  # noqa: F401 — registers all SQLAlchemy models before any mapper is configured
-from app.api.routes import properties, search, analytics, areas, auth, users, saved_searches, saved_properties, ai
+from app.api.routes import properties, search, analytics, areas, auth, users, saved_searches, saved_properties, ai, health
 from app.api.routes import area_intelligence, mediators, leads, payments, reviews
 
 
@@ -37,26 +39,37 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Total-Count"],
+    expose_headers=["X-Total-Count", "X-Request-ID"],
 )
+app.add_middleware(RequestIDMiddleware)
 
-# Routers
-app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-app.include_router(users.router, prefix="/api/users", tags=["users"])
-app.include_router(properties.router, prefix="/api/properties", tags=["properties"])
-app.include_router(saved_properties.router, prefix="/api/saved-properties", tags=["saved-properties"])
-app.include_router(saved_searches.router, prefix="/api/saved-searches", tags=["saved-searches"])
-app.include_router(search.router, prefix="/api/search", tags=["search"])
-app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
-app.include_router(area_intelligence.router, prefix="/api/areas", tags=["area-intelligence"])
-app.include_router(areas.router, prefix="/api/areas", tags=["areas"])
-app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
-app.include_router(mediators.router, prefix="/api/mediators", tags=["mediators"])
-app.include_router(leads.router, prefix="/api/leads", tags=["leads"])
-app.include_router(payments.router, prefix="/api/payments", tags=["payments"])
-app.include_router(reviews.router, prefix="/api/reviews", tags=["reviews"])
+register_exception_handlers(app)
 
+# Routers — each is mounted twice: at the legacy unversioned `/api/...` path
+# (existing clients keep working unmodified) and at `/api/v1/...` (the path
+# new clients should move to going forward). Same router instance, same
+# behavior, just reachable from both prefixes.
+_ROUTERS = [
+    (auth.router, "/auth", ["auth"]),
+    (users.router, "/users", ["users"]),
+    (properties.router, "/properties", ["properties"]),
+    (saved_properties.router, "/saved-properties", ["saved-properties"]),
+    (saved_searches.router, "/saved-searches", ["saved-searches"]),
+    (search.router, "/search", ["search"]),
+    (analytics.router, "/analytics", ["analytics"]),
+    (area_intelligence.router, "/areas", ["area-intelligence"]),
+    (areas.router, "/areas", ["areas"]),
+    (ai.router, "/ai", ["ai"]),
+    (mediators.router, "/mediators", ["mediators"]),
+    (leads.router, "/leads", ["leads"]),
+    (payments.router, "/payments", ["payments"]),
+    (reviews.router, "/reviews", ["reviews"]),
+]
 
-@app.get("/api/health", tags=["health"])
-def health_check():
-    return {"status": "ok"}
+for router, path, tags in _ROUTERS:
+    app.include_router(router, prefix=f"/api{path}", tags=tags)
+for router, path, tags in _ROUTERS:
+    app.include_router(router, prefix=f"/api/v1{path}", tags=[f"v1-{t}" for t in tags])
+
+app.include_router(health.router, prefix="/api/health", tags=["health"])
+app.include_router(health.router, prefix="/api/v1/health", tags=["v1-health"])
