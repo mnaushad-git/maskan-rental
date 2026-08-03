@@ -13,6 +13,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 
 const { width } = Dimensions.get("window");
 
@@ -21,6 +22,7 @@ export default function PropertyDetailScreen() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const router = useRouter();
+  const showToast = useToast();
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -53,6 +55,7 @@ export default function PropertyDetailScreen() {
     try {
       await saveProperty(user.id, Number(property.id));
       setSaved(true);
+      showToast(t("property.actions.savedToFavorites"));
     } catch {
       // ignore duplicate-save errors
     }

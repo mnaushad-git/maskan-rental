@@ -480,6 +480,7 @@ export const ar: TranslationDict = {
       askAI: "اسأل الذكاء الاصطناعي",
       saved: "محفوظ",
       save: "حفظ",
+      savedToFavorites: "تم الحفظ في المفضلة",
       compare: "مقارنة",
       deposit: "التأمين",
       depositValue: "5,500 ريال",

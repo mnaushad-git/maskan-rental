@@ -1,10 +1,29 @@
 /**
+ * Design principles (myHome mobile) — the "why" behind the tokens below and
+ * the components built on top of them:
+ *  1. Map-first, content-second. The map is the primary surface on Home; UI
+ *     that floats over it (sheets, pins, cards) must stay light — no heavy
+ *     blur/glass, since RN blur is expensive on mid-range Android and the
+ *     app's own performance notes already flag low-end-device concerns.
+ *  2. One accent color for actionable things, one accent for AI. `primary`
+ *     is the only color that means "tap this"; `ai` is reserved for
+ *     AI-attributed content (the advisor, match scores, recommendations) so
+ *     users learn to recognize "the AI said this" at a glance.
+ *  3. Premium means restrained, not decorated. Spacing and type hierarchy
+ *     carry the "premium" feeling — not gradients, shadows, or animation.
+ *     Default to the smallest shadow tier that reads as elevated (`card`
+ *     before `elevated` before `floating`).
+ *  4. Every list has three states, not two: loading (Skeleton), empty
+ *     (EmptyState), and error (ErrorState) — never conflate empty-because-
+ *     still-loading with empty-because-no-results (see the Search-screen
+ *     bug fixed in the previous pass for exactly this).
+ *
  * Design tokens that can't be expressed as Tailwind/NativeWind utility
  * classes — shadows (RN needs separate iOS shadow* props vs Android
  * `elevation`, not CSS box-shadow), animation timing (Reanimated takes JS
- * numbers, not CSS duration classes), and touch-target sizing. Colors,
- * radius, and font-size live in tailwind.config.js so components can use
- * className for those; reach for these only where a raw style prop is
+ * numbers, not CSS duration classes), z-index, and touch-target sizing.
+ * Colors, radius, and font-size live in tailwind.config.js so components can
+ * use className for those; reach for these only where a raw style prop is
  * unavoidable (e.g. react-native-maps overlays, Reanimated configs).
  */
 import { Platform } from "react-native";
@@ -62,3 +81,17 @@ export const easing = {
 // WCAG 2.5.5 / Material minimum — every Pressable should hit at least this,
 // via hitSlop if the visual element itself is smaller.
 export const MIN_TOUCH_TARGET = 44;
+
+// Stacking order for the floating/overlapping surfaces that show up across
+// the app (map overlays, sheets, toasts). Named by role rather than by
+// screen, so new floating UI can pick a tier without inventing a number —
+// codifies values already in ad hoc use (e.g. index.tsx's map-card-open
+// z-index of 20 and header z-index of 30).
+export const zIndex = {
+  base: 0,
+  raised: 10, // a selected/active element within its own layer (e.g. the open map pin)
+  overlay: 20, // content floating over the base layer (map preview cards, HomeSheet)
+  header: 30, // persistent chrome that should stay above overlay content
+  modal: 40, // BottomSheet / full modals
+  toast: 50, // toasts always win — they're transient and time-boxed
+} as const;

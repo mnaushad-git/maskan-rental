@@ -480,6 +480,7 @@ export const en = {
       askAI: "Ask AI",
       saved: "Saved",
       save: "Save",
+      savedToFavorites: "Saved to favorites",
       compare: "Compare",
       deposit: "Deposit",
       depositValue: "SAR 5,500",
