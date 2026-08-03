@@ -159,12 +159,12 @@ export function ListingCategoryBar({
             <>
               <button
                 type="button"
-                className="fixed inset-0 z-[1400] cursor-default"
+                className="fixed inset-0 z-[var(--z-dropdown)] cursor-default"
                 onClick={() => setMoreOpen(false)}
                 aria-label={t("common.close")}
               />
               <div
-                className="fixed z-[1401] grid w-64 grid-cols-2 gap-1 rounded-xl border border-border bg-popover p-2 shadow-elevated"
+                className="fixed z-[var(--z-dropdown-content)] grid w-64 grid-cols-2 gap-1 rounded-xl border border-border bg-popover p-2 shadow-elevated"
                 style={{ top: menuPos.top, left: menuPos.left }}
               >
                 {more.map((type) => {

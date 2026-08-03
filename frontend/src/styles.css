@@ -75,6 +75,22 @@
   --shadow-focus: 0 0 0 4px color-mix(in oklab, var(--primary) 18%, transparent);
 }
 
+/* Stacking order for floating/overlapping surfaces (map overlays, dropdowns,
+   modals) — named by role so new floating UI picks a tier instead of
+   inventing a magic number. Values match what was already in ad hoc use
+   across PropertyMapView/ListingCategoryBar/LocationOnboarding, just named.
+   Plain custom properties, not @theme tokens — Tailwind v4's z-index utility
+   is a fixed small scale (0/10/20/.../auto), not an extensible theme
+   namespace like color/radius/shadow, so these are applied via the
+   arbitrary-value syntax (z-[var(--z-overlay)]) instead of a generated
+   z-overlay utility class. */
+:root {
+  --z-overlay: 1000;
+  --z-dropdown: 1400;
+  --z-dropdown-content: 1401;
+  --z-modal: 2000;
+}
+
 :root {
   --radius: 0.875rem;
 

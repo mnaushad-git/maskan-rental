@@ -3,7 +3,7 @@ import { Sparkles, ShieldCheck, Flame, TrendingDown, Star } from "lucide-react";
 import type { ReactNode } from "react";
 import { useLanguage } from "@/lib/i18n/context";
 
-type Tone = "primary" | "secondary" | "ai" | "success" | "warning" | "info" | "neutral";
+type Tone = "primary" | "secondary" | "ai" | "success" | "warning" | "info" | "neutral" | "destructive";
 
 // Solid, high-contrast fills — pale tinted badges (the old bg-x/10-style
 // pills) read as near-identical washed-out blobs at small sizes, especially
@@ -16,6 +16,7 @@ const toneClass: Record<Tone, string> = {
   warning: "bg-warning text-warning-foreground",
   info: "bg-info text-info-foreground",
   neutral: "bg-muted-foreground text-background",
+  destructive: "bg-destructive text-destructive-foreground",
 };
 
 export function Badge({

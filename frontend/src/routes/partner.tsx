@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Briefcase, CheckCircle, Clock, Eye, EyeOff, History, Home, ListChecks, LogOut, Mail, MapPin, MessageSquare, Pencil, Phone, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/maskan/Badges";
+import { ListingStatusBadge } from "@/components/maskan/ListingStatusBadge";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { cities as CITY_LIST } from "@/lib/maskan-data";
@@ -513,22 +514,6 @@ function PartnerDashboard() {
       </div>
     </div>
   );
-}
-
-// ── Status badge helper ──────────────────────────────────────────────────────
-
-function ListingStatusBadge({ status }: { status: string }) {
-  const { t } = useLanguage();
-  const toneMap: Record<string, "success" | "warning" | "neutral" | "destructive"> = {
-    "Published": "success",
-    "Pending Approval": "warning",
-    "Draft": "neutral",
-    "Rejected": "destructive",
-    "Suspended": "destructive",
-  };
-  const tone = toneMap[status] ?? "neutral";
-  const label = status in toneMap ? t(`partnerDashboard.listingsView.statusBadges.${status}`) : status;
-  return <Badge tone={tone}>{label}</Badge>;
 }
 
 // ── Listings list view ───────────────────────────────────────────────────────

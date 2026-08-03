@@ -246,7 +246,7 @@ export function PropertyMapView({
       )}
 
       {ready && (
-        <div className="absolute start-3 top-3 z-[1000] rounded-xl border border-border bg-card/95 px-3 py-1.5 text-xs font-semibold shadow-card backdrop-blur">
+        <div className="absolute start-3 top-3 z-[var(--z-overlay)] rounded-xl border border-border bg-card/95 px-3 py-1.5 text-xs font-semibold shadow-card backdrop-blur">
           <MapPin className="me-1 inline size-3.5 text-primary" />
           {t(properties.length === 1 ? "map.propertyCountSingular" : "map.propertyCountPlural", {
             count: properties.length,
@@ -255,7 +255,7 @@ export function PropertyMapView({
       )}
 
       {selected && (
-        <div className="absolute bottom-4 left-1/2 z-[1000] w-full max-w-sm -translate-x-1/2 px-3">
+        <div className="absolute bottom-4 left-1/2 z-[var(--z-overlay)] w-full max-w-sm -translate-x-1/2 px-3">
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-elevated">
             <div className="relative aspect-[16/7] overflow-hidden bg-surface-2">
               <img src={selected.image} alt={selected.title} className="size-full object-cover" />

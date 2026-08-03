@@ -12,7 +12,6 @@ import {
   Briefcase,
   Building2,
   CheckCircle2,
-  CircleDashed,
   Clock,
   FileText,
   Filter,
@@ -45,6 +44,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/maskan/Badges";
+import { ListingStatusBadge } from "@/components/maskan/ListingStatusBadge";
 import { formatSAR, cities } from "@/lib/maskan-data"; // cities: { name, listings }[]
 import {
   adminAiChat,
@@ -1249,21 +1249,6 @@ function StatCard({
 
 // ---------- Status helpers ----------
 
-function statusTone(s: ListingStatus) {
-  switch (s) {
-    case "Published":
-      return { tone: "success" as const, icon: <CheckCircle2 className="size-3" /> };
-    case "Pending Approval":
-      return { tone: "warning" as const, icon: <Clock className="size-3" /> };
-    case "Draft":
-      return { tone: "neutral" as const, icon: <CircleDashed className="size-3" /> };
-    case "Suspended":
-      return { tone: "info" as const, icon: <ShieldAlert className="size-3" /> };
-    case "Rejected":
-      return { tone: "neutral" as const, icon: <X className="size-3" /> };
-  }
-}
-
 function RoleBadge({ role }: { role: "admin" | "partner" | "customer" }) {
   const map = {
     admin:    { label: "Admin",    cls: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
@@ -1279,15 +1264,6 @@ function SortIcon({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
     <span className={active ? "text-primary" : "text-muted-foreground/40"}>
       {!active || dir === "asc" ? "↑" : "↓"}
     </span>
-  );
-}
-
-function StatusBadge({ s }: { s: ListingStatus }) {
-  const { tone, icon } = statusTone(s);
-  return (
-    <Badge tone={tone} icon={icon}>
-      {s}
-    </Badge>
   );
 }
 
@@ -1384,7 +1360,7 @@ function ListingRow({
         SAR {formatSAR(l.rent)}
       </td>
       <td className="px-4 py-3">
-        <StatusBadge s={l.status} />
+        <ListingStatusBadge status={l.status} />
       </td>
       <td className="px-4 py-3 text-sm">{l.owner}</td>
       <td className="relative sticky right-0 bg-card px-4 py-3 group-hover:bg-surface-2/40" onClick={e => e.stopPropagation()}>
@@ -1548,7 +1524,7 @@ function ListingDetailDrawer({
 
           {/* Status + quick actions */}
           <div className="flex items-center gap-3 flex-wrap">
-            <StatusBadge s={listing.status} />
+            <ListingStatusBadge status={listing.status} />
             {listing.status !== "Published" && (
               <button type="button" onClick={() => onStatus("Published")} className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
                 <CheckCircle2 className="size-3.5" /> Approve & Publish

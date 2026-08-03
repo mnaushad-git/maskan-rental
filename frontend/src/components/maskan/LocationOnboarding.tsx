@@ -86,7 +86,7 @@ export function LocationOnboarding({
   }
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-foreground/50 backdrop-blur-sm px-4">
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-foreground/50 backdrop-blur-sm px-4">
       <div className="relative w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl sm:p-8">
         <button
           type="button"
