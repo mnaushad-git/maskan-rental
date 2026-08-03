@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput } from "react-native";
+import { View, Text, ScrollView, Pressable, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
-import { Search, ChevronRight, MapPin } from "lucide-react-native";
+import { Search, ChevronRight, MapPin, SearchX } from "lucide-react-native";
 import { fetchAreaIntelligenceList, type ApiAreaIntelligenceSummary } from "@/lib/api/maskan";
 import { useLanguage } from "@/lib/i18n/context";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 function scoreColor(score: number | null): string {
   if (score == null) return "#A8A29E";
@@ -38,9 +40,18 @@ export default function AreasScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center bg-background">
+      <SafeAreaView edges={["bottom"]} className="flex-1 gap-3 bg-background p-4">
         <Stack.Screen options={{ title: t("areas.heading") }} />
-        <ActivityIndicator color="#2563EB" />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <View key={i} className="gap-2.5 rounded-xl border border-border bg-card p-4">
+            <View className="flex-row items-center justify-between">
+              <Skeleton width="40%" height={18} />
+              <Skeleton width={36} height={24} radius={8} />
+            </View>
+            <Skeleton width="90%" height={14} />
+            <Skeleton width="70%" height={14} />
+          </View>
+        ))}
       </SafeAreaView>
     );
   }
@@ -63,7 +74,7 @@ export default function AreasScreen() {
         </View>
 
         {filtered.length === 0 ? (
-          <Text className="mt-4 text-center text-sm text-muted-foreground">{t("areas.table.noMatches")}</Text>
+          <EmptyState icon={<SearchX size={28} color="#79716B" />} title={t("areas.table.noMatches")} />
         ) : (
           filtered.map((a) => (
             <Pressable

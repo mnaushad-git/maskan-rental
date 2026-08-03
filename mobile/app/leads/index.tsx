@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, ActivityIndicator, Pressable, RefreshControl } from "react-native";
+import { View, Text, ScrollView, Pressable, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useFocusEffect } from "expo-router";
 import { ChevronRight, FileText, MapPin } from "lucide-react-native";
@@ -8,6 +8,8 @@ import { formatSAR } from "@/lib/maskan-data";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { ErrorState } from "@/components/ErrorState";
+import { Button } from "@/components/ui/Button";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   pending_review: { bg: "#FEF3C7", fg: "#92400E" },
@@ -55,18 +57,22 @@ export default function MyLeadsScreen() {
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center gap-4 bg-background p-6">
         <Stack.Screen options={{ title: t("nav.myLeads") }} />
         <Text className="text-center text-base text-muted-foreground">{t("myLeads.signInToView")}</Text>
-        <Pressable onPress={() => router.push("/auth/login")} className="rounded-xl bg-primary px-6 py-3">
-          <Text className="text-sm font-semibold text-primary-foreground">{t("myLeads.signIn")}</Text>
-        </Pressable>
+        <Button onPress={() => router.push("/auth/login")}>{t("myLeads.signIn")}</Button>
       </SafeAreaView>
     );
   }
 
   if (loading) {
     return (
-      <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center bg-background">
+      <SafeAreaView edges={["bottom"]} className="flex-1 gap-3 bg-background p-4">
         <Stack.Screen options={{ title: t("nav.myLeads") }} />
-        <ActivityIndicator color="#2563EB" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <View key={i} className="gap-2.5 rounded-xl border border-border bg-card p-4">
+            <Skeleton width="60%" height={16} />
+            <Skeleton width="40%" height={12} />
+            <Skeleton width={90} height={22} radius={11} />
+          </View>
+        ))}
       </SafeAreaView>
     );
   }
@@ -87,9 +93,9 @@ export default function MyLeadsScreen() {
         <FileText size={40} color="#A8A29E" />
         <Text className="text-center text-lg font-semibold text-foreground">{t("myLeads.empty.heading")}</Text>
         <Text className="text-center text-sm text-muted-foreground">{t("myLeads.empty.desc")}</Text>
-        <Pressable onPress={() => router.push("/lead/new")} className="mt-2 rounded-xl bg-primary px-6 py-3">
-          <Text className="text-sm font-semibold text-primary-foreground">{t("myLeads.empty.submitFirstLead")}</Text>
-        </Pressable>
+        <Button className="mt-2" onPress={() => router.push("/lead/new")}>
+          {t("myLeads.empty.submitFirstLead")}
+        </Button>
       </SafeAreaView>
     );
   }

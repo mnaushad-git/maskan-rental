@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
 import { signup } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
+import { Button } from "@/components/ui/Button";
 
 export default function SignupScreen() {
   const { t } = useLanguage();
@@ -67,17 +68,9 @@ export default function SignupScreen() {
 
       {error && <Text className="text-sm" style={{ color: "#DC2626" }}>{error}</Text>}
 
-      <Pressable
-        onPress={handleSubmit}
-        disabled={disabled}
-        className={`items-center rounded-xl bg-primary py-3 ${disabled ? "opacity-60" : ""}`}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text className="text-sm font-semibold text-primary-foreground">{t("auth.createAccountBtn")}</Text>
-        )}
-      </Pressable>
+      <Button onPress={handleSubmit} loading={loading} disabled={!email || password.length < 6} fullWidth>
+        {t("auth.createAccountBtn")}
+      </Button>
 
       <View className="flex-row justify-center gap-1">
         <Text className="text-sm text-muted-foreground">{t("auth.alreadyMember")}</Text>

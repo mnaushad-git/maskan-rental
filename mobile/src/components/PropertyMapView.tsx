@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, Pressable, type ViewStyle } from "react-native";
 import { Image } from "expo-image";
-import MapView, { Marker, type Region } from "react-native-maps";
+import RNMapView, { Marker, type Region } from "react-native-maps";
+// Drop-in MapView replacement that clusters nearby markers into a single
+// numbered pin below a zoom threshold — same react-native-maps under the
+// hood (this wraps it, no native code of its own), just groups Markers when
+// there'd otherwise be an unreadable pile of overlapping price tags.
+import ClusteredMapView from "react-native-map-clustering";
 import { Link } from "expo-router";
 import { BedDouble, Bath, MapPin, ExternalLink, X } from "lucide-react-native";
 import type { SearchProperty } from "@/lib/maskan-search-data";
@@ -78,7 +83,7 @@ export function PropertyMapView({
   onRegionSearch?: (bounds: MapSearchBounds) => void;
 }) {
   const { t } = useLanguage();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<RNMapView>(null);
   const [selected, setSelected] = useState<SearchProperty | null>(null);
   const initialRegion = useMemo(() => regionFor(properties), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -132,11 +137,23 @@ export function PropertyMapView({
       className={chromeless ? "relative overflow-hidden" : "relative overflow-hidden rounded-2xl border border-border"}
       style={style ?? { height: 320 }}
     >
-      <MapView
-        ref={mapRef}
+      <ClusteredMapView
+        // The library's own .d.ts types this callback's argument as
+        // React.Ref<Map> (a ref *wrapper* type), but in practice it invokes
+        // it with the live MapView instance, like any other ref callback —
+        // typed `any` here rather than fighting a type declaration that
+        // doesn't match the library's actual runtime behavior.
+        mapRef={(ref: any) => {
+          mapRef.current = ref;
+        }}
         style={{ flex: 1 }}
         initialRegion={initialRegion}
         onRegionChangeComplete={handleRegionChangeComplete}
+        radius={50}
+        minPoints={3}
+        spiralEnabled={false}
+        clusterColor="#2563EB"
+        clusterTextColor="#FFFFFF"
       >
         {properties.map((p, i) => {
           const [lat, lng] = pinFor(p, i);
@@ -177,7 +194,7 @@ export function PropertyMapView({
             </Marker>
           );
         })}
-      </MapView>
+      </ClusteredMapView>
 
       {!chromeless && (
         <View className="absolute start-3 top-3 flex-row items-center gap-1 rounded-xl border border-border bg-background/95 px-3 py-1.5">

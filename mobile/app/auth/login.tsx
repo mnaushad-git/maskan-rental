@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
 import { login } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
+import { Button } from "@/components/ui/Button";
 
 export default function LoginScreen() {
   const { t } = useLanguage();
@@ -54,13 +55,9 @@ export default function LoginScreen() {
 
       {error && <Text className="text-sm" style={{ color: "#DC2626" }}>{error}</Text>}
 
-      <Pressable
-        onPress={handleSubmit}
-        disabled={loading || !email || !password}
-        className={`items-center rounded-xl bg-primary py-3 ${loading || !email || !password ? "opacity-60" : ""}`}
-      >
-        {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text className="text-sm font-semibold text-primary-foreground">{t("auth.signIn")}</Text>}
-      </Pressable>
+      <Button onPress={handleSubmit} loading={loading} disabled={!email || !password} fullWidth>
+        {t("auth.signIn")}
+      </Button>
 
       <View className="flex-row justify-center gap-1">
         <Text className="text-sm text-muted-foreground">{t("auth.dontHaveAccount")}</Text>
