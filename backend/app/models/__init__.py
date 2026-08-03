@@ -8,6 +8,7 @@ from app.models.area_intelligence import AreaIntelligence
 from app.models.lead import Lead, LeadAssignment, LeadMessage, LeadSuggestion
 from app.models.payment import Payment
 from app.models.review import Review
+from app.models.outbox_event import OutboxEvent
 
 __all__ = [
     "User",
@@ -24,4 +25,5 @@ __all__ = [
     "LeadSuggestion",
     "Payment",
     "Review",
+    "OutboxEvent",
 ]

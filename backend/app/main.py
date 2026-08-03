@@ -11,6 +11,12 @@ from app.api.routes import properties, search, analytics, areas, auth, users, sa
 from app.api.routes import area_intelligence, mediators, leads, payments, reviews
 
 
+def _run_outbox_publisher() -> None:
+    from app.core.jobs import enqueue
+    from app.tasks.outbox import publish_pending_events
+    enqueue(publish_pending_events)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from apscheduler.schedulers.background import BackgroundScheduler
@@ -19,6 +25,11 @@ async def lifespan(app: FastAPI):
     scheduler = BackgroundScheduler(timezone="Asia/Riyadh")
     scheduler.add_job(refresh_all, "cron", hour=0, minute=0)
     scheduler.add_job(expire_stale_assignments, "interval", minutes=30)
+    # Outbox publisher: frequent, cheap poll. enqueue() dispatches it to
+    # Celery's scheduled_jobs queue when a broker is available, or just runs
+    # it inline in this process otherwise — either way pending events get
+    # picked up within ~15s of being written.
+    scheduler.add_job(_run_outbox_publisher, "interval", seconds=15)
     scheduler.start()
     yield
     scheduler.shutdown(wait=False)

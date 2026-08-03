@@ -3,6 +3,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_admin_user, get_current_user, get_db
+from app.core.outbox import EventType, record_event
 from app.models.mediator import Mediator
 from app.models.review import Review
 from app.models.user import User
@@ -83,6 +84,14 @@ def submit_review(
         status="pending",
     )
     db.add(review)
+    db.flush()
+    record_event(
+        db,
+        event_type=EventType.REVIEW_SUBMITTED,
+        aggregate_type="review",
+        aggregate_id=review.id,
+        payload={"review_id": review.id, "mediator_id": review.mediator_id, "rating": review.rating},
+    )
     db.commit()
     db.refresh(review)
     return review
@@ -146,6 +155,14 @@ def moderate_review(
     if not review:
         raise HTTPException(status_code=404, detail="Review not found.")
     review.status = new_status
+    if new_status == "approved":
+        record_event(
+            db,
+            event_type=EventType.REVIEW_APPROVED,
+            aggregate_type="review",
+            aggregate_id=review.id,
+            payload={"review_id": review.id, "mediator_id": review.mediator_id},
+        )
     db.commit()
     db.refresh(review)
     # Ensure mediator is loaded for response

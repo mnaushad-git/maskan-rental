@@ -8,6 +8,7 @@ from app.api.deps import get_admin_user, get_current_user, get_db, get_mediator_
 from app.core.config import settings
 from app.core.idempotency import IdempotencyConflict, IdempotencyStore
 from app.core.jobs import enqueue
+from app.core.outbox import EventType, record_event
 from app.models.lead import Lead, LeadAssignment, LeadMessage
 from app.models.mediator import Mediator, MediatorArea
 from app.models.payment import Payment
@@ -104,6 +105,14 @@ def create_lead(
         status="pending_review",
     )
     db.add(lead)
+    db.flush()  # assigns lead.id, without committing, so the outbox event below is in the SAME transaction
+    record_event(
+        db,
+        event_type=EventType.LEAD_CREATED,
+        aggregate_type="lead",
+        aggregate_id=lead.id,
+        payload={"lead_id": lead.id, "area_name": lead.area_name, "city": lead.city, "source": lead.source},
+    )
     db.commit()
     db.refresh(lead)
     enqueue(generate_lead_suggestions, lead.id)
@@ -591,8 +600,16 @@ def admin_force_close_lead(
     lead = db.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found.")
+    previous_status = lead.status
     lead.status = body.status
     lead.closed_at = datetime.now(timezone.utc)
+    record_event(
+        db,
+        event_type=EventType.LEAD_STATUS_CHANGED,
+        aggregate_type="lead",
+        aggregate_id=lead.id,
+        payload={"lead_id": lead.id, "from_status": previous_status, "to_status": lead.status, "forced_by": "admin"},
+    )
     db.commit()
     db.refresh(lead)
     return lead

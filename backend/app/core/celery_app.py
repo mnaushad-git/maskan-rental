@@ -37,7 +37,7 @@ celery_app = Celery(
     "maskan",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["app.tasks.leads", "app.tasks.area_intelligence"],
+    include=["app.tasks.leads", "app.tasks.area_intelligence", "app.tasks.outbox"],
 )
 
 celery_app.conf.update(
@@ -45,6 +45,7 @@ celery_app.conf.update(
     task_routes={
         "app.tasks.leads.*": {"queue": QUEUE_DEFAULT},
         "app.tasks.area_intelligence.*": {"queue": QUEUE_DATA_INGESTION},
+        "app.tasks.outbox.*": {"queue": QUEUE_SCHEDULED_JOBS},
     },
     # A task that's already running when its worker is killed goes back on
     # the queue instead of being silently lost.

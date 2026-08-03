@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
+from app.core.outbox import EventType, record_event
 from app.models.saved_search import SavedSearch
 from app.models.user import User as UserModel
 from app.schemas.saved_search import SavedSearchCreate, SavedSearchOut, SavedSearchUpdate
@@ -41,6 +42,14 @@ def create_saved_search(
 
     saved_search = SavedSearch(**payload.model_dump())
     db.add(saved_search)
+    db.flush()
+    record_event(
+        db,
+        event_type=EventType.SAVED_SEARCH_CREATED,
+        aggregate_type="saved_search",
+        aggregate_id=saved_search.id,
+        payload={"saved_search_id": saved_search.id, "user_id": saved_search.user_id},
+    )
     db.commit()
     db.refresh(saved_search)
     return saved_search

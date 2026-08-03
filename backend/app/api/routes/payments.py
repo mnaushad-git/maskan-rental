@@ -12,7 +12,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_admin_user, get_db
+from app.core.cache import CacheService
 from app.core.config import settings
+from app.core.outbox import EventType, record_event
 from app.models.mediator import Mediator
 from app.models.payment import Payment
 from app.models.user import User
@@ -97,6 +99,23 @@ def _handle_payment_paid(data: dict, db: Session) -> None:
             mediator.subscription_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
             if card_token:
                 mediator.moyasar_card_token = card_token
+            record_event(
+                db,
+                event_type=EventType.MEDIATOR_SUBSCRIPTION_CHANGED,
+                aggregate_type="mediator",
+                aggregate_id=mediator.id,
+                payload={"mediator_id": mediator.id, "subscription_status": mediator.subscription_status},
+            )
+            CacheService().delete("mediator-public", str(mediator.id))
+
+    if payment:
+        record_event(
+            db,
+            event_type=EventType.PAYMENT_COMPLETED,
+            aggregate_type="payment",
+            aggregate_id=payment.id,
+            payload={"payment_id": payment.id, "gateway_payment_id": gateway_id, "payment_type": payment_type},
+        )
 
     db.commit()
     logger.info(f"Payment paid: {gateway_id}")
