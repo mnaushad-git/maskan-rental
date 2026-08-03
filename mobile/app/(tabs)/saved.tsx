@@ -1,12 +1,16 @@
 import { useCallback, useState } from "react";
-import { View, Text, FlatList, ActivityIndicator, Pressable, RefreshControl } from "react-native";
+import { View, Text, FlatList, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
+import { Heart } from "lucide-react-native";
 import { fetchSavedProperties, mapApiSearchProperty, type ApiSavedProperty } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { PropertyCard } from "@/components/PropertyCard";
 import { ErrorState } from "@/components/ErrorState";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PropertyCardSkeleton } from "@/components/ui/Skeleton";
 import type { Property } from "@/lib/maskan-data";
 
 function toUiProperty(saved: ApiSavedProperty): Property {
@@ -72,8 +76,10 @@ export default function SavedScreen() {
 
   if (authLoading || loading) {
     return (
-      <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator color="#2563EB" />
+      <SafeAreaView edges={["bottom"]} className="flex-1 gap-4 bg-background p-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <PropertyCardSkeleton key={i} />
+        ))}
       </SafeAreaView>
     );
   }
@@ -82,9 +88,7 @@ export default function SavedScreen() {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center gap-4 bg-background p-6">
         <Text className="text-center text-base font-semibold text-foreground">{t("myLeads.signInToView")}</Text>
-        <Pressable onPress={() => router.push("/auth/login")} className="rounded-lg bg-primary px-5 py-2.5">
-          <Text className="text-sm font-semibold text-primary-foreground">{t("myLeads.signIn")}</Text>
-        </Pressable>
+        <Button onPress={() => router.push("/auth/login")}>{t("myLeads.signIn")}</Button>
       </SafeAreaView>
     );
   }
@@ -106,9 +110,13 @@ export default function SavedScreen() {
         renderItem={({ item }) => <PropertyCard p={toUiProperty(item)} />}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#2563EB" />}
         ListEmptyComponent={
-          <View className="items-center py-16">
-            <Text className="text-sm text-muted-foreground">{t("saved.empty.heading")}</Text>
-          </View>
+          <EmptyState
+            icon={<Heart size={32} color="#79716B" />}
+            title={t("saved.empty.heading")}
+            description={t("saved.empty.desc")}
+            actionLabel={t("saved.empty.browseProperties")}
+            onAction={() => router.push("/(tabs)/search")}
+          />
         }
       />
     </SafeAreaView>

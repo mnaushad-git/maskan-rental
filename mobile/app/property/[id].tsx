@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Linking, Dimensions } from "react-native";
+import { View, Text, ScrollView, Pressable, Linking, Dimensions } from "react-native";
 import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
@@ -10,6 +10,9 @@ import type { Property } from "@/lib/maskan-data";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { ErrorState } from "@/components/ErrorState";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const { width } = Dimensions.get("window");
 
@@ -57,8 +60,16 @@ export default function PropertyDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator color="#2563EB" />
+      <SafeAreaView edges={["bottom"]} className="flex-1 gap-4 bg-background p-4">
+        <Skeleton height={260} radius={20} />
+        <Skeleton width="60%" height={24} />
+        <Skeleton width="40%" height={16} />
+        <View className="flex-row gap-2">
+          <Skeleton width={70} height={28} radius={14} />
+          <Skeleton width={70} height={28} radius={14} />
+          <Skeleton width={70} height={28} radius={14} />
+        </View>
+        <Skeleton height={100} radius={16} />
       </SafeAreaView>
     );
   }
@@ -118,15 +129,14 @@ export default function PropertyDetailScreen() {
                 {!isSale && <Text className="text-sm font-medium text-muted-foreground"> {t("propertyCard.perYear")}</Text>}
               </Text>
             </View>
-            <Pressable
+            <IconButton
               onPress={handleSave}
-              accessibilityRole="button"
               accessibilityLabel={t(saved ? "property.actions.saved" : "property.actions.save")}
               accessibilityState={{ selected: saved }}
-              className="size-11 items-center justify-center rounded-full border border-border"
+              className="border border-border"
             >
               <Heart size={18} color={saved ? "#DC2626" : "#2B211A"} fill={saved ? "#DC2626" : "none"} />
-            </Pressable>
+            </IconButton>
           </View>
 
           <View className="flex-row gap-2">
@@ -165,13 +175,9 @@ export default function PropertyDetailScreen() {
             {property.mediatorId ? <ChevronRight size={18} color="#A8A29E" /> : null}
           </Pressable>
 
-          <Pressable
-            onPress={() => router.push("/lead/new")}
-            className="flex-row items-center justify-center gap-2 rounded-xl bg-primary py-3.5"
-          >
-            <FileText size={16} color="#FFFFFF" />
-            <Text className="text-sm font-semibold text-primary-foreground">{t("property.actions.submitLeadRequest")}</Text>
-          </Pressable>
+          <Button onPress={() => router.push("/lead/new")} icon={<FileText size={16} color="#FFFFFF" />} fullWidth>
+            {t("property.actions.submitLeadRequest")}
+          </Button>
         </View>
       </ScrollView>
     </SafeAreaView>
