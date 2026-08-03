@@ -1,11 +1,13 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_admin_user, get_db
 from app.core.cache import CacheService
+from app.core.jobs import enqueue
 from app.models.area_intelligence import AreaIntelligence
 from app.models.user import User
 from app.schemas.area_intelligence import AreaIntelligenceOut, AreaIntelligenceSummary, AreaIntelligenceUpdate
+from app.tasks.area_intelligence import refresh_district
 
 router = APIRouter()
 
@@ -78,7 +80,6 @@ def update_area_intelligence(
 @router.post("/{area_name}/intelligence/refresh")
 def refresh_area_intelligence(
     area_name: str,
-    background_tasks: BackgroundTasks,
     city: str | None = None,
     db: Session = Depends(get_db),
     _admin: User = Depends(get_admin_user),
@@ -93,6 +94,5 @@ def refresh_area_intelligence(
     if row.center_lat is None or row.center_lng is None:
         raise HTTPException(status_code=400, detail="Cannot refresh: district coordinates (center_lat, center_lng) not set. Update them first via PATCH.")
 
-    from app.jobs.refresh_area_intelligence import refresh_single_district
-    background_tasks.add_task(refresh_single_district, row.id)
+    enqueue(refresh_district, row.id)
     return {"status": "refresh_queued", "area_name": row.area_name, "city": row.city}

@@ -277,15 +277,6 @@ def _refresh_district(row: AreaIntelligence, db) -> None:
         db.rollback()
 
 
-def refresh_single_district(area_intelligence_id: int) -> None:
-    """Called from the background task triggered by the API endpoint."""
-    db = SessionLocal()
-    try:
-        row = db.get(AreaIntelligence, area_intelligence_id)
-        if row and row.center_lat is not None:
-            _refresh_district(row, db)
-    finally:
-        db.close()
 
 
 def refresh_all() -> None:

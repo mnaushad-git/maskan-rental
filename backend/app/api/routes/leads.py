@@ -7,11 +7,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_admin_user, get_current_user, get_db, get_mediator_user
 from app.core.config import settings
 from app.core.idempotency import IdempotencyConflict, IdempotencyStore
-from app.models.lead import Lead, LeadAssignment, LeadMessage, LeadSuggestion
+from app.core.jobs import enqueue
+from app.models.lead import Lead, LeadAssignment, LeadMessage
 from app.models.mediator import Mediator, MediatorArea
 from app.models.payment import Payment
-from app.models.property import Property
 from app.models.user import User
+from app.tasks.leads import generate_lead_suggestions
 from app.schemas.lead import (
     LeadAvailableOut,
     LeadCreate,
@@ -61,54 +62,11 @@ def _find_mediator_for_lead(lead: Lead, db: Session, exclude_ids: list[int] | No
     return candidate
 
 
-def _suggest_properties(lead: Lead, db: Session) -> list[LeadSuggestion]:
-    """Find up to 10 matching published properties for a lead."""
-    q = db.query(Property).filter(
-        Property.area.ilike(lead.area_name),
-        Property.status == "Published",
-    )
-    if lead.max_budget is not None:
-        q = q.filter(Property.monthly_rent <= lead.max_budget)
-    if lead.bedrooms_needed is not None:
-        q = q.filter(Property.bedrooms == lead.bedrooms_needed)
-    properties = q.order_by(Property.created_at.desc()).limit(10).all()
-
-    suggestions = []
-    for prop in properties:
-        score = 100.0
-        if lead.max_budget and prop.monthly_rent > lead.max_budget * 0.95:
-            score -= 20
-        if lead.bedrooms_needed and prop.bedrooms != lead.bedrooms_needed:
-            score -= 15
-        reason = f"Published in {prop.area}"
-        if lead.bedrooms_needed and prop.bedrooms == lead.bedrooms_needed:
-            reason += f" · {prop.bedrooms} BR match"
-        suggestions.append(LeadSuggestion(lead_id=lead.id, property_id=prop.id, match_score=max(0.0, score), reason=reason))
-    return suggestions
-
-
-def _generate_suggestions_task(lead_id: int) -> None:
-    """Background task: populate AI-matched property suggestions for a new lead."""
-    from app.db.session import SessionLocal
-    db = SessionLocal()
-    try:
-        lead = db.get(Lead, lead_id)
-        if not lead:
-            return
-        suggestions = _suggest_properties(lead, db)
-        for s in suggestions:
-            db.add(s)
-        db.commit()
-    finally:
-        db.close()
-
-
 # ── Customer: submit a lead ───────────────────────────────────────────────────
 
 @router.post("/", response_model=LeadDetailOut, status_code=201)
 def create_lead(
     body: LeadCreate,
-    background_tasks: BackgroundTasks,
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -148,7 +106,7 @@ def create_lead(
     db.add(lead)
     db.commit()
     db.refresh(lead)
-    background_tasks.add_task(_generate_suggestions_task, lead.id)
+    enqueue(generate_lead_suggestions, lead.id)
 
     if idempotency_key:
         result_body = LeadDetailOut.model_validate(lead, from_attributes=True).model_dump(mode="json")

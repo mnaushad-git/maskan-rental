@@ -28,6 +28,21 @@ class Settings(BaseSettings):
     REDIS_URL: str | None = None
     CACHE_VERSION: str = "v1"
 
+    # ── Background jobs (Celery) ───────────────────────────────────────────────
+    # Defaults to REDIS_URL (same instance, separate logical DB) so a single
+    # REDIS_URL env var is enough to light up cache + jobs together; override
+    # independently only if the broker needs to live elsewhere.
+    CELERY_BROKER_URL: str | None = None
+    CELERY_RESULT_BACKEND: str | None = None
+
+    @property
+    def celery_broker_url(self) -> str:
+        return self.CELERY_BROKER_URL or self.REDIS_URL or "redis://localhost:6379/1"
+
+    @property
+    def celery_result_backend(self) -> str:
+        return self.CELERY_RESULT_BACKEND or self.REDIS_URL or "redis://localhost:6379/1"
+
     @property
     def admin_emails(self) -> list[str]:
         return [e.strip() for e in self.ADMIN_EMAILS.split(",") if e.strip()]
