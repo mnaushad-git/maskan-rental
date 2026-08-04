@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, Pressable, RefreshControl } from "react-native";
+import { View, Text, FlatList, Pressable, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useFocusEffect } from "expo-router";
 import { ChevronRight, FileText, MapPin } from "lucide-react-native";
@@ -103,7 +103,9 @@ export default function MyLeadsScreen() {
   return (
     <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
       <Stack.Screen options={{ title: t("nav.myLeads") }} />
-      <ScrollView
+      <FlatList
+        data={leads}
+        keyExtractor={(lead) => String(lead.id)}
         contentContainerClassName="gap-3 p-4"
         refreshControl={
           <RefreshControl
@@ -115,12 +117,10 @@ export default function MyLeadsScreen() {
             tintColor="#2563EB"
           />
         }
-      >
-        {leads.map((lead) => {
+        renderItem={({ item: lead }) => {
           const color = STATUS_COLORS[lead.status] ?? STATUS_COLORS.closed_lost;
           return (
             <Pressable
-              key={lead.id}
               onPress={() => router.push(`/lead/${lead.id}`)}
               className="flex-row items-center gap-3 rounded-xl border border-border bg-card p-4"
             >
@@ -148,8 +148,8 @@ export default function MyLeadsScreen() {
               <ChevronRight size={18} color="#A8A29E" />
             </Pressable>
           );
-        })}
-      </ScrollView>
+        }}
+      />
     </SafeAreaView>
   );
 }
