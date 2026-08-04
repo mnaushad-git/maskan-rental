@@ -310,7 +310,14 @@ function AdminPage() {
     setDetailOpen(true);
   }
   async function bulkSetStatus(status: ListingStatus) {
-    await Promise.all([...selected].map((id) => setStatus(id, status)));
+    const ids = [...selected].map(Number).filter(Number.isFinite);
+    try {
+      await Promise.all(ids.map((id) => patchProperty(id, { status })));
+      const fresh = await fetchAdminProperties();
+      setListings(fresh.map(toListing));
+    } catch (err) {
+      alert(`Failed to update status: ${err instanceof Error ? err.message : String(err)}`);
+    }
     setSelected(new Set());
   }
 
@@ -1346,6 +1353,7 @@ function ListingRow({
           <img
             src={l.image}
             alt=""
+            loading="lazy"
             className="size-8 shrink-0 rounded-md object-cover"
           />
           <div className="min-w-0">

@@ -133,9 +133,12 @@ function ComparePage() {
       .catch(() => {});
   }, []);
 
-  const selected = selectedIds
-    .map((id) => allProperties.find((p) => p.id === id))
-    .filter((p): p is Property => Boolean(p));
+  const selected = useMemo(
+    () => selectedIds
+      .map((id) => allProperties.find((p) => p.id === id))
+      .filter((p): p is Property => Boolean(p)),
+    [selectedIds, allProperties],
+  );
 
   // Fetch area intel for any newly-selected property districts
   useEffect(() => {
@@ -146,9 +149,12 @@ function ComparePage() {
           .catch(() => setAreaIntelMap((prev) => ({ ...prev, [p.district]: null })));
       }
     });
-  }, [selectedIds, allProperties]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const candidates = allProperties.filter((p) => !selectedIds.includes(p.id));
+  const candidates = useMemo(
+    () => allProperties.filter((p) => !selectedIds.includes(p.id)),
+    [allProperties, selectedIds],
+  );
 
   const composite = useMemo(() => {
     return selected.map((p) => {
