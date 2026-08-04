@@ -7,6 +7,7 @@ import {
   Building2,
   Compass,
   GraduationCap,
+  Heart,
   Hospital,
   Info,
   Map as MapIcon,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/maskan/Badges";
 import { ScoreBar } from "@/components/maskan/ScoreIndicator";
 import { StatCard } from "@/components/maskan/Widgets";
@@ -576,8 +578,36 @@ function AreasPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface">
-        <div className="text-sm text-muted-foreground">{tAreas("loading")}</div>
+      <div className="min-h-screen bg-surface">
+        <TopNav />
+        <main className="space-y-6 px-6 py-8">
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-56" />
+            <Skeleton className="h-4 w-80" />
+          </div>
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-2 rounded-2xl border border-border bg-card p-4">
+                <Skeleton className="h-3.5 w-24" />
+                <Skeleton className="h-6 w-16" />
+              </div>
+            ))}
+          </section>
+          <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+            <div className="divide-y divide-border">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3">
+                  <Skeleton className="size-9 shrink-0 rounded-lg" />
+                  <div className="w-full space-y-1.5">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3.5 w-28" />
+                  </div>
+                  <Skeleton className="h-4 w-10 shrink-0" />
+                </div>
+              ))}
+            </div>
+          </section>
+        </main>
       </div>
     );
   }

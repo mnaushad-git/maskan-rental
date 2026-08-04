@@ -3,6 +3,7 @@ import { TopNav } from "@/components/maskan/TopNav";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle, Clock, Home, MessageSquare, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/maskan/Badges";
 import { NotificationBell } from "@/components/maskan/NotificationBell";
 import { useAuth } from "@/lib/auth-context";
@@ -104,7 +105,23 @@ function CustomerLeadPage() {
     return (
       <div className="min-h-screen bg-surface">
         <TopNav />
-        <div className="flex min-h-[60vh] items-center justify-center"><p className="text-sm text-muted-foreground">{t("leadDetail.loading")}</p></div>
+        <main className="mx-auto max-w-4xl px-6 py-8">
+          <Skeleton className="mb-6 h-20 w-full rounded-2xl" />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+            <div className="space-y-4 lg:col-span-2">
+              <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-card">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3.5 w-full" />
+                <Skeleton className="h-3.5 w-4/5" />
+                <Skeleton className="h-3.5 w-3/5" />
+              </div>
+              <Skeleton className="h-24 w-full rounded-2xl" />
+            </div>
+            <div className="lg:col-span-3">
+              <Skeleton className="h-96 w-full rounded-2xl" />
+            </div>
+          </div>
+        </main>
       </div>
     );
   }

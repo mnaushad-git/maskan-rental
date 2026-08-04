@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { PropertyCard } from "@/components/maskan/PropertyCard";
 import { Badge } from "@/components/maskan/Badges";
+import { EmptyState } from "@/components/maskan/EmptyState";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import {
@@ -373,10 +375,26 @@ function AgentProfilePage() {
     return (
       <div className="min-h-screen bg-background">
         {NAV}
-        <div className="flex h-[60vh] items-center justify-center">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <div className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            {t("agent.loadingProfile")}
+        <div className="container-page pb-20 pt-5">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[300px_1fr]">
+            <aside className="space-y-5">
+              <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+                <Skeleton className="h-20 w-full rounded-none" />
+                <div className="-mt-10 space-y-3 px-6 pb-6">
+                  <Skeleton className="size-20 rounded-2xl border-4 border-card" />
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-3.5 w-24" />
+                </div>
+              </div>
+            </aside>
+            <div className="space-y-4">
+              <Skeleton className="h-6 w-40" />
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-[4/3] w-full rounded-2xl" />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -541,18 +559,20 @@ function AgentProfilePage() {
             </div>
 
             {listings.length === 0 ? (
-              <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border py-16 text-center">
-                <Home className="size-12 text-muted-foreground/30" />
-                <div className="text-base font-semibold text-muted-foreground">{t("agent.noActiveListings")}</div>
-                <a
-                  href={waUrl(partner.phone)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-white"
-                >
-                  <MessageCircle className="size-4" /> {t("agent.askOnWhatsapp")}
-                </a>
-              </div>
+              <EmptyState
+                icon={Home}
+                title={t("agent.noActiveListings")}
+                action={
+                  <a
+                    href={waUrl(partner.phone)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    <MessageCircle className="size-4" /> {t("agent.askOnWhatsapp")}
+                  </a>
+                }
+              />
             ) : (
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 {listings.map((p) => <PropertyCard key={p.id} p={p} />)}

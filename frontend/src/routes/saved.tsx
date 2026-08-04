@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/maskan/Badges";
 import {
   deleteSavedProperty,
@@ -261,38 +262,54 @@ function SavedPage() {
           </div>
         </header>
 
-        {loading && <p className="mb-4 text-sm text-muted-foreground">{t("saved.loading")}</p>}
         {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
+        {loading && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+                <Skeleton className="aspect-[16/9] w-full rounded-none" />
+                <div className="space-y-3 px-5 py-5">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-3.5 w-1/3" />
+                  <Skeleton className="h-14 w-full rounded-xl" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Filter chips */}
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          <FilterChip
-            active={filter === "all"}
-            onClick={() => setFilter("all")}
-            label={t("saved.filters.all", { count: counts.all })}
-          />
-          <FilterChip
-            active={filter === "sent"}
-            onClick={() => setFilter("sent")}
-            label={t("saved.filters.sent", { count: counts.sent })}
-            tone="info"
-          />
-          <FilterChip
-            active={filter === "contacted"}
-            onClick={() => setFilter("contacted")}
-            label={t("saved.filters.contacted", { count: counts.contacted })}
-            tone="warning"
-          />
-          <FilterChip
-            active={filter === "scheduled"}
-            onClick={() => setFilter("scheduled")}
-            label={t("saved.filters.scheduled", { count: counts.scheduled })}
-            tone="success"
-          />
-        </div>
+        {!loading && (
+          <div className="mb-6 flex flex-wrap items-center gap-2">
+            <FilterChip
+              active={filter === "all"}
+              onClick={() => setFilter("all")}
+              label={t("saved.filters.all", { count: counts.all })}
+            />
+            <FilterChip
+              active={filter === "sent"}
+              onClick={() => setFilter("sent")}
+              label={t("saved.filters.sent", { count: counts.sent })}
+              tone="info"
+            />
+            <FilterChip
+              active={filter === "contacted"}
+              onClick={() => setFilter("contacted")}
+              label={t("saved.filters.contacted", { count: counts.contacted })}
+              tone="warning"
+            />
+            <FilterChip
+              active={filter === "scheduled"}
+              onClick={() => setFilter("scheduled")}
+              label={t("saved.filters.scheduled", { count: counts.scheduled })}
+              tone="success"
+            />
+          </div>
+        )}
 
         {/* Grid */}
-        {filtered.length === 0 ? (
+        {!loading && (filtered.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -310,7 +327,7 @@ function SavedPage() {
               />
             ))}
           </div>
-        )}
+        ))}
       </main>
     </div>
   );

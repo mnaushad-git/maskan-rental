@@ -3,7 +3,9 @@ import { TopNav } from "@/components/maskan/TopNav";
 import { useEffect, useState } from "react";
 import { ArrowLeft, ClipboardList, MapPin, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/maskan/Badges";
+import { EmptyState } from "@/components/maskan/EmptyState";
 import { NotificationBell } from "@/components/maskan/NotificationBell";
 import { useAuth } from "@/lib/auth-context";
 import { fetchMyLeads, type ApiLeadSummary } from "@/lib/api/maskan";
@@ -68,24 +70,32 @@ function MyLeadsPage() {
 
       <main className="mx-auto max-w-3xl px-6 py-8">
         {loading && (
-          <p className="text-sm text-muted-foreground">{t("myLeads.loadingLeads")}</p>
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="space-y-2.5 rounded-2xl border border-border bg-card p-5 shadow-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="w-full space-y-1.5">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3.5 w-56" />
+                  </div>
+                  <Skeleton className="h-3.5 w-20 shrink-0" />
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
         {!loading && leads.length === 0 && (
-          <div className="flex flex-col items-center gap-5 py-20 text-center">
-            <div className="grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary">
-              <ClipboardList className="size-7" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold">{t("myLeads.empty.heading")}</h2>
-              <p className="mt-1 text-sm text-muted-foreground max-w-sm">
-                {t("myLeads.empty.desc")}
-              </p>
-            </div>
-            <Link to="/lead/new" search={{ area: "", city: "Riyadh" }}>
-              <Button>{t("myLeads.empty.submitFirstLead")}</Button>
-            </Link>
-          </div>
+          <EmptyState
+            icon={ClipboardList}
+            title={t("myLeads.empty.heading")}
+            description={t("myLeads.empty.desc")}
+            action={
+              <Link to="/lead/new" search={{ area: "", city: "Riyadh" }}>
+                <Button>{t("myLeads.empty.submitFirstLead")}</Button>
+              </Link>
+            }
+          />
         )}
 
         {!loading && leads.length > 0 && (
