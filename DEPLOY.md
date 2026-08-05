@@ -346,6 +346,74 @@ Both commands are safe to run again if needed — they update existing records r
 
 ---
 
+## Step 9c — Notification Platform database migration
+
+The Notification Platform upgrade (real push delivery, generic lead
+notifications, per-user digest scheduling, delivery tracking, admin
+notification ops) ships as two Alembic migrations that must be applied like
+any other schema change:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production exec backend python -m alembic upgrade head
+```
+
+This is safe to run even if you're not enabling push yet — every new
+feature is gated behind a feature flag (`FEATURE_PUSH_NOTIFICATIONS=false`
+by default, see `.env.production.example`) and the existing saved-search
+alerts / Notification Center keep working exactly as before, unaffected.
+
+**Rollback**: `docker compose ... exec backend python -m alembic downgrade a1f9c3d7e024` reverses the notification-platform migration (`b2e0d5f1a933`) and drops its new tables/columns — safe as long as you haven't relied on push delivery or per-user digest scheduling data you want to keep. The saved-search-alerts schema underneath it is untouched.
+
+### Enabling real push notifications later (optional)
+
+Push delivery uses **Expo Push Notifications** (not Firebase/APNs directly —
+Expo's push service relays to both under the hood). To turn it on:
+
+1. In `mobile/`, run `eas init` (requires a free Expo/EAS account) to get a
+   real EAS project id, and add it to `mobile/app.json`'s `extra.eas.projectId`.
+2. Run `eas build` for Android/iOS at least once — this is also what
+   provisions the FCM/APNs credentials on Expo's side (uploaded to Expo's
+   credential service via the EAS CLI, not stored in this repo).
+3. Set `FEATURE_PUSH_NOTIFICATIONS=true` in `.env.production` and restart
+   the backend (`docker compose -f docker-compose.prod.yml --env-file .env.production restart backend celery-worker`).
+4. Optionally set `EXPO_ACCESS_TOKEN` (from an Expo access token, not
+   required to send at all, only raises the rate limit).
+5. Verify: sign in on a real device build, check `/admin` → Notification
+   Operations → Device Health shows the device, then use the notification
+   settings screen's "Send test notification" button.
+
+No code changes are needed for any of this — it's entirely credential/config, matching the existing `PushNotificationProvider` abstraction that was already in place before this upgrade.
+
+---
+
+## Step 9d — Property Request + AI Property Agent database migration
+
+The Property Request platform (structured/AI-assisted request creation,
+deterministic matching engine, mediator response marketplace, AI Property
+Agent, admin operations) ships as one Alembic migration adding 8 new tables
+(`property_requests` and its revisions/clarifications/activities/matches/
+mediator-responses/scoring-config tables) — no existing table is altered:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production exec backend python -m alembic upgrade head
+```
+
+No new required environment variables — the feature reuses the existing
+`ANTHROPIC_API_KEY` (AI extraction and the AI Property Agent are both
+no-ops with a clear 503 if it's unset, exactly like the existing AI
+Advisor) and the existing Celery `notifications` queue/worker. All nine new
+feature flags (`property_requests`, `ai_property_request_creation`,
+`ai_property_agent`, `mediator_request_marketplace`,
+`property_request_notifications`, `property_request_area_suggestions`,
+`property_request_commute_matching`, `property_request_ai_explanations`,
+`property_request_admin_dashboard`) default to **enabled** in
+`app/core/config.py` — set the corresponding `FEATURE_*` env var to `false`
+in `.env.production` to disable any part of it without a redeploy.
+
+**Rollback**: `docker compose ... exec backend python -m alembic downgrade b2e0d5f1a933` drops all 8 new tables and their data. Since nothing else in the platform references these tables (existing saved searches, leads, and notifications are untouched), this is always safe — you only lose Property Request data itself. For a softer rollback that keeps the data, just set `FEATURE_PROPERTY_REQUESTS=false` and restart the backend/worker instead of migrating down; every route/task checks the flag and returns 503 / no-ops without touching the schema.
+
+---
+
 ## Step 10 — Go live check (10 minutes)
 
 1. Open your browser and go to `https://yourdomain.com`
