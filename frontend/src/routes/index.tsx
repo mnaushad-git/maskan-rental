@@ -107,13 +107,15 @@ function Index() {
         filters={filters}
         listingsCount={rawProperties.length}
         onSearch={(f) => setFilters(f)}
-        onListingTypeChange={(v) => setFilters((f) => ({
-          ...f,
-          listingType: v,
-          type: "Any",
-          minRent: 0,
-          maxRent: v === "sale" ? 30_000_000 : 500_000,
-        }))}
+        onListingTypeChange={(v) =>
+          setFilters((f) => ({
+            ...f,
+            listingType: v,
+            type: "Any",
+            minRent: 0,
+            maxRent: v === "sale" ? 30_000_000 : 500_000,
+          }))
+        }
         onChangeLocation={() => setShowOnboarding(true)}
       />
       <HomeMapSection properties={mapProperties} loading={loading} filters={filters} />
@@ -171,7 +173,9 @@ function HomeSearchSection({
           <span className="inline-flex items-center gap-1.5">
             <Home className="size-4 text-primary" />
             {t(
-              listingsCount === 1 ? "home.stats.verifiedListingsSingular" : "home.stats.verifiedListingsPlural",
+              listingsCount === 1
+                ? "home.stats.verifiedListingsSingular"
+                : "home.stats.verifiedListingsPlural",
               { count: listingsCount },
             )}
           </span>
@@ -204,7 +208,9 @@ function HomeMapSection({
     ...(filters.district !== "Any" ? { district: filters.district } : {}),
     ...(filters.type !== "Any" ? { type: filters.type } : {}),
     ...(filters.minRent > 0 ? { minRent: filters.minRent } : {}),
-    ...(filters.maxRent < (filters.listingType === "sale" ? 30_000_000 : 500_000) ? { maxRent: filters.maxRent } : {}),
+    ...(filters.maxRent < (filters.listingType === "sale" ? 30_000_000 : 500_000)
+      ? { maxRent: filters.maxRent }
+      : {}),
   } as never;
 
   return (
@@ -277,11 +283,12 @@ function avatarInitials(p: ApiPartnerPublic) {
     .join("");
 }
 
-type FeatureTabKey = "partner" | "advisor" | "estimate";
+type FeatureTabKey = "partner" | "advisor" | "propertyRequest" | "estimate";
 
 const FEATURE_ACCENT: Record<FeatureTabKey, { bg: string; text: string }> = {
   partner: { bg: "bg-secondary/10", text: "text-secondary" },
   advisor: { bg: "bg-ai-soft", text: "text-ai" },
+  propertyRequest: { bg: "bg-ai-soft", text: "text-ai" },
   estimate: { bg: "bg-primary-soft", text: "text-primary" },
 };
 
@@ -317,6 +324,15 @@ function FeaturesGrid({ partners }: { partners: ApiPartnerPublic[] }) {
       to: "/advisor",
     },
     {
+      key: "propertyRequest",
+      icon: Sparkles,
+      label: t("home.truPropertyRequest.badge"),
+      newLabel: t("home.truPropertyRequest.new"),
+      title: t("home.truPropertyRequest.title"),
+      body: t("home.truPropertyRequest.body"),
+      to: "/property-requests/new",
+    },
+    {
       key: "estimate",
       icon: Calculator,
       label: t("home.truEstimate.badge"),
@@ -346,7 +362,9 @@ function FeaturesGrid({ partners }: { partners: ApiPartnerPublic[] }) {
               onClick={() => setActive(tab.key)}
               className={cn(
                 "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-xs font-semibold transition-colors sm:text-sm",
-                isActive ? `${tabAccent.bg} ${tabAccent.text}` : "text-muted-foreground hover:bg-surface-2",
+                isActive
+                  ? `${tabAccent.bg} ${tabAccent.text}`
+                  : "text-muted-foreground hover:bg-surface-2",
               )}
             >
               <tab.icon className="size-4 shrink-0" />
@@ -369,7 +387,9 @@ function FeaturesGrid({ partners }: { partners: ApiPartnerPublic[] }) {
               <Badge tone="info">{activeTab.newLabel}</Badge>
             </div>
           )}
-          <h3 className="font-display text-lg font-bold tracking-tight text-foreground">{activeTab.title}</h3>
+          <h3 className="font-display text-lg font-bold tracking-tight text-foreground">
+            {activeTab.title}
+          </h3>
           <p className="mt-2 text-sm text-muted-foreground">{activeTab.body}</p>
         </div>
         <div className="mt-5 flex items-center justify-between">
@@ -394,11 +414,15 @@ function FeaturesGrid({ partners }: { partners: ApiPartnerPublic[] }) {
               )}
             </div>
           ) : active === "estimate" ? (
-            <span className={cn("text-sm font-semibold", accent.text)}>{t("home.truEstimate.getStarted")}</span>
+            <span className={cn("text-sm font-semibold", accent.text)}>
+              {t("home.truEstimate.getStarted")}
+            </span>
           ) : (
             <span />
           )}
-          <ChevronRight className={cn("size-5 transition-transform group-hover:translate-x-1", accent.text)} />
+          <ChevronRight
+            className={cn("size-5 transition-transform group-hover:translate-x-1", accent.text)}
+          />
         </div>
       </Link>
     </section>

@@ -11,7 +11,9 @@ import { currentScope, readStoredToken, clearStoredAuth } from "@/lib/auth-stora
 // to avoid routing out to the public internet and back on every server-rendered request.
 const API_BASE_URL =
   typeof window === "undefined"
-    ? (process.env.INTERNAL_API_URL ?? import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api")
+    ? (process.env.INTERNAL_API_URL ??
+      import.meta.env.VITE_API_BASE_URL ??
+      "http://localhost:8000/api")
     : (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api");
 const PROPERTY_IMAGES = [prop1, prop2, prop3, prop4] as const;
 
@@ -70,7 +72,14 @@ export type AuthResponse = {
 export type AnalyticsSummary = {
   total_properties: number;
   total_users: number;
-  kpis: Array<{ label: string; value: string; delta: string; sub: string; trend: "up" | "down"; accent: string }>;
+  kpis: Array<{
+    label: string;
+    value: string;
+    delta: string;
+    sub: string;
+    trend: "up" | "down";
+    accent: string;
+  }>;
   searchDemand: Array<{ day: string; riyadh: number; jeddah: number; dammam: number }>;
   popularAreas: Array<{ name: string; city: string; searches: number; share: number }>;
   funnel: Array<{ stage: string; value: number; color: string }>;
@@ -119,14 +128,36 @@ export function computePropertyScore(
   let priceScore = 72;
   if (avgMonthly && avgMonthly > 0) {
     const ratio = monthlyRent / avgMonthly;
-    priceScore = ratio <= 0.80 ? 97 : ratio <= 0.90 ? 90 : ratio <= 1.00 ? 82 : ratio <= 1.10 ? 70 : ratio <= 1.20 ? 58 : 46;
+    priceScore =
+      ratio <= 0.8
+        ? 97
+        : ratio <= 0.9
+          ? 90
+          : ratio <= 1.0
+            ? 82
+            : ratio <= 1.1
+              ? 70
+              : ratio <= 1.2
+                ? 58
+                : 46;
   }
   // Area quality (35%): district score from Maskan platform intelligence
-  const districtScore = (areaScore != null && areaScore > 0) ? areaScore : 70;
+  const districtScore = areaScore != null && areaScore > 0 ? areaScore : 70;
   // Size adequacy (20%): bedroom count proxy
-  const sizeScore = bedrooms <= 0 ? 58 : bedrooms === 1 ? 65 : bedrooms === 2 ? 72 : bedrooms === 3 ? 80 : bedrooms === 4 ? 87 : 92;
+  const sizeScore =
+    bedrooms <= 0
+      ? 58
+      : bedrooms === 1
+        ? 65
+        : bedrooms === 2
+          ? 72
+          : bedrooms === 3
+            ? 80
+            : bedrooms === 4
+              ? 87
+              : 92;
   // Listing completeness (10%): fixed 80 — all DB listings have owner + description
-  const total = 0.35 * priceScore + 0.35 * districtScore + 0.20 * sizeScore + 0.10 * 80;
+  const total = 0.35 * priceScore + 0.35 * districtScore + 0.2 * sizeScore + 0.1 * 80;
   return Math.round(Math.max(55, Math.min(97, total)));
 }
 
@@ -149,7 +180,7 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
   const matchScore = isSale
     ? computePropertyScore(0, property.bedrooms ?? 0)
     : computePropertyScore(property.monthly_rent ?? 0, property.bedrooms ?? 0);
-  const imageUrls = (property.images ?? []).map(i => i.url);
+  const imageUrls = (property.images ?? []).map((i) => i.url);
   const primaryImage = imageUrls[0] ?? property.image_url ?? imageForProperty(property.id);
 
   return {
@@ -167,7 +198,12 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     images: imageUrls.length > 0 ? imageUrls : [primaryImage],
     matchScore,
     badges: ["Verified", matchScore >= 90 ? "Best Match" : "New"],
-    status: property.status === "Published" ? "Available" : property.status === "Suspended" ? "Reserved" : "Available",
+    status:
+      property.status === "Published"
+        ? "Available"
+        : property.status === "Suspended"
+          ? "Reserved"
+          : "Available",
     pricePerSqm: estimatedArea > 0 ? Math.round(displayPrice / estimatedArea) : 0,
     agent: property.mediator_agent_name ?? property.owner_name ?? "Maskan Agent",
     agentPhone: property.mediator_phone ?? null,
@@ -231,10 +267,17 @@ export function enrichPropertiesWithScores(
     let rentalScore = p.rentalScore;
     if (avgMonthly) {
       const ratio = monthlyRent / avgMonthly;
-      rentalScore = ratio < 0.85 ? 97 : ratio < 0.95 ? 88 : ratio < 1.05 ? 82 : ratio < 1.15 ? 68 : 52;
+      rentalScore =
+        ratio < 0.85 ? 97 : ratio < 0.95 ? 88 : ratio < 1.05 ? 82 : ratio < 1.15 ? 68 : 52;
     }
 
-    return { ...p, matchScore, areaScore, rentalScore, badges: ["Verified", matchScore >= 88 ? "Best Match" : "New"] };
+    return {
+      ...p,
+      matchScore,
+      areaScore,
+      rentalScore,
+      badges: ["Verified", matchScore >= 88 ? "Best Match" : "New"],
+    };
   });
 }
 
@@ -254,14 +297,18 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     let detail = `Request failed (${response.status})`;
     try {
-      const body = await response.json() as { detail?: string | Array<{ msg: string; loc?: string[] }> };
+      const body = (await response.json()) as {
+        detail?: string | Array<{ msg: string; loc?: string[] }>;
+      };
       if (typeof body.detail === "string") {
         detail = body.detail;
       } else if (Array.isArray(body.detail) && body.detail.length > 0) {
         // Pydantic 422 validation errors — extract the first human-readable message
         detail = body.detail[0].msg.replace(/^Value error,\s*/i, "");
       }
-    } catch { /* ignore parse errors */ }
+    } catch {
+      /* ignore parse errors */
+    }
     if (response.status === 401) {
       if (typeof window !== "undefined") {
         clearStoredAuth(currentScope());
@@ -303,6 +350,7 @@ export async function fetchPropertiesPaged(
   filters: PropertySearchFilters,
   skip: number,
   limit: number,
+  signal?: AbortSignal,
 ): Promise<{ data: ApiProperty[]; total: number }> {
   const params = new URLSearchParams();
   params.set("skip", String(skip));
@@ -314,8 +362,10 @@ export async function fetchPropertiesPaged(
   if (filters.furnished) params.set("furnished", filters.furnished);
   if (filters.minBedrooms != null) params.set("min_bedrooms", String(filters.minBedrooms));
   if (filters.minBathrooms != null) params.set("min_bathrooms", String(filters.minBathrooms));
-  if (filters.minMonthlyRent != null) params.set("min_monthly_rent", String(filters.minMonthlyRent));
-  if (filters.maxMonthlyRent != null) params.set("max_monthly_rent", String(filters.maxMonthlyRent));
+  if (filters.minMonthlyRent != null)
+    params.set("min_monthly_rent", String(filters.minMonthlyRent));
+  if (filters.maxMonthlyRent != null)
+    params.set("max_monthly_rent", String(filters.maxMonthlyRent));
   if (filters.minSalePrice != null) params.set("min_sale_price", String(filters.minSalePrice));
   if (filters.maxSalePrice != null) params.set("max_sale_price", String(filters.maxSalePrice));
 
@@ -325,11 +375,12 @@ export async function fetchPropertiesPaged(
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
+    signal,
   });
   if (!response.ok) {
     throw new Error(`Request failed (${response.status})`);
   }
-  const data = await response.json() as ApiProperty[];
+  const data = (await response.json()) as ApiProperty[];
   const total = Number(response.headers.get("X-Total-Count") ?? data.length);
   return { data, total };
 }
@@ -355,11 +406,20 @@ export function createProperty(payload: {
   description: string;
   external_id: string;
 }) {
-  return requestJson<ApiProperty>("/properties/", { method: "POST", body: JSON.stringify(payload) });
+  return requestJson<ApiProperty>("/properties/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
-export function patchProperty(id: number, payload: Partial<Omit<ApiProperty, "id" | "created_at">>) {
-  return requestJson<ApiProperty>(`/properties/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+export function patchProperty(
+  id: number,
+  payload: Partial<Omit<ApiProperty, "id" | "created_at">>,
+) {
+  return requestJson<ApiProperty>(`/properties/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function removeProperty(id: number) {
@@ -367,7 +427,10 @@ export function removeProperty(id: number) {
 }
 
 export function addPropertyImage(propertyId: number, url: string) {
-  return requestJson<ApiListingImage>(`/properties/${propertyId}/images`, { method: "POST", body: JSON.stringify({ url }) });
+  return requestJson<ApiListingImage>(`/properties/${propertyId}/images`, {
+    method: "POST",
+    body: JSON.stringify({ url }),
+  });
 }
 
 export function deletePropertyImage(propertyId: number, imageId: number) {
@@ -375,11 +438,16 @@ export function deletePropertyImage(propertyId: number, imageId: number) {
 }
 
 export function addPartnerPropertyImage(propertyId: number, url: string) {
-  return requestJson<ApiListingImage>(`/properties/partner/${propertyId}/images`, { method: "POST", body: JSON.stringify({ url }) });
+  return requestJson<ApiListingImage>(`/properties/partner/${propertyId}/images`, {
+    method: "POST",
+    body: JSON.stringify({ url }),
+  });
 }
 
 export function deletePartnerPropertyImage(propertyId: number, imageId: number) {
-  return requestJson<void>(`/properties/partner/${propertyId}/images/${imageId}`, { method: "DELETE" });
+  return requestJson<void>(`/properties/partner/${propertyId}/images/${imageId}`, {
+    method: "DELETE",
+  });
 }
 
 export type PartnerPropertyPayload = {
@@ -401,11 +469,17 @@ export function fetchPartnerListings() {
 }
 
 export function createPartnerListing(payload: PartnerPropertyPayload) {
-  return requestJson<ApiProperty>("/properties/partner/", { method: "POST", body: JSON.stringify(payload) });
+  return requestJson<ApiProperty>("/properties/partner/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function patchPartnerListing(id: number, payload: Partial<PartnerPropertyPayload>) {
-  return requestJson<ApiProperty>(`/properties/partner/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  return requestJson<ApiProperty>(`/properties/partner/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function saveProperty(userId: number, propertyId: number) {
@@ -438,11 +512,17 @@ export function fetchAnalyticsSummary() {
 }
 
 export function signup(payload: { email: string; password: string; full_name?: string }) {
-  return requestJson<AuthResponse>("/auth/signup", { method: "POST", body: JSON.stringify(payload) });
+  return requestJson<AuthResponse>("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function login(payload: { email: string; password: string }) {
-  return requestJson<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify(payload) });
+  return requestJson<AuthResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function fetchMe(token: string) {
@@ -474,10 +554,10 @@ export type BulkImportRow = {
 };
 
 export function bulkImportProperties(rows: BulkImportRow[]) {
-  return requestJson<{ inserted: number; skipped: number; total: number }>(
-    "/properties/bulk",
-    { method: "POST", body: JSON.stringify(rows) },
-  );
+  return requestJson<{ inserted: number; skipped: number; total: number }>("/properties/bulk", {
+    method: "POST",
+    body: JSON.stringify(rows),
+  });
 }
 
 export function fetchPropertyStats() {
@@ -537,10 +617,7 @@ export async function chatWithAdvisorStream(
   }
 }
 
-export function adminAiChat(
-  message: string,
-  history: Array<{ role: string; content: string }>,
-) {
+export function adminAiChat(message: string, history: Array<{ role: string; content: string }>) {
   return requestJson<{ reply: string }>("/ai/admin-chat", {
     method: "POST",
     body: JSON.stringify({ message, history }),
@@ -552,7 +629,11 @@ export function adminAiChat(
 export type ApiSchool = { name: string; type: string; rating: number; distance_km: number };
 export type ApiHospital = { name: string; tier: string; rating: number; distance_km: number };
 export type ApiLifestylePlace = { name: string; rating?: number; distance_km: number };
-export type ApiLifestyleCategory = { count: number; avg_rating: number | null; places?: ApiLifestylePlace[] };
+export type ApiLifestyleCategory = {
+  count: number;
+  avg_rating: number | null;
+  places?: ApiLifestylePlace[];
+};
 export type ApiLifestyle = {
   // All categories are optional — area records may omit any of them (e.g. mosques
   // is not always present), so consumers must guard with optional chaining.
@@ -607,12 +688,20 @@ export function fetchAreaIntelligenceList() {
 
 export function fetchAreaIntelligence(areaName: string, city?: string) {
   const q = city ? `?city=${encodeURIComponent(city)}` : "";
-  return requestJson<ApiAreaIntelligence>(`/areas/${encodeURIComponent(areaName)}/intelligence${q}`);
+  return requestJson<ApiAreaIntelligence>(
+    `/areas/${encodeURIComponent(areaName)}/intelligence${q}`,
+  );
 }
 
 // ── Mediators ────────────────────────────────────────────────────────────────
 
-export type ApiPartnerArea = { id: number; mediator_id: number; area_name: string; city: string; created_at: string };
+export type ApiPartnerArea = {
+  id: number;
+  mediator_id: number;
+  area_name: string;
+  city: string;
+  created_at: string;
+};
 export type ApiPartner = {
   id: number;
   user_id: number;
@@ -666,7 +755,7 @@ export type ApiReview = {
   rating: number;
   comment: string | null;
   reviewer_name: string | null;
-  status: string;  // "pending" | "approved" | "rejected"
+  status: string; // "pending" | "approved" | "rejected"
   created_at: string;
 };
 
@@ -677,7 +766,7 @@ export type ApiReviewAdmin = ApiReview & {
 export type ApiReviewSummary = {
   avg_rating: number | null;
   review_count: number;
-  distribution: Record<string, number>;  // "1"–"5" → count
+  distribution: Record<string, number>; // "1"–"5" → count
 };
 
 export function fetchMediatorReviews(mediatorId: number) {
@@ -706,27 +795,51 @@ export function fetchAllReviews(status?: string) {
 }
 
 export function moderateReview(id: number, status: "approved" | "rejected") {
-  return requestJson<ApiReviewAdmin>(`/reviews/admin/${id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+  return requestJson<ApiReviewAdmin>(`/reviews/admin/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
 export function fetchMyPartnerProfile() {
   return requestJson<ApiPartner>("/mediators/me");
 }
 
-export function registerPartner(payload: { license_number: string; agency_name?: string; phone: string; bio?: string }) {
-  return requestJson<ApiPartner>("/mediators/register", { method: "POST", body: JSON.stringify(payload) });
+export function registerPartner(payload: {
+  license_number: string;
+  agency_name?: string;
+  phone: string;
+  bio?: string;
+}) {
+  return requestJson<ApiPartner>("/mediators/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
-export function updateMediatorProfile(payload: { agency_name?: string; phone?: string; bio?: string }) {
-  return requestJson<ApiPartner>("/mediators/me", { method: "PATCH", body: JSON.stringify(payload) });
+export function updateMediatorProfile(payload: {
+  agency_name?: string;
+  phone?: string;
+  bio?: string;
+}) {
+  return requestJson<ApiPartner>("/mediators/me", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function subscribePartnerMock() {
-  return requestJson<{ status: string; subscription_expires_at: string }>("/mediators/me/subscribe", { method: "POST" });
+  return requestJson<{ status: string; subscription_expires_at: string }>(
+    "/mediators/me/subscribe",
+    { method: "POST" },
+  );
 }
 
 export function addPartnerArea(area_name: string, city: string) {
-  return requestJson<ApiPartnerArea>("/mediators/me/areas", { method: "POST", body: JSON.stringify({ area_name, city }) });
+  return requestJson<ApiPartnerArea>("/mediators/me/areas", {
+    method: "POST",
+    body: JSON.stringify({ area_name, city }),
+  });
 }
 
 export function removePartnerArea(area_id: number) {
@@ -735,9 +848,41 @@ export function removePartnerArea(area_id: number) {
 
 // ── Leads ────────────────────────────────────────────────────────────────────
 
-export type ApiLeadSuggestion = { id: number; lead_id: number; property_id: number | null; match_score: number; reason: string | null; created_at: string; property_title: string | null; monthly_rent: number | null; bedrooms: number | null };
-export type ApiLeadAssignment = { id: number; lead_id: number; mediator_id: number | null; status: string; assigned_at: string; accepted_at: string | null; rejected_at: string | null; expires_at: string; mediator_agency_name: string | null; mediator_phone: string | null };
-export type ApiLeadSummary = { id: number; area_name: string; city: string; status: string; customer_name: string; customer_phone: string; customer_email: string; max_budget: number | null; bedrooms_needed: number | null; created_at: string };
+export type ApiLeadSuggestion = {
+  id: number;
+  lead_id: number;
+  property_id: number | null;
+  match_score: number;
+  reason: string | null;
+  created_at: string;
+  property_title: string | null;
+  monthly_rent: number | null;
+  bedrooms: number | null;
+};
+export type ApiLeadAssignment = {
+  id: number;
+  lead_id: number;
+  mediator_id: number | null;
+  status: string;
+  assigned_at: string;
+  accepted_at: string | null;
+  rejected_at: string | null;
+  expires_at: string;
+  mediator_agency_name: string | null;
+  mediator_phone: string | null;
+};
+export type ApiLeadSummary = {
+  id: number;
+  area_name: string;
+  city: string;
+  status: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_email: string;
+  max_budget: number | null;
+  bedrooms_needed: number | null;
+  created_at: string;
+};
 export type ApiLeadDetail = {
   id: number;
   customer_user_id: number;
@@ -761,12 +906,27 @@ export type ApiLeadDetail = {
   suggestions: ApiLeadSuggestion[];
   assignments: ApiLeadAssignment[];
 };
-export type ApiLeadMessage = { id: number; lead_id: number; sender_user_id: number | null; sender_role: string; content: string; is_read: boolean; created_at: string };
+export type ApiLeadMessage = {
+  id: number;
+  lead_id: number;
+  sender_user_id: number | null;
+  sender_role: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+};
 
 export function createLead(payload: {
-  area_name: string; city: string; customer_name: string; customer_phone: string;
-  customer_email: string; min_budget?: number; max_budget?: number;
-  bedrooms_needed?: number; move_in_date?: string; requirements_note?: string;
+  area_name: string;
+  city: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_email: string;
+  min_budget?: number;
+  max_budget?: number;
+  bedrooms_needed?: number;
+  move_in_date?: string;
+  requirements_note?: string;
 }) {
   return requestJson<ApiLeadDetail>("/leads/", { method: "POST", body: JSON.stringify(payload) });
 }
@@ -821,7 +981,9 @@ export function fetchAvailableLeads() {
 }
 
 export function acceptLead(lead_id: number) {
-  return requestJson<{ status: string; payment_amount: number }>(`/leads/${lead_id}/accept`, { method: "POST" });
+  return requestJson<{ status: string; payment_amount: number }>(`/leads/${lead_id}/accept`, {
+    method: "POST",
+  });
 }
 
 export function rejectLead(lead_id: number) {
@@ -833,19 +995,30 @@ export function fetchLeadMessages(lead_id: number) {
 }
 
 export function sendLeadMessage(lead_id: number, content: string) {
-  return requestJson<ApiLeadMessage>(`/leads/${lead_id}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+  return requestJson<ApiLeadMessage>(`/leads/${lead_id}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  });
 }
 
 export function markLeadMessagesRead(lead_id: number) {
-  return requestJson<{ marked_read: number }>(`/leads/${lead_id}/messages/read`, { method: "POST" });
+  return requestJson<{ marked_read: number }>(`/leads/${lead_id}/messages/read`, {
+    method: "POST",
+  });
 }
 
 export function fetchAdminMediators() {
   return requestJson<ApiPartner[]>("/mediators/");
 }
 
-export function patchMediatorAdmin(mediator_id: number, payload: { is_verified?: boolean; subscription_status?: string; approval_status?: string }) {
-  return requestJson<ApiPartner>(`/mediators/${mediator_id}`, { method: "PATCH", body: JSON.stringify(payload) });
+export function patchMediatorAdmin(
+  mediator_id: number,
+  payload: { is_verified?: boolean; subscription_status?: string; approval_status?: string },
+) {
+  return requestJson<ApiPartner>(`/mediators/${mediator_id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function approvePartner(mediator_id: number) {
@@ -870,7 +1043,10 @@ export type AdminPartnerCreatePayload = {
 };
 
 export function adminCreatePartner(payload: AdminPartnerCreatePayload) {
-  return requestJson<ApiPartner>("/mediators/admin/create", { method: "POST", body: JSON.stringify(payload) });
+  return requestJson<ApiPartner>("/mediators/admin/create", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export type ApiUser = {
@@ -887,11 +1063,27 @@ export function fetchAdminUsers() {
   return requestJson<ApiUser[]>("/users/");
 }
 
-export function adminCreateUser(payload: { email: string; password: string; full_name?: string; phone?: string; role?: string }) {
+export function adminCreateUser(payload: {
+  email: string;
+  password: string;
+  full_name?: string;
+  phone?: string;
+  role?: string;
+}) {
   return requestJson<ApiUser>("/users/", { method: "POST", body: JSON.stringify(payload) });
 }
 
-export function adminUpdateUser(id: number, payload: { full_name?: string; phone?: string; email?: string; is_active?: boolean; password?: string; role?: string }) {
+export function adminUpdateUser(
+  id: number,
+  payload: {
+    full_name?: string;
+    phone?: string;
+    email?: string;
+    is_active?: boolean;
+    password?: string;
+    role?: string;
+  },
+) {
   return requestJson<ApiUser>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
@@ -900,11 +1092,17 @@ export function fetchAdminLeads() {
 }
 
 export function adminForceCloseLead(lead_id: number, status: "closed_won" | "closed_lost") {
-  return requestJson<ApiLeadDetail>(`/leads/admin/${lead_id}/close`, { method: "PATCH", body: JSON.stringify({ status }) });
+  return requestJson<ApiLeadDetail>(`/leads/admin/${lead_id}/close`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
 export function patchLeadStatus(lead_id: number, status: string, note?: string) {
-  return requestJson<ApiLeadDetail>(`/leads/${lead_id}/status`, { method: "PATCH", body: JSON.stringify({ status, note }) });
+  return requestJson<ApiLeadDetail>(`/leads/${lead_id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, note }),
+  });
 }
 
 export function adminApproveLead(lead_id: number) {
@@ -932,4 +1130,991 @@ export function adminSendMessage(lead_id: number, content: string) {
 
 export function adminFetchMessages(lead_id: number) {
   return requestJson<ApiLeadMessage[]>(`/leads/admin/${lead_id}/messages`);
+}
+
+// ── Saved search alerts ────────────────────────────────────────────────────
+// Mirrors the backend's canonical `PropertyFilterCriteria`
+// (app/core/search/filters.py) — the one filter shape saved searches, the
+// matching engine, and the preview endpoint all agree on.
+export type ApiPropertyFilterCriteria = {
+  keyword?: string;
+  transaction_type?: "rent" | "sale" | null;
+  property_type?: string | null;
+  city?: string | null;
+  districts?: string[];
+  min_price?: number | null;
+  max_price?: number | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  min_area_sq_m?: number | null;
+  max_area_sq_m?: number | null;
+  furnishing?: string | null;
+  amenities?: string[];
+  mediator_id?: number | null;
+  verified_only?: boolean;
+  min_lat?: number | null;
+  max_lat?: number | null;
+  min_lng?: number | null;
+  max_lng?: number | null;
+  sort?: "newest" | "price_asc" | "price_desc";
+};
+
+export type AlertFrequency = "instant" | "daily" | "weekly" | "off";
+export type NotificationChannel = "in_app" | "push" | "email";
+
+export type ApiSavedSearch = {
+  id: number;
+  name: string;
+  locale: string;
+  filters: ApiPropertyFilterCriteria;
+  filter_schema_version: number;
+  alert_enabled: boolean;
+  alert_frequency: AlertFrequency;
+  channels: NotificationChannel[];
+  last_evaluated_at: string | null;
+  last_notified_at: string | null;
+  status: "active" | "disabled";
+  user_id: number;
+  created_at: string;
+  updated_at: string;
+  latest_matches_count: number;
+};
+
+export type SavedSearchDuplicateError = {
+  message: string;
+  duplicate_of: { id: number; name: string };
+};
+
+export class DuplicateSavedSearchError extends Error {
+  duplicateOf: { id: number; name: string };
+  constructor(detail: SavedSearchDuplicateError) {
+    super(detail.message);
+    this.name = "DuplicateSavedSearchError";
+    this.duplicateOf = detail.duplicate_of;
+  }
+}
+
+export function fetchSavedSearches() {
+  return requestJson<ApiSavedSearch[]>("/saved-searches/");
+}
+
+// Direct fetch (bypasses requestJson's string-only `detail` parsing) so the
+// structured 409 duplicate-candidate payload can be surfaced as a typed error.
+export async function createSavedSearch(payload: {
+  name: string;
+  locale?: string;
+  filters: ApiPropertyFilterCriteria;
+  alert_enabled?: boolean;
+  alert_frequency?: AlertFrequency;
+  channels?: NotificationChannel[];
+  confirm_duplicate?: boolean;
+}) {
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
+  const response = await fetch(`${API_BASE_URL}/saved-searches/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+  if (response.status === 409) {
+    const body = (await response.json()) as { detail?: SavedSearchDuplicateError | string };
+    if (body.detail && typeof body.detail === "object" && "duplicate_of" in body.detail) {
+      throw new DuplicateSavedSearchError(body.detail);
+    }
+    throw new Error(
+      typeof body.detail === "string" ? body.detail : "This saved search already exists.",
+    );
+  }
+  if (!response.ok) {
+    let detail = `Request failed (${response.status})`;
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (typeof body.detail === "string") detail = body.detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return response.json() as Promise<ApiSavedSearch>;
+}
+
+export function updateSavedSearch(
+  id: number,
+  payload: Partial<{
+    name: string;
+    filters: ApiPropertyFilterCriteria;
+    alert_enabled: boolean;
+    alert_frequency: AlertFrequency;
+    channels: NotificationChannel[];
+    status: "active" | "disabled";
+  }>,
+) {
+  return requestJson<ApiSavedSearch>(`/saved-searches/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteSavedSearch(id: number) {
+  return requestJson<void>(`/saved-searches/${id}`, { method: "DELETE" });
+}
+
+export function enableSavedSearchAlerts(id: number) {
+  return requestJson<ApiSavedSearch>(`/saved-searches/${id}/enable-alerts`, { method: "POST" });
+}
+
+export function disableSavedSearchAlerts(id: number) {
+  return requestJson<ApiSavedSearch>(`/saved-searches/${id}/disable-alerts`, { method: "POST" });
+}
+
+export type ApiSavedSearchPreview = {
+  estimated_count: number;
+  duplicate_of: { id: number; name: string; created_at: string } | null;
+};
+
+export function previewSavedSearch(filters: ApiPropertyFilterCriteria) {
+  return requestJson<ApiSavedSearchPreview>("/saved-searches/preview", {
+    method: "POST",
+    body: JSON.stringify(filters),
+  });
+}
+
+export function previewExistingSavedSearch(id: number) {
+  return requestJson<ApiSavedSearchPreview>(`/saved-searches/${id}/preview`, { method: "POST" });
+}
+
+export type ApiSavedSearchMatch = {
+  id: number;
+  property_id: number;
+  change_type: string;
+  match_reasons: Array<{ code: string; [key: string]: unknown }>;
+  match_score: number;
+  notified: boolean;
+  created_at: string;
+};
+
+export function fetchSavedSearchMatches(id: number, params?: { skip?: number; limit?: number }) {
+  const q = new URLSearchParams();
+  if (params?.skip) q.set("skip", String(params.skip));
+  if (params?.limit) q.set("limit", String(params.limit));
+  const qs = q.toString();
+  return requestJson<ApiSavedSearchMatch[]>(`/saved-searches/${id}/matches${qs ? `?${qs}` : ""}`);
+}
+
+// ── Notification Center ─────────────────────────────────────────────────────
+export type ApiNotificationRecord = {
+  id: number;
+  type: string;
+  title: string;
+  body: string;
+  locale: string;
+  entity_type: string | null;
+  entity_id: number | null;
+  saved_search_id: number | null;
+  property_id: number | null;
+  match_reasons: Array<{ code: string; [key: string]: unknown }> | null;
+  deep_link: string | null;
+  read_at: string | null;
+  seen_at: string | null;
+  delivery_status: Record<string, string>;
+  ai_generated: boolean;
+  created_at: string;
+  expires_at: string | null;
+  meta: { ai_explanation?: string; rule_based_explanation?: string; [key: string]: unknown };
+};
+
+export type ApiNotificationList = {
+  items: ApiNotificationRecord[];
+  next_cursor: string | null;
+  unread_count: number;
+};
+
+export function fetchNotificationCenter(params?: {
+  cursor?: string;
+  type?: string;
+  unreadOnly?: boolean;
+  limit?: number;
+}) {
+  const q = new URLSearchParams();
+  if (params?.cursor) q.set("cursor", params.cursor);
+  if (params?.type) q.set("type", params.type);
+  if (params?.unreadOnly) q.set("unread_only", "true");
+  q.set("limit", String(params?.limit ?? 20));
+  return requestJson<ApiNotificationList>(`/notifications/?${q.toString()}`);
+}
+
+export function fetchUnreadNotificationCount() {
+  return requestJson<{ unread_count: number }>("/notifications/unread-count");
+}
+
+export function markNotificationRead(id: number) {
+  return requestJson<ApiNotificationRecord>(`/notifications/${id}/read`, { method: "POST" });
+}
+
+export function markAllNotificationsRead() {
+  return requestJson<{ updated: number }>("/notifications/read-all", { method: "POST" });
+}
+
+export function deleteNotificationRecord(id: number) {
+  return requestJson<void>(`/notifications/${id}`, { method: "DELETE" });
+}
+
+export type NotificationCategoryKey =
+  | "property_alerts"
+  | "price_changes"
+  | "saved_search_digest"
+  | "lead_updates"
+  | "lead_messages"
+  | "review_updates"
+  | "subscription_payments"
+  | "ai_recommendations"
+  | "product_announcements"
+  | "security";
+
+export type CategoryPreference = {
+  channels: NotificationChannel[];
+  frequency: AlertFrequency;
+};
+
+export type ApiNotificationPreferences = {
+  in_app_enabled: boolean;
+  push_enabled: boolean;
+  email_enabled: boolean;
+  category_preferences: Record<NotificationCategoryKey, CategoryPreference>;
+  digest_hour: number;
+  weekly_digest_day: number;
+  timezone: string;
+  next_daily_digest_at: string | null;
+  next_weekly_digest_at: string | null;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+  quiet_hours_allow_urgent: boolean;
+  hide_message_preview: boolean;
+};
+
+export function fetchNotificationPreferences() {
+  return requestJson<ApiNotificationPreferences>("/notification-preferences/");
+}
+
+export function updateNotificationPreferences(
+  payload: Partial<Omit<ApiNotificationPreferences, "category_preferences">> & {
+    category_preferences?: Partial<Record<NotificationCategoryKey, CategoryPreference>>;
+  },
+) {
+  return requestJson<ApiNotificationPreferences>("/notification-preferences/", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function resetNotificationPreferences() {
+  return requestJson<ApiNotificationPreferences>("/notification-preferences/reset-defaults", {
+    method: "POST",
+  });
+}
+
+export type ApiTestPushResult = { device_id: number; status: string; detail: string | null };
+export type ApiTestPushResponse = { sent: number; results: ApiTestPushResult[] };
+
+export function sendTestPush() {
+  return requestJson<ApiTestPushResponse>("/notification-preferences/test-push", {
+    method: "POST",
+  });
+}
+
+// ── Devices ──────────────────────────────────────────────────────────────────
+export type ApiDevice = {
+  id: number;
+  platform: string;
+  installation_id: string;
+  device_id: string | null;
+  app_version: string | null;
+  os_version: string | null;
+  locale: string | null;
+  device_timezone: string | null;
+  enabled: boolean;
+  failure_count: number;
+  invalidated_at: string | null;
+  last_active_at: string | null;
+  last_success_push_at: string | null;
+  last_failed_push_at: string | null;
+  created_at: string;
+};
+
+export function fetchDevices() {
+  return requestJson<ApiDevice[]>("/devices/");
+}
+
+// ── Admin: Notification Operations ──────────────────────────────────────────
+export type ApiNotificationAdminOverview = {
+  window: string;
+  notifications_created: number;
+  notifications_opened: number;
+  notification_open_rate: number;
+  push_attempted: number;
+  push_accepted: number;
+  push_failed: number;
+  push_invalid_tokens: number;
+  digest_volume: number;
+  digest_failures: number;
+  queue_backlog: number;
+  active_devices: number;
+  lead_notification_volume: number;
+};
+
+export function fetchNotificationAdminOverview() {
+  return requestJson<ApiNotificationAdminOverview>("/notifications/admin/overview");
+}
+
+export type ApiNotificationDelivery = {
+  id: number;
+  notification_id: number;
+  device_id: number | null;
+  channel: string;
+  provider: string | null;
+  provider_message_id: string | null;
+  attempt_number: number;
+  status: string;
+  failure_code: string | null;
+  failure_message: string | null;
+  attempted_at: string | null;
+  accepted_at: string | null;
+  delivered_at: string | null;
+  opened_at: string | null;
+  created_at: string;
+  trace_id: string | null;
+};
+
+export function fetchNotificationDeliveries(params?: {
+  notification_id?: number;
+  device_id?: number;
+  status?: string;
+  channel?: string;
+  skip?: number;
+  limit?: number;
+}) {
+  const q = new URLSearchParams();
+  if (params?.notification_id != null) q.set("notification_id", String(params.notification_id));
+  if (params?.device_id != null) q.set("device_id", String(params.device_id));
+  if (params?.status) q.set("status", params.status);
+  if (params?.channel) q.set("channel", params.channel);
+  q.set("skip", String(params?.skip ?? 0));
+  q.set("limit", String(params?.limit ?? 50));
+  return requestJson<ApiNotificationDelivery[]>(`/notifications/admin/deliveries?${q.toString()}`);
+}
+
+export function retryNotificationDelivery(id: number) {
+  return requestJson<{ status: string; task_id: string | null }>(
+    `/notifications/admin/deliveries/${id}/retry`,
+    { method: "POST" },
+  );
+}
+
+export function rerunUserDigest(userId: number, period: "daily" | "weekly") {
+  return requestJson<{
+    user_id: number;
+    period: string;
+    run_date: string;
+    matches_included: number;
+  }>(`/notifications/admin/digest/${userId}/rerun?period=${period}`, { method: "POST" });
+}
+
+export function sendAdminTestNotification(userId: number) {
+  return requestJson<{ sent: boolean }>(`/notifications/admin/test-send?user_id=${userId}`, {
+    method: "POST",
+  });
+}
+
+export function fetchAdminDevices(params?: {
+  platform?: string;
+  enabled?: boolean;
+  skip?: number;
+  limit?: number;
+}) {
+  const q = new URLSearchParams();
+  if (params?.platform) q.set("platform", params.platform);
+  if (params?.enabled != null) q.set("enabled", String(params.enabled));
+  q.set("skip", String(params?.skip ?? 0));
+  q.set("limit", String(params?.limit ?? 50));
+  return requestJson<Array<ApiDevice & { user_id: number; user_email: string | null }>>(
+    `/devices/admin/all?${q.toString()}`,
+  );
+}
+
+export function disableAdminDevice(id: number) {
+  return requestJson<{ status: string; device_id: number }>(`/devices/admin/${id}/disable`, {
+    method: "POST",
+  });
+}
+
+// ── Property Requests ────────────────────────────────────────────────────────
+// The "Property Request + AI Property Agent" feature: a persistent, AI-assisted
+// request that the matching engine continuously scores new/updated listings
+// against — unlike a one-off saved-search alert (point-in-time filter) or a
+// single-shot lead (one mediator hand-off). Endpoints live under three scopes:
+// customer (`/property-requests`), partner marketplace (`/partner/property-requests`),
+// and admin (`/admin/property-requests`).
+
+export type PropertyRequestStatus =
+  | "draft"
+  | "awaiting_clarification"
+  | "active"
+  | "paused"
+  | "matched"
+  | "negotiating"
+  | "fulfilled"
+  | "expired"
+  | "closed"
+  | "cancelled";
+
+export type PropertyRequestMediatorPreference = "owner_only" | "mediator_only" | "either";
+
+export type ApiPriorityWeighting = Partial<{
+  hard_fit: number;
+  location_commute: number;
+  budget_fit: number;
+  property_specs: number;
+  lifestyle_area: number;
+  listing_quality: number;
+  user_behavior: number;
+}>;
+
+// The exact vocabulary the backend accepts inside must_have_fields /
+// nice_to_have_fields / flexible_fields — anything outside this list is
+// rejected by the API, so the checklist UI must only ever offer these.
+export const PROPERTY_REQUEST_FIELD_VOCAB = [
+  "transaction_type",
+  "city",
+  "max_price",
+  "min_price",
+  "bedrooms_min",
+  "bedrooms_max",
+  "bathrooms_min",
+  "bathrooms_max",
+  "min_area_sq_m",
+  "max_area_sq_m",
+  "furnishing",
+  "property_category",
+  "verified_only",
+  "preferred_districts",
+] as const;
+export type PropertyRequestFieldKey = (typeof PROPERTY_REQUEST_FIELD_VOCAB)[number];
+
+export type ApiPropertyRequestFields = {
+  title: string;
+  description?: string | null;
+  locale?: "en" | "ar";
+  transaction_type?: "rent" | "sale" | null;
+  property_category?: string | null;
+  city?: string | null;
+  preferred_districts?: string[];
+  excluded_districts?: string[];
+  min_price?: number | null;
+  max_price?: number | null;
+  bedrooms_min?: number | null;
+  bedrooms_max?: number | null;
+  bathrooms_min?: number | null;
+  bathrooms_max?: number | null;
+  min_area_sq_m?: number | null;
+  max_area_sq_m?: number | null;
+  furnishing?: string | null;
+  required_amenities?: string[];
+  preferred_amenities?: string[];
+  property_age_preference?: string | null;
+  availability_date?: string | null;
+  move_in_date?: string | null;
+  rental_payment_frequency?: string | null;
+  mediator_preference?: PropertyRequestMediatorPreference;
+  verified_only?: boolean;
+  max_commute_minutes?: number | null;
+  commute_destination_name?: string | null;
+  commute_destination_lat?: number | null;
+  commute_destination_lng?: number | null;
+  school_preference?: boolean;
+  hospital_preference?: boolean;
+  lifestyle_preferences?: string[];
+  family_size?: number | null;
+  household_type?: string | null;
+  accessibility_requirements?: string[];
+  pet_preference?: string | null;
+  notes?: string | null;
+  must_have_fields?: PropertyRequestFieldKey[];
+  nice_to_have_fields?: PropertyRequestFieldKey[];
+  flexible_fields?: PropertyRequestFieldKey[];
+  priority_weighting?: ApiPriorityWeighting;
+  matching_enabled?: boolean;
+  mediator_responses_enabled?: boolean;
+  alert_frequency?: AlertFrequency;
+};
+
+export type PropertyRequestUpdatePayload = Partial<ApiPropertyRequestFields>;
+
+// Out shape: every optional Create/Update field is always present (nullable
+// where the field itself is nullable), plus server-computed metadata.
+export type ApiPropertyRequest = Required<Omit<ApiPropertyRequestFields, "priority_weighting">> & {
+  priority_weighting: ApiPriorityWeighting | null;
+  id: number;
+  user_id: number;
+  ai_extracted_criteria: Record<string, unknown> | null;
+  ai_confidence: number | null;
+  clarification_status: "none" | "pending" | "resolved";
+  clarification_rounds: number;
+  status: PropertyRequestStatus;
+  expiry_date: string | null;
+  last_matched_at: string | null;
+  last_customer_activity_at: string | null;
+  created_at: string;
+  updated_at: string;
+  revision_number: number;
+  match_count: number;
+  new_match_count: number;
+  mediator_response_count: number;
+};
+
+export type ApiPropertyRequestSummary = {
+  id: number;
+  title: string;
+  status: PropertyRequestStatus;
+  transaction_type: "rent" | "sale" | null;
+  city: string | null;
+  min_price: number | null;
+  max_price: number | null;
+  bedrooms_min: number | null;
+  expiry_date: string | null;
+  created_at: string;
+  updated_at: string;
+  match_count: number;
+  new_match_count: number;
+  mediator_response_count: number;
+};
+
+export type PropertyRequestFromTextResult = {
+  draft: ApiPropertyRequest;
+  ai_confidence: number;
+  missing_fields: string[];
+  clarifying_questions: string[];
+  ai_trace_id: string | null;
+};
+
+export type ApiClarification = {
+  id: number;
+  round_number: number;
+  question: string;
+  question_locale: string;
+  field_hint: string | null;
+  status: "pending" | "answered";
+  answer: string | null;
+  answered_at: string | null;
+  created_at: string;
+};
+
+export type ApiPropertyRequestMatch = {
+  id: number | null;
+  property_id: number;
+  match_score: number;
+  flexible_coverage: number;
+  preference_score: number;
+  price_fit_score: number;
+  area_fit_score: number;
+  commute_fit_score: number;
+  listing_quality_score: number;
+  confidence: number;
+  match_reasons: Array<{ code: string; [key: string]: unknown }>;
+  trade_offs: Array<{ code: string; [key: string]: unknown }>;
+  match_version: string;
+  status: "new" | "viewed" | "saved" | "contacted" | "dismissed" | "shortlisted" | "expired";
+  created_at: string;
+  updated_at: string;
+};
+
+export type ApiPropertyRequestActivity = {
+  id: number;
+  actor_type: "customer" | "mediator" | "admin" | "system" | "ai";
+  actor_id: number | null;
+  activity_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+};
+
+export type ApiNoMatchDiagnostic = {
+  field: string;
+  candidates_with_field: number;
+  candidates_if_relaxed: number;
+};
+
+export type AreaSuggestionLabel =
+  | "best_overall"
+  | "best_value"
+  | "best_commute"
+  | "best_family"
+  | "premium"
+  | "flexible_alternative";
+
+export type ApiAreaSuggestion = {
+  area_name: string;
+  city: string;
+  fit_score: number;
+  label: AreaSuggestionLabel;
+  typical_price_range: [number | null, number | null] | null;
+  estimated_availability: number;
+  commute_estimate_minutes: number | null;
+  reasons: string[];
+  trade_offs: string[];
+  data_confidence: number;
+};
+
+export type PropertyRequestAiAgentResult = { reply: string; ai_trace_id: string | null };
+
+function buildQuery(params: Record<string, string | number | boolean | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") q.set(k, String(v));
+  }
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export function createPropertyRequest(payload: ApiPropertyRequestFields) {
+  return requestJson<ApiPropertyRequest>("/property-requests/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createPropertyRequestFromText(text: string, locale: "en" | "ar") {
+  return requestJson<PropertyRequestFromTextResult>("/property-requests/from-text", {
+    method: "POST",
+    body: JSON.stringify({ text, locale }),
+  });
+}
+
+// Direct fetch (not requestJson) so the X-Total-Count header survives —
+// mirrors fetchPropertiesPaged's pattern for the same reason.
+export async function fetchPropertyRequests(params?: {
+  status?: PropertyRequestStatus;
+  skip?: number;
+  limit?: number;
+}): Promise<{ data: ApiPropertyRequestSummary[]; total: number }> {
+  const qs = buildQuery({ status: params?.status, skip: params?.skip, limit: params?.limit });
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
+  const response = await fetch(`${API_BASE_URL}/property-requests/${qs}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  const data = (await response.json()) as ApiPropertyRequestSummary[];
+  const total = Number(response.headers.get("X-Total-Count") ?? data.length);
+  return { data, total };
+}
+
+export function fetchPropertyRequest(id: number) {
+  return requestJson<ApiPropertyRequest>(`/property-requests/${id}`);
+}
+
+export function updatePropertyRequest(id: number, payload: PropertyRequestUpdatePayload) {
+  return requestJson<ApiPropertyRequest>(`/property-requests/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function cancelPropertyRequest(id: number) {
+  return requestJson<void>(`/property-requests/${id}`, { method: "DELETE" });
+}
+
+export function activatePropertyRequest(id: number) {
+  return requestJson<ApiPropertyRequest>(`/property-requests/${id}/activate`, { method: "POST" });
+}
+
+export function pausePropertyRequest(id: number) {
+  return requestJson<ApiPropertyRequest>(`/property-requests/${id}/pause`, { method: "POST" });
+}
+
+export function resumePropertyRequest(id: number) {
+  return requestJson<ApiPropertyRequest>(`/property-requests/${id}/resume`, { method: "POST" });
+}
+
+export function closePropertyRequest(id: number) {
+  return requestJson<ApiPropertyRequest>(`/property-requests/${id}/close`, { method: "POST" });
+}
+
+export function fulfillPropertyRequest(id: number) {
+  return requestJson<ApiPropertyRequest>(`/property-requests/${id}/fulfill`, { method: "POST" });
+}
+
+export function requestPropertyRequestClarifications(id: number) {
+  return requestJson<ApiClarification[]>(`/property-requests/${id}/clarifications`, {
+    method: "POST",
+  });
+}
+
+export function answerPropertyRequestClarification(
+  id: number,
+  clarificationId: number,
+  answer: string,
+) {
+  return requestJson<ApiClarification>(
+    `/property-requests/${id}/clarifications/${clarificationId}/answer`,
+    {
+      method: "POST",
+      body: JSON.stringify({ answer }),
+    },
+  );
+}
+
+export function fetchPropertyRequestMatches(
+  id: number,
+  params?: { status?: string; skip?: number; limit?: number },
+) {
+  const qs = buildQuery({ status: params?.status, skip: params?.skip, limit: params?.limit });
+  return requestJson<ApiPropertyRequestMatch[]>(`/property-requests/${id}/matches${qs}`);
+}
+
+export function dismissPropertyRequestMatch(id: number, matchId: number) {
+  return requestJson<ApiPropertyRequestMatch>(
+    `/property-requests/${id}/matches/${matchId}/dismiss`,
+    { method: "POST" },
+  );
+}
+
+export function savePropertyRequestMatch(id: number, matchId: number) {
+  return requestJson<ApiPropertyRequestMatch>(`/property-requests/${id}/matches/${matchId}/save`, {
+    method: "POST",
+  });
+}
+
+export function contactPropertyRequestMatch(id: number, matchId: number) {
+  return requestJson<ApiPropertyRequestMatch>(
+    `/property-requests/${id}/matches/${matchId}/contact`,
+    { method: "POST" },
+  );
+}
+
+export function fetchPropertyRequestActivity(
+  id: number,
+  params?: { skip?: number; limit?: number },
+) {
+  const qs = buildQuery({ skip: params?.skip, limit: params?.limit });
+  return requestJson<ApiPropertyRequestActivity[]>(`/property-requests/${id}/activity${qs}`);
+}
+
+export function fetchNoMatchDiagnostics(id: number) {
+  return requestJson<ApiNoMatchDiagnostic[]>(`/property-requests/${id}/no-match-diagnostics`);
+}
+
+export function fetchAreaSuggestions(id: number) {
+  return requestJson<ApiAreaSuggestion[]>(`/property-requests/${id}/area-suggestions`);
+}
+
+export function previewPropertyRequestMatches(id: number) {
+  return requestJson<ApiPropertyRequestMatch[]>(`/property-requests/${id}/preview-matches`, {
+    method: "POST",
+  });
+}
+
+export function chatWithPropertyRequestAgent(
+  id: number,
+  message: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+) {
+  return requestJson<PropertyRequestAiAgentResult>(`/property-requests/${id}/ai-agent`, {
+    method: "POST",
+    body: JSON.stringify({ message, history }),
+  });
+}
+
+// ── Partner marketplace: Property Requests ──────────────────────────────────
+// Privacy-safe summaries only — no customer identity is ever present in this
+// payload shape, by backend design, until a mediator engages via /respond.
+
+export type ApiPartnerRequestSummary = {
+  id: number;
+  transaction_type: "rent" | "sale" | null;
+  property_category: string | null;
+  city: string | null;
+  preferred_districts: string[];
+  min_price: number | null;
+  max_price: number | null;
+  bedrooms_min: number | null;
+  bedrooms_max: number | null;
+  must_have_fields: string[];
+  flexible_fields: string[];
+  created_at: string;
+  expiry_date: string | null;
+  inventory_match_count: number;
+  already_responded: boolean;
+};
+
+export type PartnerPropertyRequestResponseType =
+  | "submit_property"
+  | "submit_multiple"
+  | "upcoming_inventory"
+  | "clarification_question"
+  | "decline";
+
+export type ApiPartnerPropertyRequestResponse = {
+  id: number;
+  request_id: number;
+  mediator_id: number;
+  response_type: PartnerPropertyRequestResponseType;
+  message: string | null;
+  status: string;
+  created_at: string;
+  property_ids: number[];
+};
+
+export function fetchPartnerPropertyRequests(params?: {
+  city?: string;
+  district?: string;
+  transactionType?: string;
+  maxBudget?: number;
+  skip?: number;
+  limit?: number;
+}) {
+  const qs = buildQuery({
+    city: params?.city,
+    district: params?.district,
+    transaction_type: params?.transactionType,
+    max_budget: params?.maxBudget,
+    skip: params?.skip,
+    limit: params?.limit,
+  });
+  return requestJson<ApiPartnerRequestSummary[]>(`/partner/property-requests/${qs}`);
+}
+
+export function fetchPartnerPropertyRequest(id: number) {
+  return requestJson<ApiPartnerRequestSummary>(`/partner/property-requests/${id}`);
+}
+
+export function fetchEligibleProperties(id: number) {
+  return requestJson<ApiPropertyRequestMatch[]>(
+    `/partner/property-requests/${id}/eligible-properties`,
+  );
+}
+
+export function respondToPropertyRequest(
+  id: number,
+  payload: {
+    response_type: PartnerPropertyRequestResponseType;
+    message?: string;
+    property_ids?: number[];
+  },
+) {
+  return requestJson<ApiPartnerPropertyRequestResponse>(
+    `/partner/property-requests/${id}/respond`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function ignorePropertyRequest(id: number) {
+  return requestJson<void>(`/partner/property-requests/${id}/ignore`, { method: "POST" });
+}
+
+export function bookmarkPropertyRequest(id: number) {
+  return requestJson<void>(`/partner/property-requests/${id}/save`, { method: "POST" });
+}
+
+// ── Admin: Property Requests ────────────────────────────────────────────────
+
+export type ApiAdminPropertyRequest = {
+  id: number;
+  user_id: number;
+  status: PropertyRequestStatus;
+  city: string | null;
+  transaction_type: "rent" | "sale" | null;
+  min_price: number | null;
+  max_price: number | null;
+  created_at: string;
+  expiry_date: string | null;
+  match_count: number;
+  mediator_response_count: number;
+  ai_trace_id: string | null;
+};
+
+export type ApiPropertyRequestAnalytics = {
+  total_requests: number;
+  active_requests: number;
+  by_status: Record<string, number>;
+  by_city: Record<string, number>;
+  no_match_rate: number;
+  avg_time_to_first_match_hours: number | null;
+  match_to_save_rate: number;
+  match_to_contact_rate: number;
+  mediator_response_rate: number;
+  fulfillment_rate: number;
+  expiry_rate: number;
+};
+
+export async function fetchAdminPropertyRequests(params?: {
+  status?: string;
+  city?: string;
+  userId?: number;
+  skip?: number;
+  limit?: number;
+}): Promise<{ data: ApiAdminPropertyRequest[]; total: number }> {
+  const qs = buildQuery({
+    status: params?.status,
+    city: params?.city,
+    user_id: params?.userId,
+    skip: params?.skip,
+    limit: params?.limit,
+  });
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
+  const response = await fetch(`${API_BASE_URL}/admin/property-requests/${qs}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  const data = (await response.json()) as ApiAdminPropertyRequest[];
+  const total = Number(response.headers.get("X-Total-Count") ?? data.length);
+  return { data, total };
+}
+
+export function fetchAdminPropertyRequestAnalytics() {
+  return requestJson<ApiPropertyRequestAnalytics>(
+    "/admin/property-requests/property-request-analytics",
+  );
+}
+
+export function fetchAdminPropertyRequest(id: number) {
+  return requestJson<ApiAdminPropertyRequest>(`/admin/property-requests/${id}`);
+}
+
+export function adminPausePropertyRequest(id: number) {
+  return requestJson<ApiAdminPropertyRequest>(`/admin/property-requests/${id}/pause`, {
+    method: "POST",
+  });
+}
+
+export function adminClosePropertyRequest(id: number) {
+  return requestJson<ApiAdminPropertyRequest>(`/admin/property-requests/${id}/close`, {
+    method: "POST",
+  });
+}
+
+export function adminRetryPropertyRequestMatching(id: number) {
+  return requestJson<{ status: string }>(`/admin/property-requests/${id}/retry-matching`, {
+    method: "POST",
+  });
+}
+
+export function adminModeratePropertyRequestResponse(
+  id: number,
+  responseId: number,
+  action: "approve" | "reject" | "flag",
+) {
+  return requestJson<{ status: string }>(
+    `/admin/property-requests/${id}/moderate-response?response_id=${responseId}&action=${action}`,
+    { method: "POST" },
+  );
 }

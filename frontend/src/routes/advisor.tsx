@@ -8,8 +8,10 @@ import {
   CheckCircle,
   ChevronRight,
   ClipboardList,
+  Map,
   Phone,
   Plus,
+  Scale,
   Sparkles,
   X,
 } from "lucide-react";
@@ -69,7 +71,11 @@ function loadHistory(): Msg[] {
     // Insert a session-break divider so the user sees where the new session starts
     msgs.push({
       role: "divider",
-      text: new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }),
+      text: new Date().toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+      }),
     });
     return msgs;
   } catch {
@@ -80,8 +86,9 @@ function loadHistory(): Msg[] {
 function persistHistory(msgs: Msg[]) {
   try {
     const toStore: StoredMsg[] = msgs
-      .filter((m): m is { role: "user" | "ai"; text: string; ts?: number } =>
-        (m.role === "user" || m.role === "ai") && !("loading" in m && m.loading),
+      .filter(
+        (m): m is { role: "user" | "ai"; text: string; ts?: number } =>
+          (m.role === "user" || m.role === "ai") && !("loading" in m && m.loading),
       )
       .slice(-MAX_STORED)
       .map((m) => ({ role: m.role as "user" | "ai", text: m.text, ts: m.ts ?? Date.now() }));
@@ -107,7 +114,8 @@ Include all gathered optional fields in the JSON. Do not output the marker until
   },
   {
     role: "assistant",
-    content: "Understood. I'll answer rental questions and help create lead requests. When users want property matching, I'll gather their requirements conversationally and output the CREATE_LEAD marker when ready.",
+    content:
+      "Understood. I'll answer rental questions and help create lead requests. When users want property matching, I'll gather their requirements conversationally and output the CREATE_LEAD marker when ready.",
   },
 ];
 
@@ -133,6 +141,34 @@ function buildPropertyContext(p: Property): Array<{ role: string; content: strin
 }
 
 const LEAD_MARKER_RE = /\[CREATE_LEAD:(\{[\s\S]*?\})\]\s*$/m;
+
+// Shared by the empty-state grid and the desktop side panel, so the two
+// surfaces don't hand-roll their own copies of the same suggestion list.
+function buildSuggestedPrompts(
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  propertyCtx: Property | null,
+): string[] {
+  return propertyCtx
+    ? [
+        t("advisor.suggested.propFair", {
+          amount: Math.round(propertyCtx.price / 12).toLocaleString(),
+          bedrooms: propertyCtx.bedrooms,
+          district: propertyCtx.district,
+        }),
+        t("advisor.suggested.propPros", { district: propertyCtx.district }),
+        t("advisor.suggested.propCompare", {
+          district: propertyCtx.district,
+          city: propertyCtx.city,
+        }),
+        t("advisor.suggested.propCheck"),
+      ]
+    : [
+        t("advisor.suggested.q1"),
+        t("advisor.suggested.q2"),
+        t("advisor.suggested.q3"),
+        t("advisor.suggested.q4"),
+      ];
+}
 
 function AdvisorPage() {
   const { t } = useLanguage();
@@ -181,7 +217,7 @@ function AdvisorPage() {
       didAutoSend.current = true;
       void send(prefilledQ);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefilledQ]);
 
   const send = async (text: string) => {
@@ -238,10 +274,16 @@ function AdvisorPage() {
           ]);
         } catch {
           // JSON parse failed — show raw reply
-          setMessages((prev) => [...prev.slice(0, -1), { role: "ai" as const, text: full, ts: Date.now() }]);
+          setMessages((prev) => [
+            ...prev.slice(0, -1),
+            { role: "ai" as const, text: full, ts: Date.now() },
+          ]);
         }
       } else {
-        setMessages((prev) => [...prev.slice(0, -1), { role: "ai" as const, text: full, ts: Date.now() }]);
+        setMessages((prev) => [
+          ...prev.slice(0, -1),
+          { role: "ai" as const, text: full, ts: Date.now() },
+        ]);
       }
     } catch {
       setMessages((prev) => [
@@ -266,7 +308,8 @@ function AdvisorPage() {
           <div className="min-w-0 flex-1 text-xs">
             <span className="font-semibold text-ai">{t("advisor.propertyContextLoaded")}</span>
             <span className="text-muted-foreground">
-              {propertyCtx.title}, {propertyCtx.district} · SAR {Math.round(propertyCtx.price / 12).toLocaleString()}/mo
+              {propertyCtx.title}, {propertyCtx.district} · SAR{" "}
+              {Math.round(propertyCtx.price / 12).toLocaleString()}/mo
             </span>
           </div>
           <Link
@@ -278,7 +321,10 @@ function AdvisorPage() {
           </Link>
           <button
             type="button"
-            onClick={() => { setPropertyCtx(null); sessionStorage.removeItem("maskan_advisor_ctx"); }}
+            onClick={() => {
+              setPropertyCtx(null);
+              sessionStorage.removeItem("maskan_advisor_ctx");
+            }}
             className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
           >
             <X className="size-3.5" />
@@ -286,75 +332,175 @@ function AdvisorPage() {
         </div>
       )}
 
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto">
-        {isEmpty ? (
-          <EmptyState onSend={send} propertyCtx={propertyCtx} />
-        ) : (
-          <div className="mx-auto max-w-2xl px-4 pb-6 pt-8">
-            {messages.map((m, i) => (
-              <MessageRow key={i} msg={m} />
-            ))}
-            <div ref={bottomRef} />
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Messages area */}
+          <div className="flex-1 overflow-y-auto">
+            {isEmpty ? (
+              <EmptyState onSend={send} propertyCtx={propertyCtx} />
+            ) : (
+              <div className="mx-auto max-w-2xl px-4 pb-6 pt-8">
+                {messages.map((m, i) => (
+                  <MessageRow key={i} msg={m} />
+                ))}
+                <div ref={bottomRef} />
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Input bar */}
-      <div className="shrink-0 border-t border-border/60 bg-background px-4 pb-6 pt-3">
-        <div className="mx-auto mb-2 flex max-w-2xl justify-end">
-          <button
-            type="button"
-            onClick={() => {
-              setMessages([]);
-              try { localStorage.removeItem(HISTORY_KEY); } catch {}
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
-          >
-            <Plus className="size-3.5" /> {t("advisor.newChat")}
-          </button>
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            send(input);
-          }}
-          className="mx-auto max-w-2xl"
-        >
-          <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm focus-within:border-ai/50 focus-within:shadow-md transition-shadow">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                e.target.style.height = "auto";
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+          {/* Input bar */}
+          <div className="shrink-0 border-t border-border/60 bg-background px-4 pb-6 pt-3">
+            <div className="mx-auto mb-2 flex max-w-2xl justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setMessages([]);
+                  try {
+                    localStorage.removeItem(HISTORY_KEY);
+                  } catch {}
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+              >
+                <Plus className="size-3.5" /> {t("advisor.newChat")}
+              </button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                send(input);
               }}
-              placeholder={t("advisor.inputPlaceholder")}
-              rows={1}
-              className="flex-1 resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  send(input);
-                }
-              }}
-            />
-            <button
-              type="submit"
-              aria-label={t("advisor.send")}
-              disabled={!input.trim() || isLoading}
-              className="mb-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-30"
+              className="mx-auto max-w-2xl"
             >
-              <ArrowUp className="size-4" />
-            </button>
+              <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm focus-within:border-ai/50 focus-within:shadow-md transition-shadow">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    e.target.style.height = "auto";
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                  }}
+                  placeholder={t("advisor.inputPlaceholder")}
+                  rows={1}
+                  className="flex-1 resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      send(input);
+                    }
+                  }}
+                />
+                <button
+                  type="submit"
+                  aria-label={t("advisor.send")}
+                  disabled={!input.trim() || isLoading}
+                  className="mb-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-30"
+                >
+                  <ArrowUp className="size-4" />
+                </button>
+              </div>
+              <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                {t("advisor.footerDisclaimer")}
+              </p>
+            </form>
           </div>
-          <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            {t("advisor.footerDisclaimer")}
-          </p>
-        </form>
+        </div>
+
+        <AdvisorPanel propertyCtx={propertyCtx} onSend={send} />
       </div>
     </div>
+  );
+}
+
+/* ── Desktop side panel: property context, suggested prompts, quick links ──
+   Hidden below `lg` — mobile/tablet keep the single-column chat, matching
+   the rest of the app's phone-first layout. */
+function AdvisorPanel({
+  propertyCtx,
+  onSend,
+}: {
+  propertyCtx: Property | null;
+  onSend: (t: string) => void;
+}) {
+  const { t } = useLanguage();
+  const suggested = buildSuggestedPrompts(t, propertyCtx);
+
+  return (
+    <aside className="hidden w-80 shrink-0 flex-col gap-5 overflow-y-auto border-s border-border/60 bg-surface/40 p-5 lg:flex xl:w-96">
+      {propertyCtx && (
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+          <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <Building2 className="size-3.5" /> {t("advisor.panel.propertyContextTitle")}
+          </div>
+          <p className="text-sm font-semibold text-foreground">{propertyCtx.title}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {propertyCtx.district}, {propertyCtx.city}
+          </p>
+          <p className="mt-2 text-sm font-bold text-foreground">
+            SAR {Math.round(propertyCtx.price / 12).toLocaleString()}
+            <span className="ms-1 text-xs font-normal text-muted-foreground">/mo</span>
+          </p>
+          <Link
+            to="/property/$id"
+            params={{ id: String(propertyCtx.id) }}
+            className="mt-3 inline-flex items-center gap-0.5 text-xs font-semibold text-ai hover:underline"
+          >
+            {t("advisor.panel.viewProperty")} <ChevronRight className="size-3 rtl:rotate-180" />
+          </Link>
+        </div>
+      )}
+
+      <div>
+        <div className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          {t("advisor.panel.suggestedTitle")}
+        </div>
+        <div className="flex flex-col gap-2">
+          {suggested.map((q) => (
+            <button
+              key={q}
+              onClick={() => onSend(q)}
+              className="rounded-xl border border-border bg-card px-3 py-2.5 text-start text-xs leading-relaxed text-foreground transition-colors hover:border-ai/40 hover:bg-ai-soft/30"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          {t("advisor.panel.quickLinksTitle")}
+        </div>
+        <div className="flex flex-col gap-1">
+          <Link
+            to="/areas"
+            className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-foreground transition-colors hover:bg-surface"
+          >
+            <Map className="size-4 text-muted-foreground" /> {t("nav.exploreAreas")}
+          </Link>
+          <Link
+            to="/compare"
+            className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-foreground transition-colors hover:bg-surface"
+          >
+            <Scale className="size-4 text-muted-foreground" /> {t("nav.compare")}
+          </Link>
+          <Link
+            to="/lead/new"
+            search={{ area: propertyCtx?.district ?? "", city: propertyCtx?.city ?? "Riyadh" }}
+            className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-foreground transition-colors hover:bg-surface"
+          >
+            <Briefcase className="size-4 text-muted-foreground" /> {t("search.submitLeadRequest")}
+          </Link>
+          <Link
+            to="/property-requests/new"
+            className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-foreground transition-colors hover:bg-surface"
+          >
+            <Sparkles className="size-4 text-muted-foreground" />{" "}
+            {t("propertyRequest.entryPoint.ctaShort")}
+          </Link>
+        </div>
+      </div>
+    </aside>
   );
 }
 
@@ -378,7 +524,9 @@ function LeadConfirmCard({ data }: { data: LeadData }) {
         <p className="mb-4 text-sm text-muted-foreground">
           {t("advisor.leadConfirm.signInDesc", { area: data.area_name, city: data.city })}
         </p>
-        <Button size="sm" onClick={() => void navigate({ to: "/auth" })}>{t("advisor.leadConfirm.signInButton")}</Button>
+        <Button size="sm" onClick={() => void navigate({ to: "/auth" })}>
+          {t("advisor.leadConfirm.signInButton")}
+        </Button>
       </div>
     );
   }
@@ -388,13 +536,17 @@ function LeadConfirmCard({ data }: { data: LeadData }) {
       <div className="mb-8 ms-10 flex items-center gap-3 rounded-2xl border border-success/30 bg-success/5 p-5">
         <CheckCircle className="size-5 shrink-0 text-success" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-success">{t("advisor.leadConfirm.leadSubmitted")}</p>
+          <p className="text-sm font-semibold text-success">
+            {t("advisor.leadConfirm.leadSubmitted")}
+          </p>
           <p className="text-xs text-muted-foreground">
             {t("advisor.leadConfirm.willBeNotified", { area: data.area_name, city: data.city })}
           </p>
         </div>
         <Link to="/lead/$leadId" params={{ leadId: String(doneLeadId) }}>
-          <Button size="sm" variant="outline">{t("advisor.leadConfirm.trackLead")}</Button>
+          <Button size="sm" variant="outline">
+            {t("advisor.leadConfirm.trackLead")}
+          </Button>
         </Link>
       </div>
     );
@@ -409,19 +561,41 @@ function LeadConfirmCard({ data }: { data: LeadData }) {
 
       {/* Lead summary */}
       <div className="mb-4 grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-xl bg-surface p-3 text-sm">
-        <div><span className="text-muted-foreground">{t("advisor.leadConfirm.district")}</span><span className="font-medium">{data.area_name}</span></div>
-        <div><span className="text-muted-foreground">{t("advisor.leadConfirm.city")}</span><span className="font-medium">{data.city}</span></div>
+        <div>
+          <span className="text-muted-foreground">{t("advisor.leadConfirm.district")}</span>
+          <span className="font-medium">{data.area_name}</span>
+        </div>
+        <div>
+          <span className="text-muted-foreground">{t("advisor.leadConfirm.city")}</span>
+          <span className="font-medium">{data.city}</span>
+        </div>
         {data.bedrooms_needed != null && (
-          <div><span className="text-muted-foreground">{t("advisor.leadConfirm.bedrooms")}</span><span className="font-medium">{t("advisor.leadConfirm.bedroomsValue", { count: data.bedrooms_needed })}</span></div>
+          <div>
+            <span className="text-muted-foreground">{t("advisor.leadConfirm.bedrooms")}</span>
+            <span className="font-medium">
+              {t("advisor.leadConfirm.bedroomsValue", { count: data.bedrooms_needed })}
+            </span>
+          </div>
         )}
         {data.max_budget != null && (
-          <div><span className="text-muted-foreground">{t("advisor.leadConfirm.budget")}</span><span className="font-medium">{t("advisor.leadConfirm.budgetValue", { amount: data.max_budget.toLocaleString() })}</span></div>
+          <div>
+            <span className="text-muted-foreground">{t("advisor.leadConfirm.budget")}</span>
+            <span className="font-medium">
+              {t("advisor.leadConfirm.budgetValue", { amount: data.max_budget.toLocaleString() })}
+            </span>
+          </div>
         )}
         {data.move_in_date && (
-          <div><span className="text-muted-foreground">{t("advisor.leadConfirm.moveIn")}</span><span className="font-medium">{data.move_in_date}</span></div>
+          <div>
+            <span className="text-muted-foreground">{t("advisor.leadConfirm.moveIn")}</span>
+            <span className="font-medium">{data.move_in_date}</span>
+          </div>
         )}
         {data.requirements_note && (
-          <div className="col-span-2"><span className="text-muted-foreground">{t("advisor.leadConfirm.requirements")}</span><span className="font-medium">{data.requirements_note}</span></div>
+          <div className="col-span-2">
+            <span className="text-muted-foreground">{t("advisor.leadConfirm.requirements")}</span>
+            <span className="font-medium">{data.requirements_note}</span>
+          </div>
         )}
       </div>
 
@@ -429,7 +603,9 @@ function LeadConfirmCard({ data }: { data: LeadData }) {
       <div className="mb-3">
         <label className="mb-1.5 block text-xs font-medium">
           {t("advisor.leadConfirm.yourPhone")} <span className="text-destructive">*</span>
-          <span className="ms-1 font-normal text-muted-foreground">{t("advisor.leadConfirm.phoneNote")}</span>
+          <span className="ms-1 font-normal text-muted-foreground">
+            {t("advisor.leadConfirm.phoneNote")}
+          </span>
         </label>
         <div className="flex items-center gap-2">
           <Phone className="size-4 shrink-0 text-muted-foreground" />
@@ -472,7 +648,9 @@ function LeadConfirmCard({ data }: { data: LeadData }) {
             }
           }}
         >
-          {submitting ? t("advisor.leadConfirm.submitting") : t("advisor.leadConfirm.submitLeadRequest")}
+          {submitting
+            ? t("advisor.leadConfirm.submitting")
+            : t("advisor.leadConfirm.submitLeadRequest")}
         </Button>
         <span className="text-xs text-muted-foreground">{t("advisor.leadConfirm.freeNote")}</span>
       </div>
@@ -481,25 +659,15 @@ function LeadConfirmCard({ data }: { data: LeadData }) {
 }
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
-function EmptyState({ onSend, propertyCtx }: { onSend: (t: string) => void; propertyCtx: Property | null }) {
+function EmptyState({
+  onSend,
+  propertyCtx,
+}: {
+  onSend: (t: string) => void;
+  propertyCtx: Property | null;
+}) {
   const { t } = useLanguage();
-  const suggested = propertyCtx
-    ? [
-        t("advisor.suggested.propFair", {
-          amount: Math.round(propertyCtx.price / 12).toLocaleString(),
-          bedrooms: propertyCtx.bedrooms,
-          district: propertyCtx.district,
-        }),
-        t("advisor.suggested.propPros", { district: propertyCtx.district }),
-        t("advisor.suggested.propCompare", { district: propertyCtx.district, city: propertyCtx.city }),
-        t("advisor.suggested.propCheck"),
-      ]
-    : [
-        t("advisor.suggested.q1"),
-        t("advisor.suggested.q2"),
-        t("advisor.suggested.q3"),
-        t("advisor.suggested.q4"),
-      ];
+  const suggested = buildSuggestedPrompts(t, propertyCtx);
 
   return (
     <div className="flex h-full flex-col items-center justify-center px-4 pb-16">
@@ -508,14 +676,18 @@ function EmptyState({ onSend, propertyCtx }: { onSend: (t: string) => void; prop
       </div>
       {propertyCtx ? (
         <>
-          <h2 className="font-display text-2xl font-bold tracking-tight">{t("advisor.emptyState.askAboutProperty")}</h2>
+          <h2 className="font-display text-2xl font-bold tracking-tight">
+            {t("advisor.emptyState.askAboutProperty")}
+          </h2>
           <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
             {propertyCtx.title} · {propertyCtx.district}, {propertyCtx.city}
           </p>
         </>
       ) : (
         <>
-          <h2 className="font-display text-2xl font-bold tracking-tight">{t("advisor.emptyState.title")}</h2>
+          <h2 className="font-display text-2xl font-bold tracking-tight">
+            {t("advisor.emptyState.title")}
+          </h2>
           <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
             {t("advisor.emptyState.desc")}
           </p>
@@ -534,17 +706,35 @@ function EmptyState({ onSend, propertyCtx }: { onSend: (t: string) => void; prop
       </div>
 
       {/* Lead request shortcut */}
-      <div className="mt-4 w-full max-w-lg">
+      <div className="mt-4 w-full max-w-lg space-y-2">
         <button
           onClick={() => onSend(t("advisor.emptyState.leadShortcutPrompt"))}
           className="flex w-full items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-start text-sm transition-colors hover:bg-primary/10"
         >
           <Briefcase className="size-4 shrink-0 text-primary" />
           <div>
-            <span className="font-medium text-foreground">{t("advisor.emptyState.getMatchedTitle")}</span>
-            <span className="ms-2 text-muted-foreground">{t("advisor.emptyState.getMatchedDesc")}</span>
+            <span className="font-medium text-foreground">
+              {t("advisor.emptyState.getMatchedTitle")}
+            </span>
+            <span className="ms-2 text-muted-foreground">
+              {t("advisor.emptyState.getMatchedDesc")}
+            </span>
           </div>
         </button>
+        <Link
+          to="/property-requests/new"
+          className="flex w-full items-center gap-3 rounded-xl border border-ai/20 bg-ai-soft/20 px-4 py-3 text-start text-sm transition-colors hover:bg-ai-soft/30"
+        >
+          <Sparkles className="size-4 shrink-0 text-ai" />
+          <div>
+            <span className="font-medium text-foreground">
+              {t("propertyRequest.entryPoint.heading")}
+            </span>
+            <span className="ms-2 text-muted-foreground">
+              {t("propertyRequest.entryPoint.desc")}
+            </span>
+          </div>
+        </Link>
       </div>
     </div>
   );
@@ -644,7 +834,12 @@ function MarkdownBlock({ text }: { text: string }) {
     // Markdown table: header row `| a | b |`, separator row `|---|---|`, then data rows
     if (line.trim().startsWith("|") && lines[i + 1]?.match(/^\s*\|?[\s:-]+\|[\s:|-]*$/)) {
       const parseRow = (row: string): string[] =>
-        row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+        row
+          .trim()
+          .replace(/^\|/, "")
+          .replace(/\|$/, "")
+          .split("|")
+          .map((c) => c.trim());
 
       const header = parseRow(line);
       i += 2; // skip header + separator rows
@@ -663,7 +858,10 @@ function MarkdownBlock({ text }: { text: string }) {
             <thead className="bg-surface-2/60">
               <tr>
                 {header.map((h, j) => (
-                  <th key={j} className="whitespace-nowrap px-3 py-2 text-start text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <th
+                    key={j}
+                    className="whitespace-nowrap px-3 py-2 text-start text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
                     {inlineFormat(h)}
                   </th>
                 ))}
@@ -673,7 +871,9 @@ function MarkdownBlock({ text }: { text: string }) {
               {rows.map((r, ri) => (
                 <tr key={ri} className="hover:bg-surface/60">
                   {r.map((c, ci) => (
-                    <td key={ci} className="whitespace-nowrap px-3 py-2 text-foreground">{inlineFormat(c)}</td>
+                    <td key={ci} className="whitespace-nowrap px-3 py-2 text-foreground">
+                      {inlineFormat(c)}
+                    </td>
                   ))}
                 </tr>
               ))}
@@ -749,7 +949,11 @@ function inlineFormat(text: string): ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g);
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={i} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>;
+      return (
+        <strong key={i} className="font-semibold text-foreground">
+          {part.slice(2, -2)}
+        </strong>
+      );
     }
     if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
       return <em key={i}>{part.slice(1, -1)}</em>;

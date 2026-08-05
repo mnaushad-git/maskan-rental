@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "../lib/auth-context";
 import { LanguageProvider, useLanguage } from "../lib/i18n/context";
+import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   const { t } = useLanguage();
@@ -129,6 +130,7 @@ function RootComponent() {
         <AuthProvider>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
+          <Toaster position="top-center" richColors closeButton />
         </AuthProvider>
       </LanguageProvider>
     </QueryClientProvider>

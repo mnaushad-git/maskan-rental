@@ -9,9 +9,11 @@ const PROP_IMAGES = [prop1, prop2, prop3, prop4] as const;
 import {
   Bath,
   BedDouble,
+  Bell,
   Briefcase,
   Building2,
   CheckCircle2,
+  ClipboardList,
   Clock,
   FileText,
   Filter,
@@ -94,8 +96,7 @@ export const Route = createFileRoute("/admin")({
       { title: "Admin Console — Maskan" },
       {
         name: "description",
-        content:
-          "Manage property listings, approvals and publishing for the Maskan marketplace.",
+        content: "Manage property listings, approvals and publishing for the Maskan marketplace.",
       },
     ],
   }),
@@ -125,7 +126,6 @@ type Listing = {
   furnished?: string;
 };
 
-
 // ---------- Page ----------
 
 type AdminView = "listings" | "mediators" | "leads" | "users" | "reviews";
@@ -149,7 +149,7 @@ function AdminPage() {
   const [statusFilter, setStatusFilter] = useState<ListingStatus | "All">("All");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<Listing | null>(null);
+  const [editing, setEditing] = useState<Listing | Partial<Listing> | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [viewing, setViewing] = useState<Listing | null>(null);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
@@ -177,27 +177,43 @@ function AdminPage() {
     }
 
     void loadAll();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [user, authLoading]);
 
   // Load pending review count on mount for badge
   useEffect(() => {
     if (!user?.is_admin) return;
-    fetchAllReviews("pending").then(r => setPendingReviewCount(r.length)).catch(() => {});
+    fetchAllReviews("pending")
+      .then((r) => setPendingReviewCount(r.length))
+      .catch(() => {});
   }, [user]);
 
   useEffect(() => {
     if (view === "mediators" && mediators.length === 0 && !loadingMediators) {
       setLoadingMediators(true);
-      fetchAdminMediators().then(m => setMediators(m)).catch(() => {}).finally(() => setLoadingMediators(false));
+      fetchAdminMediators()
+        .then((m) => setMediators(m))
+        .catch(() => {})
+        .finally(() => setLoadingMediators(false));
     }
     if (view === "leads" && leads.length === 0 && !loadingLeads) {
       setLoadingLeads(true);
-      fetchAdminLeads().then(l => setLeads(l)).catch(err => console.error("fetchAdminLeads failed:", err)).finally(() => setLoadingLeads(false));
+      fetchAdminLeads()
+        .then((l) => setLeads(l))
+        .catch((err) => console.error("fetchAdminLeads failed:", err))
+        .finally(() => setLoadingLeads(false));
     }
     if (view === "reviews" && !loadingReviews) {
       setLoadingReviews(true);
-      fetchAllReviews().then(r => { setReviews(r); setPendingReviewCount(r.filter(x => x.status === "pending").length); }).catch(() => {}).finally(() => setLoadingReviews(false));
+      fetchAllReviews()
+        .then((r) => {
+          setReviews(r);
+          setPendingReviewCount(r.filter((x) => x.status === "pending").length);
+        })
+        .catch(() => {})
+        .finally(() => setLoadingReviews(false));
     }
   }, [view]);
 
@@ -205,8 +221,8 @@ function AdminPage() {
     setLoadingUsers(true);
     setUsersError(null);
     fetchAdminUsers()
-      .then(u => setUsers(u))
-      .catch(err => {
+      .then((u) => setUsers(u))
+      .catch((err) => {
         console.error("fetchAdminUsers failed:", err);
         setUsersError(err instanceof Error ? err.message : String(err));
       })
@@ -226,8 +242,11 @@ function AdminPage() {
   );
 
   function toggleSort(key: "city" | "district" | "rent") {
-    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir("asc"); }
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
   }
 
   const filtered = useMemo(() => {
@@ -345,12 +364,16 @@ function AdminPage() {
 
       // Sync images: add new URLs, delete removed ones
       const existingImages = saved.images ?? [];
-      const existingUrls = new Set(existingImages.map(i => i.url));
+      const existingUrls = new Set(existingImages.map((i) => i.url));
       const newUrlSet = new Set(newImageUrls);
 
       await Promise.all([
-        ...newImageUrls.filter(u => !existingUrls.has(u)).map(u => addPropertyImage(saved.id, u)),
-        ...existingImages.filter(i => !newUrlSet.has(i.url)).map(i => deletePropertyImage(saved.id, i.id)),
+        ...newImageUrls
+          .filter((u) => !existingUrls.has(u))
+          .map((u) => addPropertyImage(saved.id, u)),
+        ...existingImages
+          .filter((i) => !newUrlSet.has(i.url))
+          .map((i) => deletePropertyImage(saved.id, i.id)),
       ]);
 
       const fresh = await fetchAdminProperties();
@@ -363,43 +386,43 @@ function AdminPage() {
 
   async function handleVerifyMediator(id: number, is_verified: boolean) {
     const updated = await patchMediatorAdmin(id, { is_verified });
-    setMediators(m => m.map(med => med.id === updated.id ? updated : med));
+    setMediators((m) => m.map((med) => (med.id === updated.id ? updated : med)));
   }
 
   async function handleApprovePartner(id: number) {
     const updated = await approvePartner(id);
-    setMediators(m => m.map(med => med.id === updated.id ? updated : med));
+    setMediators((m) => m.map((med) => (med.id === updated.id ? updated : med)));
   }
 
   async function handleRejectPartner(id: number) {
     const updated = await rejectPartner(id);
-    setMediators(m => m.map(med => med.id === updated.id ? updated : med));
+    setMediators((m) => m.map((med) => (med.id === updated.id ? updated : med)));
   }
 
   async function handleAddPartner(payload: Parameters<typeof adminCreatePartner>[0]) {
     const created = await adminCreatePartner(payload);
-    setMediators(m => [created, ...m]);
+    setMediators((m) => [created, ...m]);
   }
 
   async function handleAddUser(payload: Parameters<typeof adminCreateUser>[0]) {
     const created = await adminCreateUser(payload);
-    setUsers(u => [created, ...u]);
+    setUsers((u) => [created, ...u]);
   }
 
   async function handleUpdateUser(id: number, payload: Parameters<typeof adminUpdateUser>[1]) {
     const updated = await adminUpdateUser(id, payload);
-    setUsers(u => u.map(x => x.id === updated.id ? updated : x));
+    setUsers((u) => u.map((x) => (x.id === updated.id ? updated : x)));
     return updated;
   }
 
   async function handleAddLead(payload: Parameters<typeof createLead>[0]) {
     const created = await createLead(payload);
-    setLeads(l => [created, ...l]);
+    setLeads((l) => [created, ...l]);
     return created;
   }
 
   function updateLead(updated: ApiLeadDetail) {
-    setLeads(l => l.map(lead => lead.id === updated.id ? updated : lead));
+    setLeads((l) => l.map((lead) => (lead.id === updated.id ? updated : lead)));
   }
 
   async function handleApproveLead(id: number) {
@@ -427,16 +450,30 @@ function AdminPage() {
     updateLead(updated);
   }
 
-  if (authLoading) return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">Loading…</p></div>;
-  if (!user || !user.is_admin) return <AdminLoginGate onAuth={setAuth} nonAdminUser={user !== null} />;
+  if (authLoading)
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    );
+  if (!user || !user.is_admin)
+    return <AdminLoginGate onAuth={setAuth} nonAdminUser={user !== null} />;
 
   return (
     <div className="flex min-h-screen bg-surface">
-      <AdminSidebar activeView={view} onViewChange={setView} pendingReviewCount={pendingReviewCount} />
+      <AdminSidebar
+        activeView={view}
+        onViewChange={setView}
+        pendingReviewCount={pendingReviewCount}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar onAiOpen={() => setAiPanelOpen(true)} />
-        <AdminMobileNav activeView={view} onViewChange={setView} pendingReviewCount={pendingReviewCount} />
+        <AdminMobileNav
+          activeView={view}
+          onViewChange={setView}
+          pendingReviewCount={pendingReviewCount}
+        />
 
         <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
           {/* Users view */}
@@ -453,7 +490,14 @@ function AdminPage() {
 
           {/* Mediators view */}
           {view === "mediators" && (
-            <MediatorsView mediators={mediators} loading={loadingMediators} onVerify={handleVerifyMediator} onApprove={handleApprovePartner} onReject={handleRejectPartner} onAdd={handleAddPartner} />
+            <MediatorsView
+              mediators={mediators}
+              loading={loadingMediators}
+              onVerify={handleVerifyMediator}
+              onApprove={handleApprovePartner}
+              onReject={handleRejectPartner}
+              onAdd={handleAddPartner}
+            />
           )}
 
           {/* Leads view */}
@@ -477,205 +521,250 @@ function AdminPage() {
               loading={loadingReviews}
               onModerate={async (id, status) => {
                 const updated = await moderateReview(id, status);
-                setReviews(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r));
-                setPendingReviewCount(c => status === "approved" ? Math.max(0, c - 1) : Math.max(0, c - 1));
+                setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, ...updated } : r)));
+                setPendingReviewCount((c) =>
+                  status === "approved" ? Math.max(0, c - 1) : Math.max(0, c - 1),
+                );
               }}
             />
           )}
 
           {/* Listings view */}
-          {view === "listings" && <>
-          {/* Heading */}
-          <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Listings
-              </p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight">
-                Listing Console
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Review submissions, publish properties and manage agent inventory.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/import"><Upload className="size-4" /> Import CSV</Link>
-              </Button>
-              <Button size="sm" onClick={openNew}>
-                <Plus className="size-4" /> New listing
-              </Button>
-            </div>
-          </div>
-
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard
-              label="Total listings"
-              value={stats.total}
-              delta="+12 this week"
-              icon={<Home className="size-4" />}
-              tone="primary"
-            />
-            <StatCard
-              label="Pending approval"
-              value={stats.pending}
-              delta="Needs review"
-              icon={<Clock className="size-4" />}
-              tone="warning"
-            />
-            <StatCard
-              label="Published"
-              value={stats.published}
-              delta="+4.2% MoM"
-              icon={<CheckCircle2 className="size-4" />}
-              tone="success"
-            />
-            <StatCard
-              label="Rejected"
-              value={stats.rejected}
-              delta="-1 vs last week"
-              icon={<ShieldAlert className="size-4" />}
-              tone="destructive"
-            />
-          </div>
-
-          {/* Table panel */}
-          <section className="mt-8 overflow-hidden rounded-2xl border border-border bg-card shadow-card">
-            {/* Toolbar */}
-            <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-4">
-              <div className="relative flex-1 min-w-[220px]">
-                <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by title, owner, city or ID…"
-                  className="ps-9"
-                />
-              </div>
-              <StatusFilter value={statusFilter} onChange={setStatusFilter} stats={stats} />
-              <Button variant="outline" size="sm">
-                <Filter className="size-4" /> More filters
-              </Button>
-              {selected.size > 0 && (
-                <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold">
-                  {selected.size} selected
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => void bulkSetStatus("Published")}>
-                    Approve
+          {view === "listings" && (
+            <>
+              {/* Heading */}
+              <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Listings
+                  </p>
+                  <h1 className="mt-1 text-2xl font-bold tracking-tight">Listing Console</h1>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Review submissions, publish properties and manage agent inventory.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to="/import">
+                      <Upload className="size-4" /> Import CSV
+                    </Link>
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => void bulkSetStatus("Suspended")}>
-                    Suspend
+                  <Button size="sm" onClick={openNew}>
+                    <Plus className="size-4" /> New listing
                   </Button>
                 </div>
-              )}
-            </div>
-
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-2/60 text-xs uppercase tracking-wider text-muted-foreground">
-                  <tr>
-                    <th className="w-10 px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selected.size === paginated.length && paginated.length > 0}
-                        onChange={toggleAll}
-                        className="size-4 cursor-pointer rounded border-border"
-                      />
-                    </th>
-                    <th className="w-52 px-4 py-3 text-start font-semibold">Property</th>
-                    <th className="px-4 py-3 text-start font-semibold">
-                      <button type="button" onClick={() => toggleSort("city")} className="inline-flex items-center gap-1 hover:text-foreground">
-                        City <SortIcon active={sortKey === "city"} dir={sortDir} />
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-start font-semibold">
-                      <button type="button" onClick={() => toggleSort("district")} className="inline-flex items-center gap-1 hover:text-foreground">
-                        District <SortIcon active={sortKey === "district"} dir={sortDir} />
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-end font-semibold">
-                      <button type="button" onClick={() => toggleSort("rent")} className="inline-flex items-center gap-1 hover:text-foreground">
-                        Rent / mo <SortIcon active={sortKey === "rent"} dir={sortDir} />
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 text-start font-semibold">Status</th>
-                    <th className="px-4 py-3 text-start font-semibold">Owner</th>
-                    <th className="w-24 px-4 py-3 sticky right-0 bg-surface-2/60"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {paginated.map((l) => (
-                    <ListingRow
-                      key={l.id}
-                      l={l}
-                      checked={selected.has(l.id)}
-                      onCheck={() => toggleSelect(l.id)}
-                      onStatus={(s) => void setStatus(l.id, s)}
-                      onView={() => openView(l)}
-                      onEdit={() => openEdit(l)}
-                      onRemove={() => void remove(l.id)}
-                    />
-                  ))}
-                  {loadingListings && (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">
-                        Loading listings…
-                      </td>
-                    </tr>
-                  )}
-                  {!loadingListings && filtered.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">
-                        No listings match these filters.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between border-t border-border px-5 py-3 text-xs text-muted-foreground">
-              <span>
-                Showing{" "}
-                <span className="font-semibold text-foreground">
-                  {filtered.length === 0 ? 0 : page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)}
-                </span>{" "}
-                of <span className="font-semibold text-foreground">{filtered.length}</span> listings
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  disabled={(page + 1) * PAGE_SIZE >= filtered.length}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </Button>
               </div>
-            </div>
-          </section>
-          </>}
+
+              {/* Stat cards */}
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <StatCard
+                  label="Total listings"
+                  value={stats.total}
+                  delta="+12 this week"
+                  icon={<Home className="size-4" />}
+                  tone="primary"
+                />
+                <StatCard
+                  label="Pending approval"
+                  value={stats.pending}
+                  delta="Needs review"
+                  icon={<Clock className="size-4" />}
+                  tone="warning"
+                />
+                <StatCard
+                  label="Published"
+                  value={stats.published}
+                  delta="+4.2% MoM"
+                  icon={<CheckCircle2 className="size-4" />}
+                  tone="success"
+                />
+                <StatCard
+                  label="Rejected"
+                  value={stats.rejected}
+                  delta="-1 vs last week"
+                  icon={<ShieldAlert className="size-4" />}
+                  tone="destructive"
+                />
+              </div>
+
+              {/* Table panel */}
+              <section className="mt-8 overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+                {/* Toolbar */}
+                <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-4">
+                  <div className="relative flex-1 min-w-[220px]">
+                    <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search by title, owner, city or ID…"
+                      className="ps-9"
+                    />
+                  </div>
+                  <StatusFilter value={statusFilter} onChange={setStatusFilter} stats={stats} />
+                  <Button variant="outline" size="sm">
+                    <Filter className="size-4" /> More filters
+                  </Button>
+                  {selected.size > 0 && (
+                    <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold">
+                      {selected.size} selected
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => void bulkSetStatus("Published")}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => void bulkSetStatus("Suspended")}
+                      >
+                        Suspend
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-surface-2/60 text-xs uppercase tracking-wider text-muted-foreground">
+                      <tr>
+                        <th className="w-10 px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selected.size === paginated.length && paginated.length > 0}
+                            onChange={toggleAll}
+                            className="size-4 cursor-pointer rounded border-border"
+                          />
+                        </th>
+                        <th className="w-52 px-4 py-3 text-start font-semibold">Property</th>
+                        <th className="px-4 py-3 text-start font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => toggleSort("city")}
+                            className="inline-flex items-center gap-1 hover:text-foreground"
+                          >
+                            City <SortIcon active={sortKey === "city"} dir={sortDir} />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 text-start font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => toggleSort("district")}
+                            className="inline-flex items-center gap-1 hover:text-foreground"
+                          >
+                            District <SortIcon active={sortKey === "district"} dir={sortDir} />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 text-end font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => toggleSort("rent")}
+                            className="inline-flex items-center gap-1 hover:text-foreground"
+                          >
+                            Rent / mo <SortIcon active={sortKey === "rent"} dir={sortDir} />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 text-start font-semibold">Status</th>
+                        <th className="px-4 py-3 text-start font-semibold">Owner</th>
+                        <th className="w-24 px-4 py-3 sticky right-0 bg-surface-2/60"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {paginated.map((l) => (
+                        <ListingRow
+                          key={l.id}
+                          l={l}
+                          checked={selected.has(l.id)}
+                          onCheck={() => toggleSelect(l.id)}
+                          onStatus={(s) => void setStatus(l.id, s)}
+                          onView={() => openView(l)}
+                          onEdit={() => openEdit(l)}
+                          onRemove={() => void remove(l.id)}
+                        />
+                      ))}
+                      {loadingListings && (
+                        <tr>
+                          <td
+                            colSpan={8}
+                            className="px-4 py-16 text-center text-sm text-muted-foreground"
+                          >
+                            Loading listings…
+                          </td>
+                        </tr>
+                      )}
+                      {!loadingListings && filtered.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={8}
+                            className="px-4 py-16 text-center text-sm text-muted-foreground"
+                          >
+                            No listings match these filters.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between border-t border-border px-5 py-3 text-xs text-muted-foreground">
+                  <span>
+                    Showing{" "}
+                    <span className="font-semibold text-foreground">
+                      {filtered.length === 0 ? 0 : page * PAGE_SIZE + 1}–
+                      {Math.min((page + 1) * PAGE_SIZE, filtered.length)}
+                    </span>{" "}
+                    of <span className="font-semibold text-foreground">{filtered.length}</span>{" "}
+                    listings
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      disabled={page === 0}
+                      onClick={() => setPage((p) => p - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      disabled={(page + 1) * PAGE_SIZE >= filtered.length}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
         </main>
       </div>
 
       {aiPanelOpen && (
         <AdminAIPanel
           onClose={() => setAiPanelOpen(false)}
-          onCreateListing={(prefill) => { setAiPanelOpen(false); setEditing(prefill ?? null); setFormOpen(true); setView("listings"); }}
-          onCreatePartner={() => { setAiPanelOpen(false); setView("mediators"); }}
-          onCreateLead={() => { setAiPanelOpen(false); setView("leads"); }}
+          onCreateListing={(prefill) => {
+            setAiPanelOpen(false);
+            setEditing(prefill ?? null);
+            setFormOpen(true);
+            setView("listings");
+          }}
+          onCreatePartner={() => {
+            setAiPanelOpen(false);
+            setView("mediators");
+          }}
+          onCreateLead={() => {
+            setAiPanelOpen(false);
+            setView("leads");
+          }}
         />
       )}
 
@@ -684,7 +773,10 @@ function AdminPage() {
           listing={viewing}
           onClose={() => setDetailOpen(false)}
           onEdit={() => openEdit(viewing)}
-          onStatus={(s) => { void setStatus(viewing.id, s); setViewing({ ...viewing, status: s }); }}
+          onStatus={(s) => {
+            void setStatus(viewing.id, s);
+            setViewing({ ...viewing, status: s });
+          }}
         />
       )}
 
@@ -701,9 +793,13 @@ function AdminPage() {
 
 // ---------- Reviews moderation ----------
 
-const STATUS_LABELS: Record<string, string> = { pending: "Pending", approved: "Approved", rejected: "Rejected" };
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+};
 const STATUS_TONES: Record<string, string> = {
-  pending:  "bg-warning/10 text-warning",
+  pending: "bg-warning/10 text-warning",
   approved: "bg-success/10 text-success",
   rejected: "bg-destructive/10 text-destructive",
 };
@@ -711,15 +807,24 @@ const STATUS_TONES: Record<string, string> = {
 function ReviewStaticStars({ score }: { score: number }) {
   return (
     <span className="flex items-center gap-0.5">
-      {[1,2,3,4,5].map(i => (
-        <Star key={i} className={cn("size-3.5", i <= score ? "fill-warning text-warning" : "text-muted-foreground/20")} strokeWidth={1.5} />
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Star
+          key={i}
+          className={cn(
+            "size-3.5",
+            i <= score ? "fill-warning text-warning" : "text-muted-foreground/20",
+          )}
+          strokeWidth={1.5}
+        />
       ))}
     </span>
   );
 }
 
 function ReviewsModerationView({
-  reviews, loading, onModerate,
+  reviews,
+  loading,
+  onModerate,
 }: {
   reviews: ApiReviewAdmin[];
   loading: boolean;
@@ -728,36 +833,47 @@ function ReviewsModerationView({
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
   const [acting, setActing] = useState<number | null>(null);
 
-  const visible = filter === "all" ? reviews : reviews.filter(r => r.status === filter);
-  const pendingCount = reviews.filter(r => r.status === "pending").length;
+  const visible = filter === "all" ? reviews : reviews.filter((r) => r.status === filter);
+  const pendingCount = reviews.filter((r) => r.status === "pending").length;
 
   async function act(id: number, status: "approved" | "rejected") {
     setActing(id);
-    try { await onModerate(id, status); }
-    finally { setActing(null); }
+    try {
+      await onModerate(id, status);
+    } finally {
+      setActing(null);
+    }
   }
 
   return (
     <div>
       <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Moderation</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Moderation
+        </p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Tenant Reviews</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Approve or reject reviews before they appear on partner profiles.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Approve or reject reviews before they appear on partner profiles.
+        </p>
       </div>
 
       {/* Filter bar */}
       <div className="mb-6 flex gap-2">
-        {(["pending", "approved", "rejected", "all"] as const).map(f => (
+        {(["pending", "approved", "rejected", "all"] as const).map((f) => (
           <button
             key={f}
             type="button"
             onClick={() => setFilter(f)}
             className={cn(
               "rounded-full px-3 py-1 text-sm font-medium transition-colors",
-              filter === f ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground hover:text-foreground",
+              filter === f
+                ? "bg-primary text-primary-foreground"
+                : "bg-surface-2 text-muted-foreground hover:text-foreground",
             )}
           >
-            {f === "pending" && pendingCount > 0 ? `Pending (${pendingCount})` : f.charAt(0).toUpperCase() + f.slice(1)}
+            {f === "pending" && pendingCount > 0
+              ? `Pending (${pendingCount})`
+              : f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
       </div>
@@ -770,12 +886,17 @@ function ReviewsModerationView({
       ) : visible.length === 0 ? (
         <div className="flex h-40 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
           <CheckCircle2 className="size-8 text-success/60" />
-          {filter === "pending" ? "No reviews pending — all caught up!" : "No reviews in this category."}
+          {filter === "pending"
+            ? "No reviews pending — all caught up!"
+            : "No reviews in this category."}
         </div>
       ) : (
         <div className="space-y-4">
-          {visible.map(review => (
-            <div key={review.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
+          {visible.map((review) => (
+            <div
+              key={review.id}
+              className="rounded-2xl border border-border bg-card p-5 shadow-card"
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <div className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">
@@ -783,15 +904,30 @@ function ReviewsModerationView({
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-sm">{review.reviewer_name ?? "Anonymous"}</span>
+                      <span className="font-semibold text-sm">
+                        {review.reviewer_name ?? "Anonymous"}
+                      </span>
                       <ReviewStaticStars score={review.rating} />
-                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", STATUS_TONES[review.status])}>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                          STATUS_TONES[review.status],
+                        )}
+                      >
                         {STATUS_LABELS[review.status]}
                       </span>
                     </div>
                     <div className="mt-0.5 text-xs text-muted-foreground">
-                      For: <span className="font-medium text-foreground">{review.mediator_agency_name ?? `Partner #${review.mediator_id}`}</span>
-                      {" · "}{new Date(review.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                      For:{" "}
+                      <span className="font-medium text-foreground">
+                        {review.mediator_agency_name ?? `Partner #${review.mediator_id}`}
+                      </span>
+                      {" · "}
+                      {new Date(review.created_at).toLocaleDateString("en-US", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </div>
                   </div>
                 </div>
@@ -858,19 +994,29 @@ function ReviewsModerationView({
 
 // ---------- Sidebar ----------
 
-function adminNavItems(pendingReviewCount: number): { view: AdminView; icon: React.ElementType; label: string; badge?: number }[] {
+function adminNavItems(
+  pendingReviewCount: number,
+): { view: AdminView; icon: React.ElementType; label: string; badge?: number }[] {
   return [
-    { view: "listings",  icon: ListChecks, label: "Listings"  },
-    { view: "mediators", icon: Briefcase,  label: "Partners"  },
-    { view: "leads",     icon: Users,      label: "Leads"     },
-    { view: "users",     icon: UserPlus,   label: "Users"     },
-    { view: "reviews",   icon: Star,       label: "Reviews", badge: pendingReviewCount },
+    { view: "listings", icon: ListChecks, label: "Listings" },
+    { view: "mediators", icon: Briefcase, label: "Partners" },
+    { view: "leads", icon: Users, label: "Leads" },
+    { view: "users", icon: UserPlus, label: "Users" },
+    { view: "reviews", icon: Star, label: "Reviews", badge: pendingReviewCount },
   ];
 }
 
 // Mobile nav dropdown — the sidebar is hidden below lg, so admins navigate with
 // this hamburger drawer (mirrors the customer portal's mobile menu).
-function AdminMobileNav({ activeView, onViewChange, pendingReviewCount }: { activeView: AdminView; onViewChange: (v: AdminView) => void; pendingReviewCount: number }) {
+function AdminMobileNav({
+  activeView,
+  onViewChange,
+  pendingReviewCount,
+}: {
+  activeView: AdminView;
+  onViewChange: (v: AdminView) => void;
+  pendingReviewCount: number;
+}) {
   const [open, setOpen] = useState(false);
   const items = adminNavItems(pendingReviewCount);
   const active = items.find((it) => it.view === activeView);
@@ -893,7 +1039,11 @@ function AdminMobileNav({ activeView, onViewChange, pendingReviewCount }: { acti
             </span>
           )}
         </span>
-        {open ? <X className="size-5 text-muted-foreground" /> : <Menu className="size-5 text-muted-foreground" />}
+        {open ? (
+          <X className="size-5 text-muted-foreground" />
+        ) : (
+          <Menu className="size-5 text-muted-foreground" />
+        )}
       </button>
 
       {open && (
@@ -902,10 +1052,15 @@ function AdminMobileNav({ activeView, onViewChange, pendingReviewCount }: { acti
             <button
               key={it.view}
               type="button"
-              onClick={() => { onViewChange(it.view); setOpen(false); }}
+              onClick={() => {
+                onViewChange(it.view);
+                setOpen(false);
+              }}
               className={cn(
                 "flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium transition-colors",
-                activeView === it.view ? "bg-primary-soft text-accent-foreground" : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                activeView === it.view
+                  ? "bg-primary-soft text-accent-foreground"
+                  : "text-muted-foreground hover:bg-surface hover:text-foreground",
               )}
             >
               <it.icon className="size-4" />
@@ -917,13 +1072,37 @@ function AdminMobileNav({ activeView, onViewChange, pendingReviewCount }: { acti
               )}
             </button>
           ))}
+          <Link
+            to="/admin/notifications"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+          >
+            <Bell className="size-4" />
+            <span className="flex-1 text-start">Notification ops</span>
+          </Link>
+          <Link
+            to="/admin/property-requests"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+          >
+            <ClipboardList className="size-4" />
+            <span className="flex-1 text-start">Property requests</span>
+          </Link>
         </nav>
       )}
     </div>
   );
 }
 
-function AdminSidebar({ activeView, onViewChange, pendingReviewCount }: { activeView: AdminView; onViewChange: (v: AdminView) => void; pendingReviewCount: number }) {
+function AdminSidebar({
+  activeView,
+  onViewChange,
+  pendingReviewCount,
+}: {
+  activeView: AdminView;
+  onViewChange: (v: AdminView) => void;
+  pendingReviewCount: number;
+}) {
   const { user, clearAuth } = useAuth();
   const navItems = adminNavItems(pendingReviewCount);
 
@@ -949,7 +1128,9 @@ function AdminSidebar({ activeView, onViewChange, pendingReviewCount }: { active
             onClick={() => onViewChange(it.view)}
             className={cn(
               "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-start transition-colors",
-              activeView === it.view ? "bg-primary-soft text-accent-foreground" : "text-muted-foreground hover:text-foreground hover:bg-surface-2",
+              activeView === it.view
+                ? "bg-primary-soft text-accent-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-surface-2",
             )}
           >
             <it.icon className="size-4" />
@@ -961,6 +1142,23 @@ function AdminSidebar({ activeView, onViewChange, pendingReviewCount }: { active
             )}
           </button>
         ))}
+        {/* Notification Operations lives at its own route (/admin/notifications),
+            not as a client-state AdminView, so it's a real Link rather than a
+            view-switch button — see routes/admin.notifications.tsx. */}
+        <Link
+          to="/admin/notifications"
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-start text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+        >
+          <Bell className="size-4" />
+          <span className="flex-1">Notification ops</span>
+        </Link>
+        <Link
+          to="/admin/property-requests"
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-start text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+        >
+          <ClipboardList className="size-4" />
+          <span className="flex-1">Property requests</span>
+        </Link>
       </nav>
 
       <div className="border-t border-border p-3 space-y-1">
@@ -989,12 +1187,19 @@ function AdminSidebar({ activeView, onViewChange, pendingReviewCount }: { active
 
 type AiMsg = { role: "user" | "assistant"; content: string };
 
-type AiAction = { type: "create_listing" | "create_partner" | "create_lead"; data?: Record<string, unknown> };
+type AiAction = {
+  type: "create_listing" | "create_partner" | "create_lead";
+  data?: Record<string, unknown>;
+};
 
 function parseAction(reply: string): AiAction | null {
   const m = reply.match(/<action>([\s\S]*?)<\/action>/);
   if (!m) return null;
-  try { return JSON.parse(m[1].trim()) as AiAction; } catch { return null; }
+  try {
+    return JSON.parse(m[1].trim()) as AiAction;
+  } catch {
+    return null;
+  }
 }
 
 function stripAction(reply: string) {
@@ -1034,8 +1239,8 @@ function AdminAIPanel({
   async function send(text: string) {
     if (!text.trim() || loading) return;
     const userMsg: AiMsg = { role: "user", content: text };
-    const history = messages.map(m => ({ role: m.role, content: m.content }));
-    setMessages(prev => [...prev, userMsg]);
+    const history = messages.map((m) => ({ role: m.role, content: m.content }));
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
     setPendingAction(null);
@@ -1043,10 +1248,16 @@ function AdminAIPanel({
       const { reply } = await adminAiChat(text, history);
       const action = parseAction(reply);
       const clean = stripAction(reply);
-      setMessages(prev => [...prev, { role: "assistant", content: clean }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: clean }]);
       if (action) setPendingAction(action);
     } catch (err) {
-      setMessages(prev => [...prev, { role: "assistant", content: `Error: ${err instanceof Error ? err.message : String(err)}` }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `Error: ${err instanceof Error ? err.message : String(err)}`,
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -1067,8 +1278,6 @@ function AdminAIPanel({
         areaSqm: Number(d.size_sq_m ?? d.area_sqm ?? 200),
         description: String(d.description ?? ""),
         status: "Draft",
-        id: "",
-        image: "",
         createdAt: new Date().toISOString(),
       };
       onCreateListing(prefill);
@@ -1088,7 +1297,12 @@ function AdminAIPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      <button type="button" aria-label="Close" className="flex-1 bg-foreground/30 backdrop-blur-sm" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close"
+        className="flex-1 bg-foreground/30 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <aside className="flex h-full w-full max-w-xl flex-col bg-background shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
@@ -1098,10 +1312,16 @@ function AdminAIPanel({
             </div>
             <div>
               <p className="text-sm font-bold leading-none">Admin AI Assistant</p>
-              <p className="text-xs text-muted-foreground">Powered by Claude · Full platform access</p>
+              <p className="text-xs text-muted-foreground">
+                Powered by Claude · Full platform access
+              </p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground">
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -1110,9 +1330,11 @@ function AdminAIPanel({
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
           {messages.length === 0 && (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground text-center">Ask me anything about the platform, or pick a prompt:</p>
+              <p className="text-sm text-muted-foreground text-center">
+                Ask me anything about the platform, or pick a prompt:
+              </p>
               <div className="grid grid-cols-2 gap-2">
-                {QUICK_PROMPTS.map(p => (
+                {QUICK_PROMPTS.map((p) => (
                   <button
                     key={p}
                     type="button"
@@ -1134,10 +1356,14 @@ function AdminAIPanel({
 
           {messages.map((m, i) => (
             <div key={i} className={`flex gap-3 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
-              <div className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}>
+              <div
+                className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
+              >
                 {m.role === "user" ? "A" : <Sparkles className="size-3.5" />}
               </div>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${m.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-surface-2 text-foreground rounded-tl-sm"}`}>
+              <div
+                className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${m.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-surface-2 text-foreground rounded-tl-sm"}`}
+              >
                 {m.content}
               </div>
             </div>
@@ -1175,17 +1401,28 @@ function AdminAIPanel({
           <div className="flex gap-2">
             <Input
               value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(input); } }}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send(input);
+                }
+              }}
               placeholder="Ask about data, or describe what to create…"
               disabled={loading}
               className="flex-1"
             />
-            <Button onClick={() => void send(input)} disabled={loading || !input.trim()} size="icon">
+            <Button
+              onClick={() => void send(input)}
+              disabled={loading || !input.trim()}
+              size="icon"
+            >
               <Send className="size-4" />
             </Button>
           </div>
-          <p className="mt-2 text-[10px] text-muted-foreground text-center">Press Enter to send · AI has full read access to all platform data</p>
+          <p className="mt-2 text-[10px] text-muted-foreground text-center">
+            Press Enter to send · AI has full read access to all platform data
+          </p>
         </div>
       </aside>
     </div>
@@ -1258,12 +1495,24 @@ function StatCard({
 
 function RoleBadge({ role }: { role: "admin" | "partner" | "customer" }) {
   const map = {
-    admin:    { label: "Admin",    cls: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
-    partner:  { label: "Partner",  cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+    admin: {
+      label: "Admin",
+      cls: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+    },
+    partner: {
+      label: "Partner",
+      cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+    },
     customer: { label: "Customer", cls: "bg-surface-2 text-muted-foreground" },
   };
   const { label, cls } = map[role] ?? map.customer;
-  return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>;
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}
+    >
+      {label}
+    </span>
+  );
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
@@ -1283,7 +1532,14 @@ function StatusFilter({
 }: {
   value: ListingStatus | "All";
   onChange: (v: ListingStatus | "All") => void;
-  stats: { total: number; pending: number; published: number; draft: number; suspended: number; rejected: number };
+  stats: {
+    total: number;
+    pending: number;
+    published: number;
+    draft: number;
+    suspended: number;
+    rejected: number;
+  };
 }) {
   const options: { label: ListingStatus | "All"; count: number }[] = [
     { label: "All", count: stats.total },
@@ -1340,7 +1596,7 @@ function ListingRow({
 
   return (
     <tr className="group hover:bg-surface-2/40 cursor-pointer" onClick={onView}>
-      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={checked}
@@ -1371,7 +1627,10 @@ function ListingRow({
         <ListingStatusBadge status={l.status} />
       </td>
       <td className="px-4 py-3 text-sm">{l.owner}</td>
-      <td className="relative sticky right-0 bg-card px-4 py-3 group-hover:bg-surface-2/40" onClick={e => e.stopPropagation()}>
+      <td
+        className="relative sticky right-0 bg-card px-4 py-3 group-hover:bg-surface-2/40"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -1511,16 +1770,28 @@ function ListingDetailDrawer({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex">
-      <button type="button" aria-label="Close" className="flex-1 bg-foreground/40 backdrop-blur-sm" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close"
+        className="flex-1 bg-foreground/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <aside className="flex h-full w-full max-w-lg flex-col bg-background shadow-2xl">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Property details</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Property details
+            </p>
             <h2 className="mt-1 truncate text-lg font-bold tracking-tight">{listing.title}</h2>
             <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{listing.id}</p>
           </div>
-          <button type="button" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground" aria-label="Close">
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+            aria-label="Close"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -1534,12 +1805,20 @@ function ListingDetailDrawer({
           <div className="flex items-center gap-3 flex-wrap">
             <ListingStatusBadge status={listing.status} />
             {listing.status !== "Published" && (
-              <button type="button" onClick={() => onStatus("Published")} className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
+              <button
+                type="button"
+                onClick={() => onStatus("Published")}
+                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+              >
                 <CheckCircle2 className="size-3.5" /> Approve & Publish
               </button>
             )}
             {listing.status === "Published" && (
-              <button type="button" onClick={() => onStatus("Suspended")} className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-surface-2">
+              <button
+                type="button"
+                onClick={() => onStatus("Suspended")}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-surface-2"
+              >
                 <ShieldAlert className="size-3.5" /> Suspend
               </button>
             )}
@@ -1548,51 +1827,81 @@ function ListingDetailDrawer({
           {/* Core details */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">City</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                City
+              </p>
               <p className="mt-1 text-sm font-medium">{listing.city}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">District</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                District
+              </p>
               <p className="mt-1 text-sm font-medium">{listing.district}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Monthly rent</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Monthly rent
+              </p>
               <p className="mt-1 text-sm font-semibold">SAR {formatSAR(listing.rent)}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Area</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Area
+              </p>
               <p className="mt-1 text-sm font-medium">{listing.areaSqm ?? "—"} m²</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bedrooms</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Bedrooms
+              </p>
               <p className="mt-1 text-sm font-medium">{listing.bedrooms ?? "—"}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bathrooms</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Bathrooms
+              </p>
               <p className="mt-1 text-sm font-medium">{listing.bathrooms ?? "—"}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Owner</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Owner
+              </p>
               <p className="mt-1 text-sm font-medium">{listing.owner}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Listed on</p>
-              <p className="mt-1 text-sm font-medium">{new Date(listing.createdAt).toLocaleDateString("en-SA", { day: "numeric", month: "short", year: "numeric" })}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Listed on
+              </p>
+              <p className="mt-1 text-sm font-medium">
+                {new Date(listing.createdAt).toLocaleDateString("en-SA", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </p>
             </div>
           </div>
 
           {/* Description */}
           {listing.description && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Description</p>
-              <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">{listing.description}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                Description
+              </p>
+              <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
+                {listing.description}
+              </p>
             </div>
           )}
         </div>
 
         {/* Footer */}
         <div className="border-t border-border px-6 py-4">
-          <button type="button" onClick={onEdit} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          >
             <Pencil className="size-4" /> Edit property
           </button>
         </div>
@@ -1606,11 +1915,11 @@ function ListingFormDrawer({
   onClose,
   onSave,
 }: {
-  listing: Listing | null;
+  listing: Listing | Partial<Listing> | null;
   onClose: () => void;
   onSave: (l: Listing, imageUrls: string[]) => void | Promise<void>;
 }) {
-  const isEdit = !!listing;
+  const isEdit = !!listing?.id;
   const [areas, setAreas] = useState<ApiAreaSummary[]>([]);
   const [form, setForm] = useState({
     id: listing?.id ?? `MSK-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -1629,14 +1938,14 @@ function ListingFormDrawer({
   });
 
   useEffect(() => {
-    fetchAreas().then(setAreas).catch(() => {});
+    fetchAreas()
+      .then(setAreas)
+      .catch(() => {});
   }, []);
-  const [amenities, setAmenities] = useState<Set<string>>(
-    new Set(["Parking", "Central A/C"]),
-  );
+  const [amenities, setAmenities] = useState<Set<string>>(new Set(["Parking", "Central A/C"]));
   const [media, setMedia] = useState<string[]>(
     listing?.images?.length
-      ? listing.images.sort((a, b) => a.display_order - b.display_order).map(i => i.url)
+      ? listing.images.sort((a, b) => a.display_order - b.display_order).map((i) => i.url)
       : listing?.image && !listing.image.startsWith("data:")
         ? [listing.image]
         : [],
@@ -1653,26 +1962,35 @@ function ListingFormDrawer({
 
   function submit(nextStatus: ListingStatus) {
     const rentNum = parseFloat(form.rent);
-    if (!form.district) { alert("Please select a district."); return; }
-    if (!rentNum || rentNum <= 0) { alert("Please enter a valid monthly rent."); return; }
-    void onSave({
-      id: form.id,
-      title: form.title || "Untitled listing",
-      city: form.city,
-      district: form.district,
-      rent: rentNum,
-      status: nextStatus,
-      owner: form.owner || "Unassigned",
-      createdAt: listing?.createdAt ?? new Date().toISOString().slice(0, 10),
-      image: media[0] ?? "",
-      images: listing?.images ?? [],
-      areaSqm: form.area,
-      bedrooms: form.bedrooms,
-      bathrooms: form.bathrooms,
-      description: form.description,
-      property_type: form.property_type || undefined,
-      furnished: form.furnished || undefined,
-    }, media);
+    if (!form.district) {
+      alert("Please select a district.");
+      return;
+    }
+    if (!rentNum || rentNum <= 0) {
+      alert("Please enter a valid monthly rent.");
+      return;
+    }
+    void onSave(
+      {
+        id: form.id,
+        title: form.title || "Untitled listing",
+        city: form.city,
+        district: form.district,
+        rent: rentNum,
+        status: nextStatus,
+        owner: form.owner || "Unassigned",
+        createdAt: listing?.createdAt ?? new Date().toISOString().slice(0, 10),
+        image: media[0] ?? "",
+        images: listing?.images ?? [],
+        areaSqm: form.area,
+        bedrooms: form.bedrooms,
+        bathrooms: form.bathrooms,
+        description: form.description,
+        property_type: form.property_type || undefined,
+        furnished: form.furnished || undefined,
+      },
+      media,
+    );
   }
 
   return (
@@ -1725,24 +2043,32 @@ function ListingFormDrawer({
               </Field>
               <Field label="District">
                 <select
-                  value={areas.some(a => a.name === form.district) ? form.district : (form.district ? "__custom__" : "")}
+                  value={
+                    areas.some((a) => a.name === form.district)
+                      ? form.district
+                      : form.district
+                        ? "__custom__"
+                        : ""
+                  }
                   onChange={(e) => {
                     if (e.target.value === "__custom__") {
                       setForm({ ...form, district: "" });
                     } else {
-                      const sel = areas.find(a => a.name === e.target.value);
+                      const sel = areas.find((a) => a.name === e.target.value);
                       setForm({ ...form, district: e.target.value, city: sel?.city ?? form.city });
                     }
                   }}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="">Select district…</option>
-                  {areas.map(a => (
-                    <option key={`${a.name}|${a.city}`} value={a.name}>{a.name}, {a.city}</option>
+                  {areas.map((a) => (
+                    <option key={`${a.name}|${a.city}`} value={a.name}>
+                      {a.name}, {a.city}
+                    </option>
                   ))}
                   <option value="__custom__">+ Enter new district…</option>
                 </select>
-                {(!areas.some(a => a.name === form.district)) && (
+                {!areas.some((a) => a.name === form.district) && (
                   <Input
                     className="mt-2"
                     value={form.district}
@@ -1836,18 +2162,23 @@ function ListingFormDrawer({
               {media.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
                   {media.map((url, i) => (
-                    <div key={i} className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-border bg-surface-2">
+                    <div
+                      key={i}
+                      className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-border bg-surface-2"
+                    >
                       <img src={url} alt="" className="size-full object-cover" />
                       <button
                         type="button"
-                        onClick={() => setMedia(m => m.filter((_, idx) => idx !== i))}
+                        onClick={() => setMedia((m) => m.filter((_, idx) => idx !== i))}
                         className="absolute end-1 top-1 grid size-6 place-items-center rounded-md bg-background/90 text-foreground opacity-0 transition-opacity hover:bg-background group-hover:opacity-100"
                         aria-label="Remove image"
                       >
                         <X className="size-3.5" />
                       </button>
                       {i === 0 && (
-                        <span className="absolute bottom-1 start-1 rounded bg-foreground/85 px-1.5 py-0.5 text-[10px] font-bold uppercase text-background">Cover</span>
+                        <span className="absolute bottom-1 start-1 rounded bg-foreground/85 px-1.5 py-0.5 text-[10px] font-bold uppercase text-background">
+                          Cover
+                        </span>
                       )}
                     </div>
                   ))}
@@ -1858,12 +2189,12 @@ function ListingFormDrawer({
                 <input
                   type="url"
                   value={urlInput}
-                  onChange={e => setUrlInput(e.target.value)}
-                  onKeyDown={e => {
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
                       const trimmed = urlInput.trim();
-                      if (trimmed && !media.includes(trimmed)) setMedia(m => [...m, trimmed]);
+                      if (trimmed && !media.includes(trimmed)) setMedia((m) => [...m, trimmed]);
                       setUrlInput("");
                     }
                   }}
@@ -1876,7 +2207,7 @@ function ListingFormDrawer({
                   variant="outline"
                   onClick={() => {
                     const trimmed = urlInput.trim();
-                    if (trimmed && !media.includes(trimmed)) setMedia(m => [...m, trimmed]);
+                    if (trimmed && !media.includes(trimmed)) setMedia((m) => [...m, trimmed]);
                     setUrlInput("");
                   }}
                   disabled={!urlInput.trim()}
@@ -1884,7 +2215,10 @@ function ListingFormDrawer({
                   <Plus className="size-4" /> Add
                 </Button>
               </div>
-              <p className="text-[11px] text-muted-foreground">Paste a direct image URL (from Cloudinary, Unsplash, etc.). First photo is the cover.</p>
+              <p className="text-[11px] text-muted-foreground">
+                Paste a direct image URL (from Cloudinary, Unsplash, etc.). First photo is the
+                cover.
+              </p>
             </div>
           </Section>
 
@@ -1917,9 +2251,7 @@ function ListingFormDrawer({
           <Section icon={<Sparkles className="size-4" />} title="Publish controls">
             <div className="space-y-3">
               <div>
-                <div className="text-xs font-semibold text-muted-foreground">
-                  Listing status
-                </div>
+                <div className="text-xs font-semibold text-muted-foreground">Listing status</div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {(["Draft", "Pending Approval", "Published", "Suspended"] as ListingStatus[]).map(
                     (s) => (
@@ -2013,22 +2345,30 @@ function UsersView({
     if (users.length === 0 && !loading && !error) {
       onRetry();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filtered = users.filter(u => {
+  const filtered = users.filter((u) => {
     if (!query) return true;
     const q = query.toLowerCase();
-    return (u.email.toLowerCase().includes(q) || (u.full_name ?? "").toLowerCase().includes(q) || (u.phone ?? "").includes(q));
+    return (
+      u.email.toLowerCase().includes(q) ||
+      (u.full_name ?? "").toLowerCase().includes(q) ||
+      (u.phone ?? "").includes(q)
+    );
   });
 
   return (
     <div>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Portal accounts</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Portal accounts
+          </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Users</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Manage customer accounts, enable or disable access.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage customer accounts, enable or disable access.
+          </p>
         </div>
         <Button onClick={() => setFormOpen(true)} className="shrink-0">
           <UserPlus className="size-4" /> Add User
@@ -2038,20 +2378,31 @@ function UsersView({
       {/* Search */}
       <div className="mb-4 relative max-w-sm">
         <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by name, email or phone…" className="ps-9" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by name, email or phone…"
+          className="ps-9"
+        />
       </div>
 
       {formOpen && (
         <UserFormDrawer
           onClose={() => setFormOpen(false)}
-          onSave={async p => { await onAdd(p); setFormOpen(false); }}
+          onSave={async (p) => {
+            await onAdd(p);
+            setFormOpen(false);
+          }}
         />
       )}
       {detailUser && (
         <UserDetailDrawer
           user={detailUser}
           onClose={() => setDetailUser(null)}
-          onEdit={() => { setEditUser(detailUser); setDetailUser(null); }}
+          onEdit={() => {
+            setEditUser(detailUser);
+            setDetailUser(null);
+          }}
           onToggle={async () => {
             const updated = await onUpdate(detailUser.id, { is_active: !detailUser.is_active });
             setDetailUser(updated);
@@ -2062,7 +2413,10 @@ function UsersView({
         <UserEditDrawer
           user={editUser}
           onClose={() => setEditUser(null)}
-          onSave={async p => { await onUpdate(editUser.id, p); setEditUser(null); }}
+          onSave={async (p) => {
+            await onUpdate(editUser.id, p);
+            setEditUser(null);
+          }}
         />
       )}
 
@@ -2081,20 +2435,34 @@ function UsersView({
             </thead>
             <tbody className="divide-y divide-border">
               {loading && (
-                <tr><td colSpan={6} className="px-4 py-16 text-center text-sm text-muted-foreground">Loading users…</td></tr>
+                <tr>
+                  <td colSpan={6} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                    Loading users…
+                  </td>
+                </tr>
               )}
               {!loading && error && (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center">
                     <p className="text-sm text-destructive mb-3">Failed to load users: {error}</p>
-                    <button type="button" onClick={onRetry} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2">Retry</button>
+                    <button
+                      type="button"
+                      onClick={onRetry}
+                      className="rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2"
+                    >
+                      Retry
+                    </button>
                   </td>
                 </tr>
               )}
               {!loading && !error && filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-16 text-center text-sm text-muted-foreground">No users found.</td></tr>
+                <tr>
+                  <td colSpan={6} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                    No users found.
+                  </td>
+                </tr>
               )}
-              {filtered.map(u => (
+              {filtered.map((u) => (
                 <tr
                   key={u.id}
                   className="group cursor-pointer hover:bg-surface-2/40"
@@ -2105,7 +2473,11 @@ function UsersView({
                       <div className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-bold text-muted-foreground">
                         {(u.full_name ?? u.email).charAt(0).toUpperCase()}
                       </div>
-                      <span className="font-medium">{u.full_name ?? <span className="text-muted-foreground italic">No name</span>}</span>
+                      <span className="font-medium">
+                        {u.full_name ?? (
+                          <span className="text-muted-foreground italic">No name</span>
+                        )}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
@@ -2114,12 +2486,18 @@ function UsersView({
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{u.phone ?? "—"}</td>
                   <td className="px-4 py-3">
-                    {u.is_active
-                      ? <Badge tone="success">Active</Badge>
-                      : <Badge tone="destructive">Disabled</Badge>}
+                    {u.is_active ? (
+                      <Badge tone="success">Active</Badge>
+                    ) : (
+                      <Badge tone="destructive">Disabled</Badge>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    {new Date(u.created_at).toLocaleDateString("en-SA", { day: "numeric", month: "short", year: "numeric" })}
+                    {new Date(u.created_at).toLocaleDateString("en-SA", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
                   </td>
                 </tr>
               ))}
@@ -2145,15 +2523,26 @@ function UserDetailDrawer({
   const [toggling, setToggling] = useState(false);
   return (
     <div className="fixed inset-0 z-50 flex">
-      <button type="button" aria-label="Close" className="flex-1 bg-foreground/40 backdrop-blur-sm" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close"
+        className="flex-1 bg-foreground/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <aside className="flex h-full w-full max-w-md flex-col bg-background shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">User account</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              User account
+            </p>
             <h2 className="mt-1 text-lg font-bold">{user.full_name ?? "No name"}</h2>
             <p className="text-xs text-muted-foreground">{user.email}</p>
           </div>
-          <button type="button" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -2165,9 +2554,11 @@ function UserDetailDrawer({
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                {user.is_active
-                  ? <Badge tone="success">Active</Badge>
-                  : <Badge tone="destructive">Disabled</Badge>}
+                {user.is_active ? (
+                  <Badge tone="success">Active</Badge>
+                ) : (
+                  <Badge tone="destructive">Disabled</Badge>
+                )}
                 <RoleBadge role={user.role} />
               </div>
               <p className="text-xs text-muted-foreground">User #{user.id}</p>
@@ -2176,20 +2567,34 @@ function UserDetailDrawer({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Full name</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Full name
+              </p>
               <p className="mt-1 text-sm">{user.full_name ?? "—"}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Phone
+              </p>
               <p className="mt-1 text-sm">{user.phone ?? "—"}</p>
             </div>
             <div className="col-span-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Email</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Email
+              </p>
               <p className="mt-1 text-sm">{user.email}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Joined</p>
-              <p className="mt-1 text-sm">{new Date(user.created_at).toLocaleDateString("en-SA", { day: "numeric", month: "long", year: "numeric" })}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Joined
+              </p>
+              <p className="mt-1 text-sm">
+                {new Date(user.created_at).toLocaleDateString("en-SA", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </p>
             </div>
           </div>
         </div>
@@ -2198,7 +2603,14 @@ function UserDetailDrawer({
           <button
             type="button"
             disabled={toggling}
-            onClick={async () => { setToggling(true); try { await onToggle(); } finally { setToggling(false); } }}
+            onClick={async () => {
+              setToggling(true);
+              try {
+                await onToggle();
+              } finally {
+                setToggling(false);
+              }
+            }}
             className={cn(
               "inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors",
               user.is_active
@@ -2242,7 +2654,10 @@ function UserEditDrawer({
   const [showPwd, setShowPwd] = useState(false);
 
   async function submit() {
-    if (!form.email.trim()) { alert("Email is required."); return; }
+    if (!form.email.trim()) {
+      alert("Email is required.");
+      return;
+    }
     setSaving(true);
     try {
       const payload: Parameters<typeof adminUpdateUser>[1] = {
@@ -2262,20 +2677,31 @@ function UserEditDrawer({
 
   const ROLES: { value: "admin" | "partner" | "customer"; label: string; description: string }[] = [
     { value: "customer", label: "Customer", description: "Regular portal user" },
-    { value: "partner",  label: "Partner",  description: "Realtor / mediator" },
-    { value: "admin",    label: "Admin",    description: "Full dashboard access" },
+    { value: "partner", label: "Partner", description: "Realtor / mediator" },
+    { value: "admin", label: "Admin", description: "Full dashboard access" },
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      <button type="button" aria-label="Close" className="flex-1 bg-foreground/40 backdrop-blur-sm" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close"
+        className="flex-1 bg-foreground/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <aside className="flex h-full w-full max-w-md flex-col bg-background shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Edit account</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Edit account
+            </p>
             <h2 className="mt-1 text-lg font-bold">{user.full_name ?? user.email}</h2>
           </div>
-          <button type="button" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -2283,11 +2709,11 @@ function UserEditDrawer({
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           <Field label="Role">
             <div className="grid grid-cols-3 gap-2">
-              {ROLES.map(r => (
+              {ROLES.map((r) => (
                 <button
                   key={r.value}
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, role: r.value }))}
+                  onClick={() => setForm((f) => ({ ...f, role: r.value }))}
                   className={cn(
                     "flex flex-col items-start rounded-xl border px-3 py-2.5 text-left transition-colors",
                     form.role === r.value
@@ -2296,30 +2722,48 @@ function UserEditDrawer({
                   )}
                 >
                   <RoleBadge role={r.value} />
-                  <span className="mt-1.5 text-[11px] text-muted-foreground leading-tight">{r.description}</span>
+                  <span className="mt-1.5 text-[11px] text-muted-foreground leading-tight">
+                    {r.description}
+                  </span>
                 </button>
               ))}
             </div>
           </Field>
           <Field label="Full name">
-            <Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="Mohammed Al-Ghamdi" />
+            <Input
+              value={form.full_name}
+              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+              placeholder="Mohammed Al-Ghamdi"
+            />
           </Field>
           <Field label="Email *">
-            <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+            <Input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
           </Field>
           <Field label="Phone">
-            <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+966 5X XXX XXXX" />
+            <Input
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="+966 5X XXX XXXX"
+            />
           </Field>
           <Field label="New password">
             <div className="relative">
               <Input
                 type={showPwd ? "text" : "password"}
                 value={form.password}
-                onChange={e => setForm({ ...form, password: e.target.value })}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
                 placeholder="Leave blank to keep current password"
                 className="pr-10"
               />
-              <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <button
+                type="button"
+                onClick={() => setShowPwd((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
                 {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
@@ -2327,7 +2771,9 @@ function UserEditDrawer({
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={submit} disabled={saving}>
             {saving ? "Saving…" : "Save changes"}
           </Button>
@@ -2344,13 +2790,25 @@ function UserFormDrawer({
   onClose: () => void;
   onSave: (p: Parameters<typeof adminCreateUser>[0]) => Promise<void>;
 }) {
-  const [form, setForm] = useState({ full_name: "", email: "", phone: "", password: "", role: "customer" });
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    password: "",
+    role: "customer",
+  });
   const [saving, setSaving] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
 
   async function submit() {
-    if (!form.email.trim()) { alert("Email is required."); return; }
-    if (!form.password.trim()) { alert("Password is required."); return; }
+    if (!form.email.trim()) {
+      alert("Email is required.");
+      return;
+    }
+    if (!form.password.trim()) {
+      alert("Password is required.");
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
@@ -2368,21 +2826,40 @@ function UserFormDrawer({
   }
 
   const ROLES = [
-    { value: "customer", label: "Customer", description: "Regular portal user — can search and submit leads" },
-    { value: "partner",  label: "Partner",  description: "Realtor / mediator — receives and manages leads" },
-    { value: "admin",    label: "Admin",    description: "Full admin access to this dashboard" },
+    {
+      value: "customer",
+      label: "Customer",
+      description: "Regular portal user — can search and submit leads",
+    },
+    {
+      value: "partner",
+      label: "Partner",
+      description: "Realtor / mediator — receives and manages leads",
+    },
+    { value: "admin", label: "Admin", description: "Full admin access to this dashboard" },
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      <button type="button" aria-label="Close" className="flex-1 bg-foreground/40 backdrop-blur-sm" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close"
+        className="flex-1 bg-foreground/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <aside className="flex h-full w-full max-w-md flex-col bg-background shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Portal accounts</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Portal accounts
+            </p>
             <h2 className="mt-1 text-lg font-bold">Add new user</h2>
           </div>
-          <button type="button" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -2391,11 +2868,11 @@ function UserFormDrawer({
           {/* Role picker */}
           <Field label="Role *">
             <div className="grid grid-cols-3 gap-2">
-              {ROLES.map(r => (
+              {ROLES.map((r) => (
                 <button
                   key={r.value}
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, role: r.value }))}
+                  onClick={() => setForm((f) => ({ ...f, role: r.value }))}
                   className={cn(
                     "flex flex-col items-start rounded-xl border px-3 py-2.5 text-left transition-colors",
                     form.role === r.value
@@ -2404,31 +2881,50 @@ function UserFormDrawer({
                   )}
                 >
                   <RoleBadge role={r.value as "admin" | "partner" | "customer"} />
-                  <span className="mt-1.5 text-[11px] text-muted-foreground leading-tight">{r.description}</span>
+                  <span className="mt-1.5 text-[11px] text-muted-foreground leading-tight">
+                    {r.description}
+                  </span>
                 </button>
               ))}
             </div>
           </Field>
 
           <Field label="Full name">
-            <Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="Mohammed Al-Ghamdi" />
+            <Input
+              value={form.full_name}
+              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+              placeholder="Mohammed Al-Ghamdi"
+            />
           </Field>
           <Field label="Email *">
-            <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="user@example.com" />
+            <Input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="user@example.com"
+            />
           </Field>
           <Field label="Phone">
-            <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+966 5X XXX XXXX" />
+            <Input
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="+966 5X XXX XXXX"
+            />
           </Field>
           <Field label="Password *">
             <div className="relative">
               <Input
                 type={showPwd ? "text" : "password"}
                 value={form.password}
-                onChange={e => setForm({ ...form, password: e.target.value })}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
                 placeholder="Minimum 8 characters"
                 className="pr-10"
               />
-              <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <button
+                type="button"
+                onClick={() => setShowPwd((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
                 {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
@@ -2436,7 +2932,9 @@ function UserFormDrawer({
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={submit} disabled={saving}>
             <UserPlus className="size-4" />
             {saving ? "Creating…" : `Add ${form.role.charAt(0).toUpperCase() + form.role.slice(1)}`}
@@ -2479,16 +2977,28 @@ function PartnerFormDrawer({
     reader.onload = (ev) => {
       const dataUrl = ev.target?.result as string;
       setImgPreview(dataUrl);
-      setForm(f => ({ ...f, profile_image_url: dataUrl }));
+      setForm((f) => ({ ...f, profile_image_url: dataUrl }));
     };
     reader.readAsDataURL(file);
   }
 
   async function submit() {
-    if (!form.email.trim()) { alert("Email is required."); return; }
-    if (!form.password.trim()) { alert("Password is required."); return; }
-    if (!form.license_number.trim()) { alert("License number is required."); return; }
-    if (!form.phone.trim()) { alert("Phone is required."); return; }
+    if (!form.email.trim()) {
+      alert("Email is required.");
+      return;
+    }
+    if (!form.password.trim()) {
+      alert("Password is required.");
+      return;
+    }
+    if (!form.license_number.trim()) {
+      alert("License number is required.");
+      return;
+    }
+    if (!form.phone.trim()) {
+      alert("Phone is required.");
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
@@ -2512,16 +3022,30 @@ function PartnerFormDrawer({
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      <button type="button" aria-label="Close" className="flex-1 bg-foreground/40 backdrop-blur-sm" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close"
+        className="flex-1 bg-foreground/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <aside className="flex h-full w-full max-w-lg flex-col bg-background shadow-2xl">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Partner platform</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Partner platform
+            </p>
             <h2 className="mt-1 text-lg font-bold tracking-tight">Add new partner</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">Creates a login account and partner profile in one step.</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Creates a login account and partner profile in one step.
+            </p>
           </div>
-          <button type="button" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground" aria-label="Close">
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+            aria-label="Close"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -2531,21 +3055,34 @@ function PartnerFormDrawer({
           <Section icon={<Users className="size-4" />} title="Account details">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Full name" className="sm:col-span-2">
-                <Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="Abdullah Al-Rashid" />
+                <Input
+                  value={form.full_name}
+                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                  placeholder="Abdullah Al-Rashid"
+                />
               </Field>
               <Field label="Email *" className="sm:col-span-2">
-                <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="partner@example.com" />
+                <Input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="partner@example.com"
+                />
               </Field>
               <Field label="Password *" className="sm:col-span-2">
                 <div className="relative">
                   <Input
                     type={showPwd ? "text" : "password"}
                     value={form.password}
-                    onChange={e => setForm({ ...form, password: e.target.value })}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
                     placeholder="Minimum 8 characters"
                     className="pr-10"
                   />
-                  <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <button
+                    type="button"
+                    onClick={() => setShowPwd((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
                     {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </div>
@@ -2563,7 +3100,9 @@ function PartnerFormDrawer({
                     {imgPreview ? (
                       <img src={imgPreview} alt="Preview" className="size-full object-cover" />
                     ) : (
-                      <div className="flex size-full items-center justify-center text-xs text-muted-foreground">No photo</div>
+                      <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
+                        No photo
+                      </div>
                     )}
                   </div>
                   <div className="flex-1 space-y-2">
@@ -2578,9 +3117,11 @@ function PartnerFormDrawer({
                     </label>
                     <p className="text-[11px] text-muted-foreground">Or paste a URL below</p>
                     <Input
-                      value={form.profile_image_url.startsWith("data:") ? "" : form.profile_image_url}
-                      onChange={e => {
-                        setForm(f => ({ ...f, profile_image_url: e.target.value }));
+                      value={
+                        form.profile_image_url.startsWith("data:") ? "" : form.profile_image_url
+                      }
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, profile_image_url: e.target.value }));
                         setImgPreview(e.target.value || null);
                       }}
                       placeholder="https://example.com/photo.jpg"
@@ -2591,16 +3132,33 @@ function PartnerFormDrawer({
               </Field>
 
               <Field label="Agency / company name" className="sm:col-span-2">
-                <Input value={form.agency_name} onChange={e => setForm({ ...form, agency_name: e.target.value })} placeholder="Al-Rashid Real Estate" />
+                <Input
+                  value={form.agency_name}
+                  onChange={(e) => setForm({ ...form, agency_name: e.target.value })}
+                  placeholder="Al-Rashid Real Estate"
+                />
               </Field>
               <Field label="License number *">
-                <Input value={form.license_number} onChange={e => setForm({ ...form, license_number: e.target.value })} placeholder="RE-12345" />
+                <Input
+                  value={form.license_number}
+                  onChange={(e) => setForm({ ...form, license_number: e.target.value })}
+                  placeholder="RE-12345"
+                />
               </Field>
               <Field label="Phone *">
-                <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+966 5X XXX XXXX" />
+                <Input
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  placeholder="+966 5X XXX XXXX"
+                />
               </Field>
               <Field label="Bio" className="sm:col-span-2">
-                <Textarea value={form.bio} onChange={e => setForm({ ...form, bio: e.target.value })} placeholder="Brief description of the partner's expertise…" rows={3} />
+                <Textarea
+                  value={form.bio}
+                  onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                  placeholder="Brief description of the partner's expertise…"
+                  rows={3}
+                />
               </Field>
             </div>
           </Section>
@@ -2611,7 +3169,7 @@ function PartnerFormDrawer({
                 <input
                   type="checkbox"
                   checked={form.is_verified}
-                  onChange={e => setForm({ ...form, is_verified: e.target.checked })}
+                  onChange={(e) => setForm({ ...form, is_verified: e.target.checked })}
                   className="size-4 rounded border-border cursor-pointer"
                 />
                 <span className="text-sm font-medium">Mark as verified</span>
@@ -2619,7 +3177,7 @@ function PartnerFormDrawer({
               <div>
                 <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Subscription</p>
                 <div className="flex gap-2 flex-wrap">
-                  {["active", "pending_payment", "expired"].map(s => (
+                  {["active", "pending_payment", "expired"].map((s) => (
                     <button
                       key={s}
                       type="button"
@@ -2642,7 +3200,9 @@ function PartnerFormDrawer({
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 border-t border-border bg-surface/50 px-6 py-4">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={submit} disabled={saving}>
             <UserPlus className="size-4" />
             {saving ? "Adding…" : "Add Partner"}
@@ -2675,21 +3235,29 @@ function MediatorsView({
 
   async function run(id: number, fn: (id: number) => Promise<void>) {
     setBusyId(id);
-    try { await fn(id); } finally { setBusyId(null); }
+    try {
+      await fn(id);
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  const pendingCount = mediators.filter(m => m.approval_status === "pending").length;
+  const pendingCount = mediators.filter((m) => m.approval_status === "pending").length;
 
   return (
     <div>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Partner platform</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Partner platform
+          </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Partners</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Approve or reject partner accounts, verify profiles and manage subscriptions.
             {pendingCount > 0 && (
-              <span className="ml-1 font-semibold text-warning">{pendingCount} pending approval.</span>
+              <span className="ml-1 font-semibold text-warning">
+                {pendingCount} pending approval.
+              </span>
             )}
           </p>
         </div>
@@ -2701,7 +3269,10 @@ function MediatorsView({
       {formOpen && (
         <PartnerFormDrawer
           onClose={() => setFormOpen(false)}
-          onSave={async (payload) => { await onAdd(payload); setFormOpen(false); }}
+          onSave={async (payload) => {
+            await onAdd(payload);
+            setFormOpen(false);
+          }}
         />
       )}
 
@@ -2722,21 +3293,43 @@ function MediatorsView({
             </thead>
             <tbody className="divide-y divide-border">
               {loading && (
-                <tr><td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">Loading partners…</td></tr>
+                <tr>
+                  <td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                    Loading partners…
+                  </td>
+                </tr>
               )}
               {!loading && mediators.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">No partners registered yet.</td></tr>
+                <tr>
+                  <td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                    No partners registered yet.
+                  </td>
+                </tr>
               )}
-              {mediators.map(m => (
+              {mediators.map((m) => (
                 <tr key={m.id} className="hover:bg-surface-2/40">
                   <td className="px-4 py-3">
                     <div className="font-semibold">{m.agency_name ?? `Partner #${m.id}`}</div>
                     <div className="text-xs text-muted-foreground">{m.phone}</div>
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{m.license_number}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                    {m.license_number}
+                  </td>
                   <td className="px-4 py-3">
-                    <Badge tone={m.approval_status === "approved" ? "success" : m.approval_status === "rejected" ? "destructive" : "warning"}>
-                      {m.approval_status === "approved" ? "Approved" : m.approval_status === "rejected" ? "Rejected" : "Pending"}
+                    <Badge
+                      tone={
+                        m.approval_status === "approved"
+                          ? "success"
+                          : m.approval_status === "rejected"
+                            ? "destructive"
+                            : "warning"
+                      }
+                    >
+                      {m.approval_status === "approved"
+                        ? "Approved"
+                        : m.approval_status === "rejected"
+                          ? "Rejected"
+                          : "Pending"}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
@@ -2751,18 +3344,29 @@ function MediatorsView({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      {(m.areas ?? []).slice(0, 3).map(a => (
-                        <span key={a.id} className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium">{a.area_name}</span>
+                      {(m.areas ?? []).slice(0, 3).map((a) => (
+                        <span
+                          key={a.id}
+                          className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium"
+                        >
+                          {a.area_name}
+                        </span>
                       ))}
                       {(m.areas ?? []).length > 3 && (
-                        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] text-muted-foreground">+{(m.areas ?? []).length - 3}</span>
+                        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] text-muted-foreground">
+                          +{(m.areas ?? []).length - 3}
+                        </span>
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-end font-semibold tabular-nums">{m.total_leads_accepted}</td>
+                  <td className="px-4 py-3 text-end font-semibold tabular-nums">
+                    {m.total_leads_accepted}
+                  </td>
                   <td className="px-4 py-3">
                     {m.is_verified ? (
-                      <Badge tone="success" icon={<ShieldCheck className="size-3" />}>Verified</Badge>
+                      <Badge tone="success" icon={<ShieldCheck className="size-3" />}>
+                        Verified
+                      </Badge>
                     ) : (
                       <Badge tone="neutral">Unverified</Badge>
                     )}
@@ -2835,15 +3439,31 @@ function NewLeadDrawer({
   });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { fetchAreas().then(setAreas).catch(() => {}); }, []);
+  useEffect(() => {
+    fetchAreas()
+      .then(setAreas)
+      .catch(() => {});
+  }, []);
 
-  const districtOptions = areas.filter(a => !form.city || a.city === form.city);
+  const districtOptions = areas.filter((a) => !form.city || a.city === form.city);
 
   async function submit() {
-    if (!form.area_name.trim()) { alert("District / area is required."); return; }
-    if (!form.customer_name.trim()) { alert("Customer name is required."); return; }
-    if (!form.customer_phone.trim()) { alert("Customer phone is required."); return; }
-    if (!form.customer_email.trim()) { alert("Customer email is required."); return; }
+    if (!form.area_name.trim()) {
+      alert("District / area is required.");
+      return;
+    }
+    if (!form.customer_name.trim()) {
+      alert("Customer name is required.");
+      return;
+    }
+    if (!form.customer_phone.trim()) {
+      alert("Customer phone is required.");
+      return;
+    }
+    if (!form.customer_email.trim()) {
+      alert("Customer email is required.");
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
@@ -2867,16 +3487,30 @@ function NewLeadDrawer({
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      <button type="button" aria-label="Close" className="flex-1 bg-foreground/40 backdrop-blur-sm" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close"
+        className="flex-1 bg-foreground/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <aside className="flex h-full w-full max-w-lg flex-col bg-background shadow-2xl">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Partner platform</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Partner platform
+            </p>
             <h2 className="mt-1 text-lg font-bold tracking-tight">New lead</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">Lead enters pending review and follows the normal assignment flow.</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Lead enters pending review and follows the normal assignment flow.
+            </p>
           </div>
-          <button type="button" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground" aria-label="Close">
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+            aria-label="Close"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -2888,23 +3522,36 @@ function NewLeadDrawer({
               <Field label="City">
                 <select
                   value={form.city}
-                  onChange={e => setForm({ ...form, city: e.target.value, area_name: "" })}
+                  onChange={(e) => setForm({ ...form, city: e.target.value, area_name: "" })}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  {cities.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                  {cities.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
                 </select>
               </Field>
               <Field label="District / area *">
                 <select
                   value={form.area_name}
-                  onChange={e => setForm({ ...form, area_name: e.target.value })}
+                  onChange={(e) => setForm({ ...form, area_name: e.target.value })}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <option value="">Select district…</option>
-                  {districtOptions.map(a => <option key={`${a.name}|${a.city}`} value={a.name}>{a.name}</option>)}
+                  {districtOptions.map((a) => (
+                    <option key={`${a.name}|${a.city}`} value={a.name}>
+                      {a.name}
+                    </option>
+                  ))}
                 </select>
                 {!districtOptions.length && (
-                  <Input className="mt-2" value={form.area_name} onChange={e => setForm({ ...form, area_name: e.target.value })} placeholder="Type district name…" />
+                  <Input
+                    className="mt-2"
+                    value={form.area_name}
+                    onChange={(e) => setForm({ ...form, area_name: e.target.value })}
+                    placeholder="Type district name…"
+                  />
                 )}
               </Field>
             </div>
@@ -2913,13 +3560,26 @@ function NewLeadDrawer({
           <Section icon={<Users className="size-4" />} title="Customer details">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Full name *" className="sm:col-span-2">
-                <Input value={form.customer_name} onChange={e => setForm({ ...form, customer_name: e.target.value })} placeholder="Mohammed Al-Ghamdi" />
+                <Input
+                  value={form.customer_name}
+                  onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
+                  placeholder="Mohammed Al-Ghamdi"
+                />
               </Field>
               <Field label="Phone *">
-                <Input value={form.customer_phone} onChange={e => setForm({ ...form, customer_phone: e.target.value })} placeholder="+966 5X XXX XXXX" />
+                <Input
+                  value={form.customer_phone}
+                  onChange={(e) => setForm({ ...form, customer_phone: e.target.value })}
+                  placeholder="+966 5X XXX XXXX"
+                />
               </Field>
               <Field label="Email *">
-                <Input type="email" value={form.customer_email} onChange={e => setForm({ ...form, customer_email: e.target.value })} placeholder="customer@example.com" />
+                <Input
+                  type="email"
+                  value={form.customer_email}
+                  onChange={(e) => setForm({ ...form, customer_email: e.target.value })}
+                  placeholder="customer@example.com"
+                />
               </Field>
             </div>
           </Section>
@@ -2927,19 +3587,45 @@ function NewLeadDrawer({
           <Section icon={<Home className="size-4" />} title="Requirements">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Min budget (SAR/mo)">
-                <Input type="number" value={form.min_budget} onChange={e => setForm({ ...form, min_budget: e.target.value })} placeholder="5000" />
+                <Input
+                  type="number"
+                  value={form.min_budget}
+                  onChange={(e) => setForm({ ...form, min_budget: e.target.value })}
+                  placeholder="5000"
+                />
               </Field>
               <Field label="Max budget (SAR/mo)">
-                <Input type="number" value={form.max_budget} onChange={e => setForm({ ...form, max_budget: e.target.value })} placeholder="15000" />
+                <Input
+                  type="number"
+                  value={form.max_budget}
+                  onChange={(e) => setForm({ ...form, max_budget: e.target.value })}
+                  placeholder="15000"
+                />
               </Field>
               <Field label="Bedrooms needed">
-                <Input type="number" min={0} max={10} value={form.bedrooms_needed} onChange={e => setForm({ ...form, bedrooms_needed: e.target.value })} placeholder="3" />
+                <Input
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={form.bedrooms_needed}
+                  onChange={(e) => setForm({ ...form, bedrooms_needed: e.target.value })}
+                  placeholder="3"
+                />
               </Field>
               <Field label="Move-in date">
-                <Input type="date" value={form.move_in_date} onChange={e => setForm({ ...form, move_in_date: e.target.value })} />
+                <Input
+                  type="date"
+                  value={form.move_in_date}
+                  onChange={(e) => setForm({ ...form, move_in_date: e.target.value })}
+                />
               </Field>
               <Field label="Notes / requirements" className="sm:col-span-2">
-                <Textarea value={form.requirements_note} onChange={e => setForm({ ...form, requirements_note: e.target.value })} placeholder="Near school, ground floor preferred, pet-friendly…" rows={3} />
+                <Textarea
+                  value={form.requirements_note}
+                  onChange={(e) => setForm({ ...form, requirements_note: e.target.value })}
+                  placeholder="Near school, ground floor preferred, pet-friendly…"
+                  rows={3}
+                />
               </Field>
             </div>
           </Section>
@@ -2947,7 +3633,9 @@ function NewLeadDrawer({
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 border-t border-border bg-surface/50 px-6 py-4">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={submit} disabled={saving}>
             <Plus className="size-4" />
             {saving ? "Creating…" : "Create Lead"}
@@ -3002,7 +3690,11 @@ function LeadsView({
 
   async function act(id: number, fn: () => Promise<void>) {
     setActingId(id);
-    try { await fn(); } finally { setActingId(null); }
+    try {
+      await fn();
+    } finally {
+      setActingId(null);
+    }
   }
 
   async function toggleConvo(leadId: number) {
@@ -3014,7 +3706,7 @@ function LeadsView({
       // Always fetch fresh on expand — a customer reply since the last time
       // this was open must not be masked by a stale cached snapshot.
       const msgs = await adminFetchMessages(leadId).catch(() => []);
-      setConvoMessages(m => ({ ...m, [leadId]: msgs }));
+      setConvoMessages((m) => ({ ...m, [leadId]: msgs }));
     }
     setExpandedConvos(next);
   }
@@ -3026,7 +3718,7 @@ function LeadsView({
     const interval = setInterval(() => {
       for (const leadId of expandedConvos) {
         adminFetchMessages(leadId)
-          .then(msgs => setConvoMessages(m => ({ ...m, [leadId]: msgs })))
+          .then((msgs) => setConvoMessages((m) => ({ ...m, [leadId]: msgs })))
           .catch(() => {});
       }
     }, 8000);
@@ -3039,8 +3731,8 @@ function LeadsView({
     setSendingMsg(leadId);
     try {
       const msg = await adminSendMessage(leadId, content);
-      setConvoMessages(m => ({ ...m, [leadId]: [...(m[leadId] ?? []), msg] }));
-      setAdminDraft(d => ({ ...d, [leadId]: "" }));
+      setConvoMessages((m) => ({ ...m, [leadId]: [...(m[leadId] ?? []), msg] }));
+      setAdminDraft((d) => ({ ...d, [leadId]: "" }));
     } catch {
       // swallow
     } finally {
@@ -3048,18 +3740,22 @@ function LeadsView({
     }
   }
 
-  const pendingReview  = leads.filter(l => l.status === "pending_review");
-  const pendingClosure = leads.filter(l => l.status === "pending_closure");
-  const otherLeads     = leads;
+  const pendingReview = leads.filter((l) => l.status === "pending_review");
+  const pendingClosure = leads.filter((l) => l.status === "pending_closure");
+  const otherLeads = leads;
   const isClosed = (s: string) => s === "closed_won" || s === "closed_lost" || s === "rejected";
 
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Partner platform</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Partner platform
+          </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Customer Leads</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Review submissions and closure requests before they take effect.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Review submissions and closure requests before they take effect.
+          </p>
         </div>
         <Button onClick={() => setNewLeadOpen(true)} className="shrink-0">
           <Plus className="size-4" /> New Lead
@@ -3069,7 +3765,10 @@ function LeadsView({
       {newLeadOpen && (
         <NewLeadDrawer
           onClose={() => setNewLeadOpen(false)}
-          onSave={async (payload) => { await onAddLead(payload); setNewLeadOpen(false); }}
+          onSave={async (payload) => {
+            await onAddLead(payload);
+            setNewLeadOpen(false);
+          }}
         />
       )}
 
@@ -3092,18 +3791,36 @@ function LeadsView({
             </div>
           ) : (
             <div className="space-y-3">
-              {pendingReview.map(lead => (
-                <div key={lead.id} className="rounded-2xl border border-warning/30 bg-warning/5 p-5 space-y-3">
+              {pendingReview.map((lead) => (
+                <div
+                  key={lead.id}
+                  className="rounded-2xl border border-warning/30 bg-warning/5 p-5 space-y-3"
+                >
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <div className="text-xs font-mono text-muted-foreground">Lead #{lead.id}</div>
                       <div className="font-semibold">{lead.customer_name}</div>
-                      <div className="text-sm text-muted-foreground">{lead.customer_phone} · {lead.customer_email}</div>
-                      <div className="text-sm font-medium">{lead.area_name}, {lead.city}</div>
-                      {lead.max_budget && <div className="text-sm text-muted-foreground">Up to SAR {formatSAR(lead.max_budget)}/mo{lead.bedrooms_needed ? ` · ${lead.bedrooms_needed} BR` : ""}</div>}
-                      {lead.requirements_note && <div className="text-sm text-foreground line-clamp-2 mt-1">"{lead.requirements_note}"</div>}
+                      <div className="text-sm text-muted-foreground">
+                        {lead.customer_phone} · {lead.customer_email}
+                      </div>
+                      <div className="text-sm font-medium">
+                        {lead.area_name}, {lead.city}
+                      </div>
+                      {lead.max_budget && (
+                        <div className="text-sm text-muted-foreground">
+                          Up to SAR {formatSAR(lead.max_budget)}/mo
+                          {lead.bedrooms_needed ? ` · ${lead.bedrooms_needed} BR` : ""}
+                        </div>
+                      )}
+                      {lead.requirements_note && (
+                        <div className="text-sm text-foreground line-clamp-2 mt-1">
+                          "{lead.requirements_note}"
+                        </div>
+                      )}
                     </div>
-                    <span className="shrink-0 text-xs text-muted-foreground">{new Date(lead.created_at).toLocaleDateString("en-SA")}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {new Date(lead.created_at).toLocaleDateString("en-SA")}
+                    </span>
                   </div>
 
                   {/* Conversation thread */}
@@ -3114,27 +3831,45 @@ function LeadsView({
                       className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                     >
                       <MessageSquare className="size-3.5" />
-                      {expandedConvos.has(lead.id) ? "Hide conversation" : "Ask customer a question"}
+                      {expandedConvos.has(lead.id)
+                        ? "Hide conversation"
+                        : "Ask customer a question"}
                     </button>
 
                     {expandedConvos.has(lead.id) && (
                       <div className="mt-3 space-y-2">
                         {/* Message thread */}
                         {(convoMessages[lead.id] ?? []).length === 0 && (
-                          <p className="text-xs text-muted-foreground italic">No messages yet. Type below to ask the customer a question.</p>
+                          <p className="text-xs text-muted-foreground italic">
+                            No messages yet. Type below to ask the customer a question.
+                          </p>
                         )}
-                        {(convoMessages[lead.id] ?? []).map(msg => (
-                          <div key={msg.id} className={`flex ${msg.sender_role === "admin" ? "justify-end" : "justify-start"}`}>
-                            <div className={`max-w-sm rounded-xl px-3 py-2 text-sm ${msg.sender_role === "admin" ? "bg-primary text-primary-foreground" : "bg-background border border-border"}`}>
+                        {(convoMessages[lead.id] ?? []).map((msg) => (
+                          <div
+                            key={msg.id}
+                            className={`flex ${msg.sender_role === "admin" ? "justify-end" : "justify-start"}`}
+                          >
+                            <div
+                              className={`max-w-sm rounded-xl px-3 py-2 text-sm ${msg.sender_role === "admin" ? "bg-primary text-primary-foreground" : "bg-background border border-border"}`}
+                            >
                               {msg.sender_role !== "admin" && (
-                                <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Customer</div>
+                                <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Customer
+                                </div>
                               )}
                               {msg.sender_role === "admin" && (
-                                <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground/70">You (Admin)</div>
+                                <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground/70">
+                                  You (Admin)
+                                </div>
                               )}
                               <div>{msg.content}</div>
-                              <div className={`mt-0.5 text-[10px] ${msg.sender_role === "admin" ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                                {new Date(msg.created_at).toLocaleTimeString("en-SA", { hour: "2-digit", minute: "2-digit" })}
+                              <div
+                                className={`mt-0.5 text-[10px] ${msg.sender_role === "admin" ? "text-primary-foreground/60" : "text-muted-foreground"}`}
+                              >
+                                {new Date(msg.created_at).toLocaleTimeString("en-SA", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
                               </div>
                             </div>
                           </div>
@@ -3143,8 +3878,15 @@ function LeadsView({
                         <div className="flex gap-2 pt-1">
                           <textarea
                             value={adminDraft[lead.id] ?? ""}
-                            onChange={e => setAdminDraft(d => ({ ...d, [lead.id]: e.target.value }))}
-                            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(lead.id); } }}
+                            onChange={(e) =>
+                              setAdminDraft((d) => ({ ...d, [lead.id]: e.target.value }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendMessage(lead.id);
+                              }
+                            }}
                             placeholder="Type your question to the customer…"
                             rows={2}
                             className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none"
@@ -3205,29 +3947,44 @@ function LeadsView({
             </div>
           ) : (
             <div className="space-y-3">
-              {pendingClosure.map(lead => {
-                const accepted = lead.assignments.find(a => a.status === "accepted");
+              {pendingClosure.map((lead) => {
+                const accepted = lead.assignments.find((a) => a.status === "accepted");
                 return (
-                  <div key={lead.id} className="rounded-2xl border border-border bg-card p-5 space-y-3 shadow-card">
+                  <div
+                    key={lead.id}
+                    className="rounded-2xl border border-border bg-card p-5 space-y-3 shadow-card"
+                  >
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1">
-                        <div className="text-xs font-mono text-muted-foreground">Lead #{lead.id} · {lead.area_name}, {lead.city}</div>
+                        <div className="text-xs font-mono text-muted-foreground">
+                          Lead #{lead.id} · {lead.area_name}, {lead.city}
+                        </div>
                         <div className="font-semibold">{lead.customer_name}</div>
                         <div className="text-sm text-muted-foreground">{lead.customer_phone}</div>
                       </div>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {lead.closure_requested_at ? new Date(lead.closure_requested_at).toLocaleDateString("en-SA") : ""}
+                        {lead.closure_requested_at
+                          ? new Date(lead.closure_requested_at).toLocaleDateString("en-SA")
+                          : ""}
                       </span>
                     </div>
                     <div className="rounded-lg bg-surface p-3 space-y-1 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Partner</span>
-                        <span className="font-semibold">{accepted?.mediator_agency_name ?? `Partner #${accepted?.mediator_id}`}</span>
+                        <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                          Partner
+                        </span>
+                        <span className="font-semibold">
+                          {accepted?.mediator_agency_name ?? `Partner #${accepted?.mediator_id}`}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Outcome</span>
+                        <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                          Outcome
+                        </span>
                         <Badge tone={lead.closure_outcome === "closed_won" ? "success" : "neutral"}>
-                          {lead.closure_outcome === "closed_won" ? "Found a property" : "No match found"}
+                          {lead.closure_outcome === "closed_won"
+                            ? "Found a property"
+                            : "No match found"}
                         </Badge>
                       </div>
                       {lead.closure_note && (
@@ -3281,20 +4038,31 @@ function LeadsView({
               </thead>
               <tbody className="divide-y divide-border">
                 {!loading && otherLeads.length === 0 && (
-                  <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">No leads yet.</td></tr>
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="px-4 py-12 text-center text-sm text-muted-foreground"
+                    >
+                      No leads yet.
+                    </td>
+                  </tr>
                 )}
-                {otherLeads.map(lead => {
-                  const accepted = lead.assignments.find(a => a.status === "accepted");
+                {otherLeads.map((lead) => {
+                  const accepted = lead.assignments.find((a) => a.status === "accepted");
                   const isConfirming = confirmingClose === lead.id;
                   const isActing = actingId === lead.id;
                   const closed = isClosed(lead.status);
                   return (
                     <tr key={lead.id} className="hover:bg-surface-2/40 align-top">
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">#{lead.id}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        #{lead.id}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="font-semibold">{lead.customer_name}</div>
                         <div className="text-xs text-muted-foreground">{lead.customer_phone}</div>
-                        <div className="text-[10px] text-muted-foreground">{lead.customer_email}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {lead.customer_email}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div>{lead.area_name}</div>
@@ -3304,17 +4072,32 @@ function LeadsView({
                         {lead.max_budget ? `SAR ${formatSAR(lead.max_budget)}` : "—"}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge tone={leadStatusTone(lead.status)}>{leadStatusLabel(lead.status)}</Badge>
+                        <Badge tone={leadStatusTone(lead.status)}>
+                          {leadStatusLabel(lead.status)}
+                        </Badge>
                         {lead.closed_at && (
-                          <div className="mt-0.5 text-[10px] text-muted-foreground">{new Date(lead.closed_at).toLocaleDateString("en-SA")}</div>
+                          <div className="mt-0.5 text-[10px] text-muted-foreground">
+                            {new Date(lead.closed_at).toLocaleDateString("en-SA")}
+                          </div>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         {accepted ? (
                           <div>
-                            <div className="font-semibold text-sm">{accepted.mediator_agency_name ?? `Partner #${accepted.mediator_id}`}</div>
-                            {accepted.mediator_phone && <div className="text-xs text-muted-foreground">{accepted.mediator_phone}</div>}
-                            {accepted.accepted_at && <div className="text-[10px] text-muted-foreground">Accepted {new Date(accepted.accepted_at).toLocaleDateString("en-SA")}</div>}
+                            <div className="font-semibold text-sm">
+                              {accepted.mediator_agency_name ?? `Partner #${accepted.mediator_id}`}
+                            </div>
+                            {accepted.mediator_phone && (
+                              <div className="text-xs text-muted-foreground">
+                                {accepted.mediator_phone}
+                              </div>
+                            )}
+                            {accepted.accepted_at && (
+                              <div className="text-[10px] text-muted-foreground">
+                                Accepted{" "}
+                                {new Date(accepted.accepted_at).toLocaleDateString("en-SA")}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
@@ -3328,15 +4111,55 @@ function LeadsView({
                           <span className="text-xs text-muted-foreground">Closed</span>
                         ) : isConfirming ? (
                           <div className="space-y-1">
-                            <p className="text-[11px] text-muted-foreground font-medium mb-1.5">Force close as:</p>
+                            <p className="text-[11px] text-muted-foreground font-medium mb-1.5">
+                              Force close as:
+                            </p>
                             <div className="flex gap-1.5">
-                              <Button size="sm" className="h-7 px-2 text-xs bg-success hover:bg-success/90" onClick={() => act(lead.id, async () => { await onForceClose(lead.id, "closed_won"); setConfirmingClose(null); })} disabled={isActing}>Won</Button>
-                              <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => act(lead.id, async () => { await onForceClose(lead.id, "closed_lost"); setConfirmingClose(null); })} disabled={isActing}>Lost</Button>
-                              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setConfirmingClose(null)} disabled={isActing}>Cancel</Button>
+                              <Button
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-success hover:bg-success/90"
+                                onClick={() =>
+                                  act(lead.id, async () => {
+                                    await onForceClose(lead.id, "closed_won");
+                                    setConfirmingClose(null);
+                                  })
+                                }
+                                disabled={isActing}
+                              >
+                                Won
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-xs"
+                                onClick={() =>
+                                  act(lead.id, async () => {
+                                    await onForceClose(lead.id, "closed_lost");
+                                    setConfirmingClose(null);
+                                  })
+                                }
+                                disabled={isActing}
+                              >
+                                Lost
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => setConfirmingClose(null)}
+                                disabled={isActing}
+                              >
+                                Cancel
+                              </Button>
                             </div>
                           </div>
                         ) : (
-                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive/5" onClick={() => setConfirmingClose(lead.id)}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive/5"
+                            onClick={() => setConfirmingClose(lead.id)}
+                          >
                             Force close
                           </Button>
                         )}
@@ -3452,7 +4275,13 @@ function ToggleRow({
 
 // ---------- Inline admin login gate (shown when unauthenticated at /admin) ----------
 
-function AdminLoginGate({ onAuth, nonAdminUser }: { onAuth: (user: AuthUser, token: string) => void; nonAdminUser: boolean }) {
+function AdminLoginGate({
+  onAuth,
+  nonAdminUser,
+}: {
+  onAuth: (user: AuthUser, token: string) => void;
+  nonAdminUser: boolean;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -3499,13 +4328,16 @@ function AdminLoginGate({ onAuth, nonAdminUser }: { onAuth: (user: AuthUser, tok
             Current session has no admin privileges.
           </div>
         )}
-        <form className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-card" onSubmit={handleSubmit}>
+        <form
+          className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-card"
+          onSubmit={handleSubmit}
+        >
           <div>
             <label className="mb-1.5 block text-sm font-medium">Email</label>
             <input
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@maskan.sa"
               className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
@@ -3516,13 +4348,13 @@ function AdminLoginGate({ onAuth, nonAdminUser }: { onAuth: (user: AuthUser, tok
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 className="h-11 w-full rounded-lg border border-border bg-background pe-10 ps-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(s => !s)}
+                onClick={() => setShowPassword((s) => !s)}
                 className="absolute end-3 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:text-foreground"
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}

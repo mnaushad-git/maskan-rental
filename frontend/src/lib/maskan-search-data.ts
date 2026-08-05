@@ -42,6 +42,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     rentalScore: 92, areaScore: 88, matchScore: 96,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Within Budget", "Family Friendly", "Near Schools", "Good Rental Value"],
+    agentPhone: null,
   },
   {
     title: "Najdi Modern Villa",
@@ -52,6 +53,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     rentalScore: 88, areaScore: 92, matchScore: 91,
     amenities: { parking: true, balcony: true, gym: false, pool: true },
     reasons: ["Family Friendly", "Spacious Layout", "Near Schools", "Top-rated Area"],
+    agentPhone: null,
   },
   {
     title: "KAFD Penthouse",
@@ -62,6 +64,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     rentalScore: 79, areaScore: 95, matchScore: 88,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Prime Location", "Premium Finishings", "Concierge", "Skyline View"],
+    agentPhone: null,
   },
   {
     title: "Coastal Townhouse",
@@ -72,6 +75,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     rentalScore: 90, areaScore: 86, matchScore: 84,
     amenities: { parking: true, balcony: true, gym: false, pool: false },
     reasons: ["Within Budget", "Beach Access", "Family Friendly", "Good Rental Value"],
+    agentPhone: null,
   },
   {
     title: "Family Apartment",
@@ -82,6 +86,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     rentalScore: 94, areaScore: 86, matchScore: 89,
     amenities: { parking: true, balcony: true, gym: false, pool: false },
     reasons: ["Within Budget", "Family Friendly", "Near Schools", "Best Value"],
+    agentPhone: null,
   },
   {
     title: "Garden Villa",
@@ -92,6 +97,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     rentalScore: 85, areaScore: 94, matchScore: 92,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Family Friendly", "Near Schools", "Premium Compound", "Good Rental Value"],
+    agentPhone: null,
   },
   {
     title: "Marina View Apartment",
@@ -102,6 +108,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     rentalScore: 87, areaScore: 89, matchScore: 86,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Sea View", "Within Budget", "Modern Building", "Good Amenities"],
+    agentPhone: null,
   },
   {
     title: "Diplomatic Quarter Villa",
@@ -112,6 +119,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     rentalScore: 81, areaScore: 96, matchScore: 87,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Top-rated Area", "Family Friendly", "Premium Security", "Near Schools"],
+    agentPhone: null,
   },
   {
     title: "Corniche Apartment",
@@ -122,6 +130,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     rentalScore: 93, areaScore: 82, matchScore: 83,
     amenities: { parking: true, balcony: true, gym: false, pool: false },
     reasons: ["Within Budget", "Sea View", "Walkable", "Good Rental Value"],
+    agentPhone: null,
   },
   {
     title: "Modern Family Townhouse",
@@ -132,6 +141,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     rentalScore: 89, areaScore: 88, matchScore: 90,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Within Budget", "Family Friendly", "Near KAFD", "Compound Amenities"],
+    agentPhone: null,
   },
   {
     title: "Business Bay Apartment",
@@ -142,6 +152,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     rentalScore: 91, areaScore: 80, matchScore: 81,
     amenities: { parking: true, balcony: true, gym: true, pool: false },
     reasons: ["Within Budget", "Furnished", "Near Workplaces", "Good Value"],
+    agentPhone: null,
   },
   {
     title: "Hittin Premium Villa",
@@ -152,6 +163,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     rentalScore: 83, areaScore: 93, matchScore: 89,
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Family Friendly", "Near International Schools", "Premium Area", "Spacious"],
+    agentPhone: null,
   },
 ];
 
@@ -159,7 +171,6 @@ export const searchProperties: SearchProperty[] = baseTitles.map((b, i) => ({
   ...b,
   id: `MSK-${7000 + i}`,
   image: IMGS[i % IMGS.length],
-  agentPhone: null,
 }));
 
 export const districtsByCity: Record<string, string[]> = {

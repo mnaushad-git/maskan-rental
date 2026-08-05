@@ -111,7 +111,7 @@ function NewLeadPage() {
                   <div key={s.id} className="rounded-lg border border-border p-3 text-sm">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-medium truncate">{s.property_title ?? t("leadNew.success.propertyFallback", { id: s.property_id })}</p>
+                        <p className="font-medium truncate">{s.property_title ?? t("leadNew.success.propertyFallback", { id: s.property_id ?? "" })}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {s.bedrooms ? t("leadNew.success.bedroomsPrefix", { count: s.bedrooms }) : ""}
                           {s.monthly_rent ? t("leadNew.success.perMonth", { amount: s.monthly_rent.toLocaleString() }) : ""}

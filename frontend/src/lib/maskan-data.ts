@@ -233,8 +233,17 @@ export const aiQuickQuestions = [
   "Is this rent fair?",
 ];
 
-export const formatSAR = (n: number) =>
-  new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n);
+// Uses Western digits (numberingSystem: "latn") in both locales — Saudi
+// financial UIs conventionally keep 0-9 digits even in Arabic, since that's
+// what users read and type. Only the grouping/decimal separator convention
+// varies with locale. Reads the language the LanguageProvider has already
+// stamped onto <html lang> rather than taking a prop, since formatSAR is
+// called from ~80 call sites that don't all have `lang` in scope.
+export const formatSAR = (n: number) => {
+  const locale =
+    typeof document !== "undefined" && document.documentElement.lang === "ar" ? "ar-SA" : "en-US";
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0, numberingSystem: "latn" }).format(n);
+};
 
 export type DistrictScores = {
   areaScore: number;

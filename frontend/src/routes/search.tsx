@@ -1,10 +1,11 @@
-import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { TopNav } from "@/components/maskan/TopNav";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpDown,
   Bath,
   BedDouble,
+  Bell,
   Briefcase,
   Building2,
   Car,
@@ -18,7 +19,6 @@ import {
   Map,
   MapPin,
   Maximize,
-  Phone,
   Search,
   SlidersHorizontal,
   Sofa,
@@ -30,13 +30,25 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/maskan/Badges";
-import { fetchPropertiesPaged, fetchSavedProperties, saveProperty, deleteSavedProperty, mapApiSearchProperty, fetchAreaIntelligenceList, fetchAreas, enrichPropertiesWithScores, type ApiAreaIntelligenceSummary, type ApiAreaSummary, type PropertySearchFilters } from "@/lib/api/maskan";
+import { ContactButtons } from "@/components/maskan/ContactButtons";
+import { SaveSearchDialog } from "@/components/maskan/SaveSearchDialog";
+import {
+  fetchPropertiesPaged,
+  fetchSavedProperties,
+  saveProperty,
+  deleteSavedProperty,
+  mapApiSearchProperty,
+  fetchAreaIntelligenceList,
+  fetchAreas,
+  enrichPropertiesWithScores,
+  type ApiAreaIntelligenceSummary,
+  type ApiAreaSummary,
+  type ApiPropertyFilterCriteria,
+  type PropertySearchFilters,
+} from "@/lib/api/maskan";
 import { PropertyMapView } from "@/components/maskan/PropertyMapView";
 import { useAuth } from "@/lib/auth-context";
-import {
-  districtsByCity,
-  type SearchProperty,
-} from "@/lib/maskan-search-data";
+import { districtsByCity, type SearchProperty } from "@/lib/maskan-search-data";
 import { formatSAR } from "@/lib/maskan-data";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
@@ -102,18 +114,21 @@ function useSearchT() {
 
 function SearchPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { t } = useLanguage();
   const tSearch = useSearchT();
-  const rawSearch = useRouterState({ select: s => s.location.searchStr });
+  const [saveSearchOpen, setSaveSearchOpen] = useState(false);
+  const rawSearch = useRouterState({ select: (s) => s.location.searchStr });
   const _qs = new URLSearchParams(rawSearch);
   const initialListingType = (_qs.get("listingType") as ListingType) ?? "rent";
   const [filters, setFilters] = useState<Filters>({
     ...DEFAULTS,
     listingType: initialListingType,
-    city:     _qs.get("city")     ?? "Any",
+    city: _qs.get("city") ?? "Any",
     district: _qs.get("district") ?? "Any",
-    minRent:  Number(_qs.get("minRent") ?? 0),
-    maxRent:  Number(_qs.get("maxRent") ?? (initialListingType === "sale" ? 30_000_000 : 500_000)),
-    type:     _qs.get("type")     ?? "Any",
+    minRent: Number(_qs.get("minRent") ?? 0),
+    maxRent: Number(_qs.get("maxRent") ?? (initialListingType === "sale" ? 30_000_000 : 500_000)),
+    type: _qs.get("type") ?? "Any",
   });
   const [view, setView] = useState<"grid" | "list" | "map">("map");
   const [sort, setSort] = useState<"match" | "price-asc" | "price-desc" | "value">("match");
@@ -127,7 +142,19 @@ function SearchPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [intel, setIntel] = useState<{ list: ApiAreaIntelligenceSummary[]; avgMap: Record<string, number> }>({ list: [], avgMap: {} });
+  const [intel, setIntel] = useState<{
+    list: ApiAreaIntelligenceSummary[];
+    avgMap: Record<string, number>;
+  }>({ list: [], avgMap: {} });
+
+  // `filters` updates immediately (so number inputs stay responsive), but the
+  // fetch effect below reads `debouncedFilters` — otherwise typing a budget
+  // like "80000" fires one request per keystroke.
+  const [debouncedFilters, setDebouncedFilters] = useState(filters);
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedFilters(filters), 400);
+    return () => clearTimeout(id);
+  }, [filters]);
 
   const PAGE_SIZE = 60;
 
@@ -152,6 +179,38 @@ function SearchPage() {
       if (f.maxRent < 500_000) out.maxMonthlyRent = f.maxRent / 12;
     }
     return out;
+  }
+
+  // Same UI filter state, translated into the backend's canonical saved-
+  // search criteria shape (app.core.search.filters.PropertyFilterCriteria)
+  // instead of the ApiSearch-specific PropertySearchFilters above — prices
+  // here stay annual→monthly-normalized the same way buildServerFilters does.
+  function buildSavedSearchCriteria(f: Filters): ApiPropertyFilterCriteria {
+    return {
+      transaction_type: f.listingType,
+      city: f.city !== "Any" ? f.city : undefined,
+      districts: f.district !== "Any" ? [f.district] : [],
+      property_type: f.type !== "Any" ? f.type : undefined,
+      furnishing: f.furnishing !== "Any" ? f.furnishing : undefined,
+      bedrooms: f.bedrooms > 0 ? f.bedrooms : undefined,
+      bathrooms: f.bathrooms > 0 ? f.bathrooms : undefined,
+      min_price:
+        f.listingType === "sale"
+          ? f.minRent > 0
+            ? f.minRent
+            : undefined
+          : f.minRent > 0
+            ? f.minRent / 12
+            : undefined,
+      max_price:
+        f.listingType === "sale"
+          ? f.maxRent < 30_000_000
+            ? f.maxRent
+            : undefined
+          : f.maxRent < 500_000
+            ? f.maxRent / 12
+            : undefined,
+    };
   }
 
   // Saved-properties list only depends on the logged-in user, not on search filters.
@@ -194,18 +253,30 @@ function SearchPage() {
   // Fetch the first page from the server whenever a server-backed filter changes.
   useEffect(() => {
     let cancelled = false;
+    // Aborts the in-flight HTTP request itself (not just its effect on state)
+    // when filters change again before the previous page finishes loading —
+    // e.g. dragging a rent slider fires several fetches per second.
+    let controller = new AbortController();
 
     async function load() {
+      controller.abort();
+      controller = new AbortController();
       try {
         setLoading(true);
         setError(null);
-        const { data, total: totalCount } = await fetchPropertiesPaged(buildServerFilters(filters), 0, PAGE_SIZE);
+        const { data, total: totalCount } = await fetchPropertiesPaged(
+          buildServerFilters(debouncedFilters),
+          0,
+          PAGE_SIZE,
+          controller.signal,
+        );
         if (cancelled) return;
         setRawProperties(data.map(mapApiSearchProperty));
         setTotal(totalCount);
         setSkip(data.length);
         setLoading(false);
-      } catch {
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
         if (!cancelled) {
           setError(tSearch("errorLoading"));
           setRawProperties([]);
@@ -226,17 +297,32 @@ function SearchPage() {
 
     return () => {
       cancelled = true;
+      controller.abort();
       document.removeEventListener("visibilitychange", onVisible);
     };
     // tSearch intentionally omitted — switching language shouldn't re-fetch listings.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.listingType, filters.city, filters.district, filters.type, filters.furnishing, filters.bedrooms, filters.bathrooms, filters.minRent, filters.maxRent]);
+  }, [
+    debouncedFilters.listingType,
+    debouncedFilters.city,
+    debouncedFilters.district,
+    debouncedFilters.type,
+    debouncedFilters.furnishing,
+    debouncedFilters.bedrooms,
+    debouncedFilters.bathrooms,
+    debouncedFilters.minRent,
+    debouncedFilters.maxRent,
+  ]);
 
   async function loadMore() {
     if (loadingMore || rawProperties.length >= total) return;
     setLoadingMore(true);
     try {
-      const { data } = await fetchPropertiesPaged(buildServerFilters(filters), skip, PAGE_SIZE);
+      const { data } = await fetchPropertiesPaged(
+        buildServerFilters(debouncedFilters),
+        skip,
+        PAGE_SIZE,
+      );
       setRawProperties((prev) => [...prev, ...data.map(mapApiSearchProperty)]);
       setSkip((s) => s + data.length);
     } catch {
@@ -272,15 +358,17 @@ function SearchPage() {
   const hasMore = rawProperties.length < total;
 
   const toggleCompare = (id: string) =>
-    setCompare((c) =>
-      c.includes(id) ? c.filter((x) => x !== id) : c.length < 3 ? [...c, id] : c,
-    );
+    setCompare((c) => (c.includes(id) ? c.filter((x) => x !== id) : c.length < 3 ? [...c, id] : c));
 
   const toggleSave = async (id: string) => {
     if (!user) return;
     if (id in savedMap) {
       const recordId = savedMap[id];
-      setSavedMap((m) => { const next = { ...m }; delete next[id]; return next; });
+      setSavedMap((m) => {
+        const next = { ...m };
+        delete next[id];
+        return next;
+      });
       try {
         await deleteSavedProperty(recordId);
       } catch {
@@ -292,7 +380,11 @@ function SearchPage() {
         const record = await saveProperty(user.id, Number(id));
         setSavedMap((m) => ({ ...m, [id]: record.id }));
       } catch {
-        setSavedMap((m) => { const next = { ...m }; delete next[id]; return next; });
+        setSavedMap((m) => {
+          const next = { ...m };
+          delete next[id];
+          return next;
+        });
       }
     }
   };
@@ -321,13 +413,15 @@ function SearchPage() {
         <ListingCategoryBar
           className="mt-4"
           listingType={filters.listingType}
-          onListingTypeChange={(v) => setFilters({
-            ...filters,
-            listingType: v,
-            type: "Any",
-            minRent: 0,
-            maxRent: v === "sale" ? 30_000_000 : 500_000,
-          })}
+          onListingTypeChange={(v) =>
+            setFilters({
+              ...filters,
+              listingType: v,
+              type: "Any",
+              minRent: 0,
+              maxRent: v === "sale" ? 30_000_000 : 500_000,
+            })
+          }
           propertyType={filters.type}
           onPropertyTypeChange={(v) => setFilters({ ...filters, type: v })}
         />
@@ -340,6 +434,17 @@ function SearchPage() {
           view={view}
           setView={setView}
         />
+
+        <div className="mt-3 flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => (user ? setSaveSearchOpen(true) : navigate({ to: "/auth" }))}
+            className="gap-1.5"
+          >
+            <Bell className="size-3.5" /> {t("savedSearches.saveButton")}
+          </Button>
+        </div>
 
         {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
@@ -398,12 +503,7 @@ function SearchPage() {
         </div>
       </div>
 
-      {compare.length > 0 && (
-        <CompareBar
-          count={compare.length}
-          onClear={() => setCompare([])}
-        />
-      )}
+      {compare.length > 0 && <CompareBar count={compare.length} onClear={() => setCompare([])} />}
 
       <MobileFilterSheet
         open={filtersOpen}
@@ -411,6 +511,21 @@ function SearchPage() {
         filters={filters}
         setFilters={setFilters}
         resultsCount={results.length}
+      />
+
+      <SaveSearchDialog
+        open={saveSearchOpen}
+        onOpenChange={setSaveSearchOpen}
+        filters={buildSavedSearchCriteria(filters)}
+        suggestedName={
+          filters.district !== "Any"
+            ? `${filters.type !== "Any" ? filters.type : filters.listingType} · ${filters.district}`
+            : filters.city !== "Any"
+              ? `${filters.type !== "Any" ? filters.type : filters.listingType} · ${filters.city}`
+              : filters.listingType === "sale"
+                ? tSearch("resultsHeadingSalePlural", { count: total })
+                : tSearch("resultsHeadingPlural", { count: total })
+        }
       />
     </div>
   );
@@ -452,9 +567,14 @@ function ResultsHeader({
   setView: (v: "grid" | "list" | "map") => void;
 }) {
   const tSearch = useSearchT();
-  const headingKey = listingType === "sale"
-    ? (count === 1 ? "resultsHeadingSaleSingular" : "resultsHeadingSalePlural")
-    : (count === 1 ? "resultsHeadingSingular" : "resultsHeadingPlural");
+  const headingKey =
+    listingType === "sale"
+      ? count === 1
+        ? "resultsHeadingSaleSingular"
+        : "resultsHeadingSalePlural"
+      : count === 1
+        ? "resultsHeadingSingular"
+        : "resultsHeadingPlural";
   return (
     <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
       <div>
@@ -485,7 +605,9 @@ function ResultsHeader({
             aria-label={tSearch("gridView")}
             className={cn(
               "grid size-8 place-items-center rounded-lg transition-colors",
-              view === "grid" ? "bg-surface text-foreground" : "text-muted-foreground hover:text-foreground",
+              view === "grid"
+                ? "bg-surface text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             <LayoutGrid className="size-4" />
@@ -495,7 +617,9 @@ function ResultsHeader({
             aria-label={tSearch("listView")}
             className={cn(
               "grid size-8 place-items-center rounded-lg transition-colors",
-              view === "list" ? "bg-surface text-foreground" : "text-muted-foreground hover:text-foreground",
+              view === "list"
+                ? "bg-surface text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             <List className="size-4" />
@@ -530,8 +654,7 @@ function FilterFields({
 }) {
   const { t } = useLanguage();
   const tSearch = useSearchT();
-  const set = <K extends keyof Filters>(k: K, v: Filters[K]) =>
-    setFilters({ ...filters, [k]: v });
+  const set = <K extends keyof Filters>(k: K, v: Filters[K]) => setFilters({ ...filters, [k]: v });
 
   const cities = ["Any", "Riyadh", "Jeddah", "Dammam", "Khobar", "Madinah"];
   const districts =
@@ -542,7 +665,10 @@ function FilterFields({
   return (
     <div className="space-y-5">
       <Field label={tSearch("city")}>
-        <Select value={filters.city} onChange={(v) => setFilters({ ...filters, city: v, district: "Any" })}>
+        <Select
+          value={filters.city}
+          onChange={(v) => setFilters({ ...filters, city: v, district: "Any" })}
+        >
           {cities.map((c) => (
             <option key={c} value={c}>
               {c === "Any" ? t("onboarding.any") : t(`cities.${c}`)}
@@ -563,10 +689,20 @@ function FilterFields({
 
       <div className="grid grid-cols-2 gap-3">
         <Field label={tSearch(filters.listingType === "sale" ? "minPrice" : "minRent")}>
-          <NumberInput value={filters.minRent} onChange={(v) => set("minRent", v)} step={5000} placeholder="0" />
+          <NumberInput
+            value={filters.minRent}
+            onChange={(v) => set("minRent", v)}
+            step={5000}
+            placeholder="0"
+          />
         </Field>
         <Field label={tSearch(filters.listingType === "sale" ? "maxPrice" : "maxRent")}>
-          <NumberInput value={filters.maxRent} onChange={(v) => set("maxRent", v)} step={5000} placeholder="500,000" />
+          <NumberInput
+            value={filters.maxRent}
+            onChange={(v) => set("maxRent", v)}
+            step={5000}
+            placeholder="500,000"
+          />
         </Field>
       </div>
 
@@ -626,10 +762,30 @@ function FilterFields({
           {tSearch("amenities")}
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Toggle label={tSearch("parking")} icon={<Car className="size-3.5" />} active={filters.parking} onToggle={() => set("parking", !filters.parking)} />
-          <Toggle label={tSearch("balcony")} icon={<Trees className="size-3.5" />} active={filters.balcony} onToggle={() => set("balcony", !filters.balcony)} />
-          <Toggle label={tSearch("gym")} icon={<Dumbbell className="size-3.5" />} active={filters.gym} onToggle={() => set("gym", !filters.gym)} />
-          <Toggle label={tSearch("pool")} icon={<Waves className="size-3.5" />} active={filters.pool} onToggle={() => set("pool", !filters.pool)} />
+          <Toggle
+            label={tSearch("parking")}
+            icon={<Car className="size-3.5" />}
+            active={filters.parking}
+            onToggle={() => set("parking", !filters.parking)}
+          />
+          <Toggle
+            label={tSearch("balcony")}
+            icon={<Trees className="size-3.5" />}
+            active={filters.balcony}
+            onToggle={() => set("balcony", !filters.balcony)}
+          />
+          <Toggle
+            label={tSearch("gym")}
+            icon={<Dumbbell className="size-3.5" />}
+            active={filters.gym}
+            onToggle={() => set("gym", !filters.gym)}
+          />
+          <Toggle
+            label={tSearch("pool")}
+            icon={<Waves className="size-3.5" />}
+            active={filters.pool}
+            onToggle={() => set("pool", !filters.pool)}
+          />
         </div>
       </div>
     </div>
@@ -652,7 +808,11 @@ function FiltersPanel({
           <SlidersHorizontal className="size-4 text-primary" />
           <h2 className="text-sm font-semibold">{tSearch("filters")}</h2>
         </div>
-        <button type="button" onClick={() => setFilters(DEFAULTS)} className="text-xs font-semibold text-primary hover:underline">
+        <button
+          type="button"
+          onClick={() => setFilters(DEFAULTS)}
+          className="text-xs font-semibold text-primary hover:underline"
+        >
           {tSearch("reset")}
         </button>
       </div>
@@ -685,7 +845,11 @@ function MobileFilterSheet({
       <div className="absolute inset-x-0 bottom-0 flex max-h-[90vh] flex-col rounded-t-3xl bg-background shadow-2xl">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <div className="text-base font-semibold">{tSearch("filters")}</div>
-          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground"
+          >
             <X className="size-5" />
           </button>
         </div>
@@ -698,10 +862,9 @@ function MobileFilterSheet({
               {tSearch("reset")}
             </Button>
             <Button variant="hero" className="flex-[2]" onClick={onClose}>
-              {tSearch(
-                resultsCount === 1 ? "showNPropertiesSingular" : "showNPropertiesPlural",
-                { count: resultsCount },
-              )}
+              {tSearch(resultsCount === 1 ? "showNPropertiesSingular" : "showNPropertiesPlural", {
+                count: resultsCount,
+              })}
             </Button>
           </div>
         </div>
@@ -783,7 +946,9 @@ function SegmentedControl({
           onClick={() => onChange(o)}
           className={cn(
             "flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors",
-            value === o ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+            value === o
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           {labels?.[i] ?? o}
@@ -831,7 +996,12 @@ function ResultCardSkeleton({ variant }: { variant: "grid" | "list" }) {
         isList ? "grid grid-cols-1 gap-0 md:grid-cols-[240px_1fr]" : "flex flex-col",
       )}
     >
-      <Skeleton className={cn("shrink-0 rounded-none", isList ? "aspect-[4/3] md:aspect-auto md:h-full" : "aspect-[4/3]")} />
+      <Skeleton
+        className={cn(
+          "shrink-0 rounded-none",
+          isList ? "aspect-[4/3] md:aspect-auto md:h-full" : "aspect-[4/3]",
+        )}
+      />
       <div className="flex min-w-0 flex-col gap-3 p-5">
         <Skeleton className="h-5 w-3/4" />
         <Skeleton className="h-4 w-1/2" />
@@ -873,7 +1043,12 @@ function ResultsPanel({
 
   if (loading && results.length === 0) {
     return (
-      <div className={cn("grid gap-5", view === "grid" ? "sm:grid-cols-2 xl:grid-cols-3" : "grid-cols-1")}>
+      <div
+        className={cn(
+          "grid gap-5",
+          view === "grid" ? "sm:grid-cols-2 xl:grid-cols-3" : "grid-cols-1",
+        )}
+      >
         {Array.from({ length: 6 }).map((_, i) => (
           <ResultCardSkeleton key={i} variant={view === "map" ? "grid" : view} />
         ))}
@@ -887,11 +1062,10 @@ function ResultsPanel({
         <div className="grid place-items-center rounded-2xl border border-dashed border-border bg-card p-16 text-center">
           <Building2 className="size-10 text-muted-foreground" />
           <h3 className="mt-4 font-display text-lg font-bold">{tSearch("noMatchesTitle")}</h3>
-          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            {tSearch("noMatchesDesc")}
-          </p>
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">{tSearch("noMatchesDesc")}</p>
         </div>
         <LeadCTABanner city={leadCity} area={leadArea} />
+        <PropertyRequestCTABanner />
       </div>
     );
   }
@@ -942,6 +1116,31 @@ function LeadCTABanner({ city, area }: { city: string; area: string }) {
   );
 }
 
+// AI Property Agent entry point — offered alongside the one-off lead CTA so
+// customers with an ongoing search (not just this one query) can set up
+// continuous AI matching instead of a single hand-off to a partner.
+function PropertyRequestCTABanner() {
+  const { t } = useLanguage();
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-ai/20 bg-ai-soft/20 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <Sparkles className="size-5 shrink-0 text-ai mt-0.5" />
+        <div>
+          <p className="font-semibold text-sm">{t("propertyRequest.entryPoint.heading")}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t("propertyRequest.entryPoint.desc")}
+          </p>
+        </div>
+      </div>
+      <Link to="/property-requests/new" className="shrink-0">
+        <Button size="sm" variant="outline">
+          {t("propertyRequest.entryPoint.ctaShort")}
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
 function ResultCard({
   p,
   variant,
@@ -961,9 +1160,6 @@ function ResultCard({
   const tSearch = useSearchT();
   const isList = variant === "list";
   const hasPhone = !!p.agentPhone;
-  const waLink = hasPhone
-    ? `https://wa.me/${p.agentPhone!.replace(/\D/g, "").replace(/^0/, "966")}`
-    : undefined;
 
   return (
     <div
@@ -972,8 +1168,17 @@ function ResultCard({
         isList ? "grid grid-cols-1 gap-0 md:grid-cols-[240px_1fr]" : "flex flex-col",
       )}
     >
-      <Link to="/property/$id" params={{ id: p.id }} className={cn("flex flex-col", isList && "contents")}>
-        <div className={cn("relative shrink-0 overflow-hidden bg-surface-2", isList ? "aspect-[4/3] md:aspect-auto md:h-full" : "aspect-[4/3]")}>
+      <Link
+        to="/property/$id"
+        params={{ id: p.id }}
+        className={cn("flex flex-col", isList && "contents")}
+      >
+        <div
+          className={cn(
+            "relative shrink-0 overflow-hidden bg-surface-2",
+            isList ? "aspect-[4/3] md:aspect-auto md:h-full" : "aspect-[4/3]",
+          )}
+        >
           <img
             src={p.image}
             alt={p.title}
@@ -986,11 +1191,16 @@ function ResultCard({
             </Badge>
             <button
               type="button"
-              onClick={(e) => { e.preventDefault(); onSave(); }}
+              onClick={(e) => {
+                e.preventDefault();
+                onSave();
+              }}
               aria-label={tSearch("save")}
               className={cn(
                 "grid size-9 place-items-center rounded-full shadow-card backdrop-blur transition-colors",
-                saved ? "bg-destructive text-destructive-foreground" : "bg-background/95 text-foreground hover:bg-background",
+                saved
+                  ? "bg-destructive text-destructive-foreground"
+                  : "bg-background/95 text-foreground hover:bg-background",
               )}
             >
               <Heart className={cn("size-4", saved && "fill-current")} />
@@ -1030,7 +1240,9 @@ function ResultCard({
           <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
             <div>
               <div className="text-xs text-muted-foreground">
-                {p.listingType === "sale" ? t("propertyCard.salePrice") : t("propertyCard.annualRent")}
+                {p.listingType === "sale"
+                  ? t("propertyCard.salePrice")
+                  : t("propertyCard.annualRent")}
               </div>
               <div className="font-display text-xl font-bold tracking-tight">
                 SAR {formatSAR(p.price)}
@@ -1044,7 +1256,10 @@ function ResultCard({
             <Button
               variant={compared ? "soft" : "outline"}
               size="sm"
-              onClick={(e) => { e.preventDefault(); onCompare(); }}
+              onClick={(e) => {
+                e.preventDefault();
+                onCompare();
+              }}
               aria-pressed={compared}
             >
               <GitCompare className="size-3.5" />
@@ -1056,25 +1271,11 @@ function ResultCard({
 
       {/* Contact CTA — outside the Link to avoid nested <a> */}
       {hasPhone && !isList && (
-        <div className="flex gap-2 border-t border-border px-5 py-3">
-          <a
-            href={`tel:${p.agentPhone}`}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-2 text-xs font-medium text-foreground transition-colors hover:bg-surface"
-          >
-            <Phone className="size-3.5" /> {t("propertyCard.call")}
-          </a>
-          <a
-            href={waLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#25D366] bg-[#25D366]/10 py-2 text-xs font-medium text-[#128C7E] transition-colors hover:bg-[#25D366]/20 dark:text-[#25D366]"
-          >
-            <svg viewBox="0 0 24 24" className="size-3.5 fill-current" aria-hidden="true">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-            </svg>
-            {t("propertyCard.whatsapp")}
-          </a>
-        </div>
+        <ContactButtons
+          phone={p.agentPhone!}
+          callLabel={t("propertyCard.call")}
+          whatsappLabel={t("propertyCard.whatsapp")}
+        />
       )}
     </div>
   );
@@ -1082,7 +1283,10 @@ function ResultCard({
 
 // Reasons come pre-formatted in English from the API mapper (see mapApiProperty in
 // lib/api/maskan.ts) — translate the small fixed vocabulary here at render time.
-function translateReason(reason: string, t: (key: string, vars?: Record<string, string | number>) => string): string {
+function translateReason(
+  reason: string,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
   if (reason === "Verified listing") return t("search.reasonVerifiedListing");
   if (reason === "Detailed description available") return t("search.reasonDetailedDescription");
   if (reason === "Fresh inventory") return t("search.reasonFreshInventory");

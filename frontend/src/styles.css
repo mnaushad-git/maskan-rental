@@ -54,6 +54,8 @@
   --color-ai: var(--ai);
   --color-ai-foreground: var(--ai-foreground);
   --color-ai-soft: var(--ai-soft);
+  --color-whatsapp: var(--whatsapp);
+  --color-whatsapp-foreground: var(--whatsapp-foreground);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -132,6 +134,12 @@
   --ai: oklch(0.55 0.18 285);
   --ai-foreground: oklch(0.99 0.005 285);
   --ai-soft: oklch(0.96 0.03 285);
+
+  /* WhatsApp brand mark — fixed third-party brand color, not part of the
+     adaptive theme, so it's a literal hex (not oklch) and doesn't vary
+     between light/dark like the semantic tokens above. */
+  --whatsapp: #25d366;
+  --whatsapp-foreground: #128c7e;
 
   --border: oklch(0.92 0.008 256);
   --input: oklch(0.92 0.008 256);

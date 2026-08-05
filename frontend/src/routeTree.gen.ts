@@ -10,9 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as SavedSearchesRouteImport } from './routes/saved-searches'
 import { Route as SavedRouteImport } from './routes/saved'
+import { Route as PropertyRequestsRouteImport } from './routes/property-requests'
 import { Route as PartnersRouteImport } from './routes/partners'
 import { Route as PartnerRouteImport } from './routes/partner'
+import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as NotificationSettingsRouteImport } from './routes/notification-settings'
 import { Route as MyLeadsRouteImport } from './routes/my-leads'
 import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as ImportRouteImport } from './routes/import'
@@ -25,11 +29,17 @@ import { Route as AdvisorRouteImport } from './routes/advisor'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PropertyIdRouteImport } from './routes/property.$id'
+import { Route as PropertyRequestsNewRouteImport } from './routes/property-requests.new'
+import { Route as PropertyRequestsIdRouteImport } from './routes/property-requests.$id'
+import { Route as PartnerRequestsRouteImport } from './routes/partner.requests'
 import { Route as PartnerRegisterRouteImport } from './routes/partner.register'
 import { Route as LeadNewRouteImport } from './routes/lead.new'
 import { Route as LeadLeadIdRouteImport } from './routes/lead.$leadId'
 import { Route as AgentIdRouteImport } from './routes/agent.$id'
+import { Route as AdminPropertyRequestsRouteImport } from './routes/admin_.property-requests'
+import { Route as AdminNotificationsRouteImport } from './routes/admin_.notifications'
 import { Route as PropertyRouteImport } from './routes/property.'
+import { Route as PartnerRequestsIdRouteImport } from './routes/partner.requests.$id'
 import { Route as PartnerLeadsLeadIdRouteImport } from './routes/partner.leads.$leadId'
 
 const SearchRoute = SearchRouteImport.update({
@@ -37,9 +47,19 @@ const SearchRoute = SearchRouteImport.update({
   path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SavedSearchesRoute = SavedSearchesRouteImport.update({
+  id: '/saved-searches',
+  path: '/saved-searches',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SavedRoute = SavedRouteImport.update({
   id: '/saved',
   path: '/saved',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PropertyRequestsRoute = PropertyRequestsRouteImport.update({
+  id: '/property-requests',
+  path: '/property-requests',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PartnersRoute = PartnersRouteImport.update({
@@ -50,6 +70,16 @@ const PartnersRoute = PartnersRouteImport.update({
 const PartnerRoute = PartnerRouteImport.update({
   id: '/partner',
   path: '/partner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationSettingsRoute = NotificationSettingsRouteImport.update({
+  id: '/notification-settings',
+  path: '/notification-settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MyLeadsRoute = MyLeadsRouteImport.update({
@@ -112,6 +142,21 @@ const PropertyIdRoute = PropertyIdRouteImport.update({
   path: '/property/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PropertyRequestsNewRoute = PropertyRequestsNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => PropertyRequestsRoute,
+} as any)
+const PropertyRequestsIdRoute = PropertyRequestsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PropertyRequestsRoute,
+} as any)
+const PartnerRequestsRoute = PartnerRequestsRouteImport.update({
+  id: '/requests',
+  path: '/requests',
+  getParentRoute: () => PartnerRoute,
+} as any)
 const PartnerRegisterRoute = PartnerRegisterRouteImport.update({
   id: '/register',
   path: '/register',
@@ -132,10 +177,25 @@ const AgentIdRoute = AgentIdRouteImport.update({
   path: '/agent/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminPropertyRequestsRoute = AdminPropertyRequestsRouteImport.update({
+  id: '/admin_/property-requests',
+  path: '/admin/property-requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
+  id: '/admin_/notifications',
+  path: '/admin/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PropertyRoute = PropertyRouteImport.update({
   id: '/property/',
   path: '/property/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerRequestsIdRoute = PartnerRequestsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PartnerRequestsRoute,
 } as any)
 const PartnerLeadsLeadIdRoute = PartnerLeadsLeadIdRouteImport.update({
   id: '/leads/$leadId',
@@ -155,17 +215,27 @@ export interface FileRoutesByFullPath {
   '/import': typeof ImportRoute
   '/methodology': typeof MethodologyRoute
   '/my-leads': typeof MyLeadsRoute
+  '/notification-settings': typeof NotificationSettingsRoute
+  '/notifications': typeof NotificationsRoute
   '/partner': typeof PartnerRouteWithChildren
   '/partners': typeof PartnersRoute
+  '/property-requests': typeof PropertyRequestsRouteWithChildren
   '/saved': typeof SavedRoute
+  '/saved-searches': typeof SavedSearchesRoute
   '/search': typeof SearchRoute
   '/property/': typeof PropertyRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/property-requests': typeof AdminPropertyRequestsRoute
   '/agent/$id': typeof AgentIdRoute
   '/lead/$leadId': typeof LeadLeadIdRoute
   '/lead/new': typeof LeadNewRoute
   '/partner/register': typeof PartnerRegisterRoute
+  '/partner/requests': typeof PartnerRequestsRouteWithChildren
+  '/property-requests/$id': typeof PropertyRequestsIdRoute
+  '/property-requests/new': typeof PropertyRequestsNewRoute
   '/property/$id': typeof PropertyIdRoute
   '/partner/leads/$leadId': typeof PartnerLeadsLeadIdRoute
+  '/partner/requests/$id': typeof PartnerRequestsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -179,17 +249,27 @@ export interface FileRoutesByTo {
   '/import': typeof ImportRoute
   '/methodology': typeof MethodologyRoute
   '/my-leads': typeof MyLeadsRoute
+  '/notification-settings': typeof NotificationSettingsRoute
+  '/notifications': typeof NotificationsRoute
   '/partner': typeof PartnerRouteWithChildren
   '/partners': typeof PartnersRoute
+  '/property-requests': typeof PropertyRequestsRouteWithChildren
   '/saved': typeof SavedRoute
+  '/saved-searches': typeof SavedSearchesRoute
   '/search': typeof SearchRoute
   '/property': typeof PropertyRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/property-requests': typeof AdminPropertyRequestsRoute
   '/agent/$id': typeof AgentIdRoute
   '/lead/$leadId': typeof LeadLeadIdRoute
   '/lead/new': typeof LeadNewRoute
   '/partner/register': typeof PartnerRegisterRoute
+  '/partner/requests': typeof PartnerRequestsRouteWithChildren
+  '/property-requests/$id': typeof PropertyRequestsIdRoute
+  '/property-requests/new': typeof PropertyRequestsNewRoute
   '/property/$id': typeof PropertyIdRoute
   '/partner/leads/$leadId': typeof PartnerLeadsLeadIdRoute
+  '/partner/requests/$id': typeof PartnerRequestsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -204,17 +284,27 @@ export interface FileRoutesById {
   '/import': typeof ImportRoute
   '/methodology': typeof MethodologyRoute
   '/my-leads': typeof MyLeadsRoute
+  '/notification-settings': typeof NotificationSettingsRoute
+  '/notifications': typeof NotificationsRoute
   '/partner': typeof PartnerRouteWithChildren
   '/partners': typeof PartnersRoute
+  '/property-requests': typeof PropertyRequestsRouteWithChildren
   '/saved': typeof SavedRoute
+  '/saved-searches': typeof SavedSearchesRoute
   '/search': typeof SearchRoute
   '/property/': typeof PropertyRoute
+  '/admin_/notifications': typeof AdminNotificationsRoute
+  '/admin_/property-requests': typeof AdminPropertyRequestsRoute
   '/agent/$id': typeof AgentIdRoute
   '/lead/$leadId': typeof LeadLeadIdRoute
   '/lead/new': typeof LeadNewRoute
   '/partner/register': typeof PartnerRegisterRoute
+  '/partner/requests': typeof PartnerRequestsRouteWithChildren
+  '/property-requests/$id': typeof PropertyRequestsIdRoute
+  '/property-requests/new': typeof PropertyRequestsNewRoute
   '/property/$id': typeof PropertyIdRoute
   '/partner/leads/$leadId': typeof PartnerLeadsLeadIdRoute
+  '/partner/requests/$id': typeof PartnerRequestsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -230,17 +320,27 @@ export interface FileRouteTypes {
     | '/import'
     | '/methodology'
     | '/my-leads'
+    | '/notification-settings'
+    | '/notifications'
     | '/partner'
     | '/partners'
+    | '/property-requests'
     | '/saved'
+    | '/saved-searches'
     | '/search'
     | '/property/'
+    | '/admin/notifications'
+    | '/admin/property-requests'
     | '/agent/$id'
     | '/lead/$leadId'
     | '/lead/new'
     | '/partner/register'
+    | '/partner/requests'
+    | '/property-requests/$id'
+    | '/property-requests/new'
     | '/property/$id'
     | '/partner/leads/$leadId'
+    | '/partner/requests/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -254,17 +354,27 @@ export interface FileRouteTypes {
     | '/import'
     | '/methodology'
     | '/my-leads'
+    | '/notification-settings'
+    | '/notifications'
     | '/partner'
     | '/partners'
+    | '/property-requests'
     | '/saved'
+    | '/saved-searches'
     | '/search'
     | '/property'
+    | '/admin/notifications'
+    | '/admin/property-requests'
     | '/agent/$id'
     | '/lead/$leadId'
     | '/lead/new'
     | '/partner/register'
+    | '/partner/requests'
+    | '/property-requests/$id'
+    | '/property-requests/new'
     | '/property/$id'
     | '/partner/leads/$leadId'
+    | '/partner/requests/$id'
   id:
     | '__root__'
     | '/'
@@ -278,17 +388,27 @@ export interface FileRouteTypes {
     | '/import'
     | '/methodology'
     | '/my-leads'
+    | '/notification-settings'
+    | '/notifications'
     | '/partner'
     | '/partners'
+    | '/property-requests'
     | '/saved'
+    | '/saved-searches'
     | '/search'
     | '/property/'
+    | '/admin_/notifications'
+    | '/admin_/property-requests'
     | '/agent/$id'
     | '/lead/$leadId'
     | '/lead/new'
     | '/partner/register'
+    | '/partner/requests'
+    | '/property-requests/$id'
+    | '/property-requests/new'
     | '/property/$id'
     | '/partner/leads/$leadId'
+    | '/partner/requests/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -303,11 +423,17 @@ export interface RootRouteChildren {
   ImportRoute: typeof ImportRoute
   MethodologyRoute: typeof MethodologyRoute
   MyLeadsRoute: typeof MyLeadsRoute
+  NotificationSettingsRoute: typeof NotificationSettingsRoute
+  NotificationsRoute: typeof NotificationsRoute
   PartnerRoute: typeof PartnerRouteWithChildren
   PartnersRoute: typeof PartnersRoute
+  PropertyRequestsRoute: typeof PropertyRequestsRouteWithChildren
   SavedRoute: typeof SavedRoute
+  SavedSearchesRoute: typeof SavedSearchesRoute
   SearchRoute: typeof SearchRoute
   PropertyRoute: typeof PropertyRoute
+  AdminNotificationsRoute: typeof AdminNotificationsRoute
+  AdminPropertyRequestsRoute: typeof AdminPropertyRequestsRoute
   AgentIdRoute: typeof AgentIdRoute
   LeadLeadIdRoute: typeof LeadLeadIdRoute
   LeadNewRoute: typeof LeadNewRoute
@@ -323,11 +449,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/saved-searches': {
+      id: '/saved-searches'
+      path: '/saved-searches'
+      fullPath: '/saved-searches'
+      preLoaderRoute: typeof SavedSearchesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/saved': {
       id: '/saved'
       path: '/saved'
       fullPath: '/saved'
       preLoaderRoute: typeof SavedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/property-requests': {
+      id: '/property-requests'
+      path: '/property-requests'
+      fullPath: '/property-requests'
+      preLoaderRoute: typeof PropertyRequestsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/partners': {
@@ -342,6 +482,20 @@ declare module '@tanstack/react-router' {
       path: '/partner'
       fullPath: '/partner'
       preLoaderRoute: typeof PartnerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notification-settings': {
+      id: '/notification-settings'
+      path: '/notification-settings'
+      fullPath: '/notification-settings'
+      preLoaderRoute: typeof NotificationSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/my-leads': {
@@ -428,6 +582,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PropertyIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/property-requests/new': {
+      id: '/property-requests/new'
+      path: '/new'
+      fullPath: '/property-requests/new'
+      preLoaderRoute: typeof PropertyRequestsNewRouteImport
+      parentRoute: typeof PropertyRequestsRoute
+    }
+    '/property-requests/$id': {
+      id: '/property-requests/$id'
+      path: '/$id'
+      fullPath: '/property-requests/$id'
+      preLoaderRoute: typeof PropertyRequestsIdRouteImport
+      parentRoute: typeof PropertyRequestsRoute
+    }
+    '/partner/requests': {
+      id: '/partner/requests'
+      path: '/requests'
+      fullPath: '/partner/requests'
+      preLoaderRoute: typeof PartnerRequestsRouteImport
+      parentRoute: typeof PartnerRoute
+    }
     '/partner/register': {
       id: '/partner/register'
       path: '/register'
@@ -456,12 +631,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/property-requests': {
+      id: '/admin_/property-requests'
+      path: '/admin/property-requests'
+      fullPath: '/admin/property-requests'
+      preLoaderRoute: typeof AdminPropertyRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/notifications': {
+      id: '/admin_/notifications'
+      path: '/admin/notifications'
+      fullPath: '/admin/notifications'
+      preLoaderRoute: typeof AdminNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/property/': {
       id: '/property/'
       path: '/property'
       fullPath: '/property/'
       preLoaderRoute: typeof PropertyRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/partner/requests/$id': {
+      id: '/partner/requests/$id'
+      path: '/$id'
+      fullPath: '/partner/requests/$id'
+      preLoaderRoute: typeof PartnerRequestsIdRouteImport
+      parentRoute: typeof PartnerRequestsRoute
     }
     '/partner/leads/$leadId': {
       id: '/partner/leads/$leadId'
@@ -473,18 +669,45 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface PartnerRequestsRouteChildren {
+  PartnerRequestsIdRoute: typeof PartnerRequestsIdRoute
+}
+
+const PartnerRequestsRouteChildren: PartnerRequestsRouteChildren = {
+  PartnerRequestsIdRoute: PartnerRequestsIdRoute,
+}
+
+const PartnerRequestsRouteWithChildren = PartnerRequestsRoute._addFileChildren(
+  PartnerRequestsRouteChildren,
+)
+
 interface PartnerRouteChildren {
   PartnerRegisterRoute: typeof PartnerRegisterRoute
+  PartnerRequestsRoute: typeof PartnerRequestsRouteWithChildren
   PartnerLeadsLeadIdRoute: typeof PartnerLeadsLeadIdRoute
 }
 
 const PartnerRouteChildren: PartnerRouteChildren = {
   PartnerRegisterRoute: PartnerRegisterRoute,
+  PartnerRequestsRoute: PartnerRequestsRouteWithChildren,
   PartnerLeadsLeadIdRoute: PartnerLeadsLeadIdRoute,
 }
 
 const PartnerRouteWithChildren =
   PartnerRoute._addFileChildren(PartnerRouteChildren)
+
+interface PropertyRequestsRouteChildren {
+  PropertyRequestsIdRoute: typeof PropertyRequestsIdRoute
+  PropertyRequestsNewRoute: typeof PropertyRequestsNewRoute
+}
+
+const PropertyRequestsRouteChildren: PropertyRequestsRouteChildren = {
+  PropertyRequestsIdRoute: PropertyRequestsIdRoute,
+  PropertyRequestsNewRoute: PropertyRequestsNewRoute,
+}
+
+const PropertyRequestsRouteWithChildren =
+  PropertyRequestsRoute._addFileChildren(PropertyRequestsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -498,11 +721,17 @@ const rootRouteChildren: RootRouteChildren = {
   ImportRoute: ImportRoute,
   MethodologyRoute: MethodologyRoute,
   MyLeadsRoute: MyLeadsRoute,
+  NotificationSettingsRoute: NotificationSettingsRoute,
+  NotificationsRoute: NotificationsRoute,
   PartnerRoute: PartnerRouteWithChildren,
   PartnersRoute: PartnersRoute,
+  PropertyRequestsRoute: PropertyRequestsRouteWithChildren,
   SavedRoute: SavedRoute,
+  SavedSearchesRoute: SavedSearchesRoute,
   SearchRoute: SearchRoute,
   PropertyRoute: PropertyRoute,
+  AdminNotificationsRoute: AdminNotificationsRoute,
+  AdminPropertyRequestsRoute: AdminPropertyRequestsRoute,
   AgentIdRoute: AgentIdRoute,
   LeadLeadIdRoute: LeadLeadIdRoute,
   LeadNewRoute: LeadNewRoute,

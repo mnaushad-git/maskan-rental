@@ -1,6 +1,25 @@
-import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Briefcase, CheckCircle, Clock, Eye, EyeOff, History, Home, ListChecks, LogOut, Mail, MapPin, MessageSquare, Pencil, Phone, Plus, Trash2, X } from "lucide-react";
+import {
+  Briefcase,
+  CheckCircle,
+  ClipboardList,
+  Clock,
+  Eye,
+  EyeOff,
+  History,
+  Home,
+  ListChecks,
+  LogOut,
+  Mail,
+  MapPin,
+  MessageSquare,
+  Pencil,
+  Phone,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/maskan/Badges";
 import { ListingStatusBadge } from "@/components/maskan/ListingStatusBadge";
@@ -43,7 +62,7 @@ function PartnerDashboard() {
   const { user, authLoading, clearAuth } = useAuth();
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: s => s.location.pathname });
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const [view, setView] = useState<PartnerView>("leads");
   const [partner, setPartner] = useState<ApiPartner | null>(null);
@@ -83,7 +102,11 @@ function PartnerDashboard() {
       fetchAvailableLeads().catch(() => []),
       fetchAreas().catch(() => []),
     ]).then(([m, l, avail, areas]) => {
-      if (!m) { setNoProfile(true); setLoading(false); return; }
+      if (!m) {
+        setNoProfile(true);
+        setLoading(false);
+        return;
+      }
       setPartner(m);
       setLeads(l as ApiLeadDetail[]);
       setAvailableLeads(avail as ApiLeadAvailable[]);
@@ -95,7 +118,10 @@ function PartnerDashboard() {
   useEffect(() => {
     if (view === "listings" && !loadingListings) {
       setLoadingListings(true);
-      fetchPartnerListings().then(setListings).catch(() => {}).finally(() => setLoadingListings(false));
+      fetchPartnerListings()
+        .then(setListings)
+        .catch(() => {})
+        .finally(() => setLoadingListings(false));
     }
   }, [view]);
 
@@ -119,7 +145,7 @@ function PartnerDashboard() {
     setAddingArea(true);
     try {
       const area = await addPartnerArea(newArea.area_name.trim(), newArea.city);
-      setPartner(m => m ? { ...m, areas: [...m.areas, area] } : m);
+      setPartner((m) => (m ? { ...m, areas: [...m.areas, area] } : m));
       setNewArea({ area_name: "", city: "Riyadh" });
     } finally {
       setAddingArea(false);
@@ -128,25 +154,33 @@ function PartnerDashboard() {
 
   async function handleRemoveArea(area_id: number) {
     await removePartnerArea(area_id);
-    setPartner(m => m ? { ...m, areas: m.areas.filter(a => a.id !== area_id) } : m);
+    setPartner((m) => (m ? { ...m, areas: m.areas.filter((a) => a.id !== area_id) } : m));
   }
 
-  async function handleSaveListing(payload: PartnerPropertyPayload, imageUrls: string[], editId?: number) {
+  async function handleSaveListing(
+    payload: PartnerPropertyPayload,
+    imageUrls: string[],
+    editId?: number,
+  ) {
     let saved: ApiProperty;
     if (editId) {
       saved = await patchPartnerListing(editId, payload);
-      setListings(ls => ls.map(l => l.id === editId ? saved : l));
+      setListings((ls) => ls.map((l) => (l.id === editId ? saved : l)));
     } else {
       saved = await createPartnerListing(payload);
-      setListings(ls => [saved, ...ls]);
+      setListings((ls) => [saved, ...ls]);
     }
     // Sync images
     const existingImages = saved.images ?? [];
-    const existingUrls = new Set(existingImages.map(i => i.url));
+    const existingUrls = new Set(existingImages.map((i) => i.url));
     const newUrlSet = new Set(imageUrls);
     await Promise.all([
-      ...imageUrls.filter(u => !existingUrls.has(u)).map(u => addPartnerPropertyImage(saved.id, u)),
-      ...existingImages.filter(i => !newUrlSet.has(i.url)).map(i => deletePartnerPropertyImage(saved.id, i.id)),
+      ...imageUrls
+        .filter((u) => !existingUrls.has(u))
+        .map((u) => addPartnerPropertyImage(saved.id, u)),
+      ...existingImages
+        .filter((i) => !newUrlSet.has(i.url))
+        .map((i) => deletePartnerPropertyImage(saved.id, i.id)),
     ]);
     // Re-fetch to get updated images
     const fresh = await fetchPartnerListings();
@@ -154,26 +188,49 @@ function PartnerDashboard() {
   }
 
   if (pathname !== "/partner") return <Outlet />;
-  if (authLoading) return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">{t("common.loading")}</p></div>;
-  if (!user) return <PartnerLoginGate />;
-  if (loading) return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">{t("common.loading")}</p></div>;
-
-  if (noProfile) return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
-      <div className="grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary"><Briefcase className="size-8" /></div>
-      <div className="text-center">
-        <h1 className="text-2xl font-bold">{t("partnerDashboard.becomePartner.heading")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground max-w-sm">{t("partnerDashboard.becomePartner.desc")}</p>
+  if (authLoading)
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
       </div>
-      <Button onClick={() => navigate({ to: "/partner/register" })}>{t("partnerDashboard.becomePartner.cta")}</Button>
-    </div>
+    );
+  if (!user) return <PartnerLoginGate />;
+  if (loading)
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+      </div>
+    );
+
+  if (noProfile)
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
+        <div className="grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary">
+          <Briefcase className="size-8" />
+        </div>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">{t("partnerDashboard.becomePartner.heading")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground max-w-sm">
+            {t("partnerDashboard.becomePartner.desc")}
+          </p>
+        </div>
+        <Button onClick={() => navigate({ to: "/partner/register" })}>
+          {t("partnerDashboard.becomePartner.cta")}
+        </Button>
+      </div>
+    );
+
+  if (partner && partner.approval_status === "pending")
+    return <PartnerApprovalGate state="pending" email={user?.email} onSignOut={clearAuth} />;
+  if (partner && partner.approval_status === "rejected")
+    return <PartnerApprovalGate state="rejected" email={user?.email} onSignOut={clearAuth} />;
+
+  const acceptedLeads = leads.filter(
+    (l) =>
+      l.assignments.some((a) => a.status === "accepted") &&
+      (l.status === "in_progress" || l.status === "pending_closure"),
   );
-
-  if (partner && partner.approval_status === "pending") return <PartnerApprovalGate state="pending" email={user?.email} onSignOut={clearAuth} />;
-  if (partner && partner.approval_status === "rejected") return <PartnerApprovalGate state="rejected" email={user?.email} onSignOut={clearAuth} />;
-
-  const acceptedLeads = leads.filter(l => l.assignments.some(a => a.status === "accepted") && (l.status === "in_progress" || l.status === "pending_closure"));
-  const closedLeads   = leads.filter(l => l.status === "closed_won" || l.status === "closed_lost");
+  const closedLeads = leads.filter((l) => l.status === "closed_won" || l.status === "closed_lost");
 
   return (
     <div className="flex min-h-screen bg-surface">
@@ -185,15 +242,25 @@ function PartnerDashboard() {
           </div>
           <div className="min-w-0">
             <div className="truncate text-sm font-bold">{t("partnerDashboard.sidebar.brand")}</div>
-            <div className="truncate text-xs text-muted-foreground">{user?.full_name ?? user?.email}</div>
+            <div className="truncate text-xs text-muted-foreground">
+              {user?.full_name ?? user?.email}
+            </div>
           </div>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {([
-            { v: "leads" as const,    icon: ListChecks, label: t("partnerDashboard.sidebar.navLeads") },
-            { v: "listings" as const, icon: Home,       label: t("partnerDashboard.sidebar.navListings") },
-          ]).map(({ v, icon: Icon, label }) => (
+          {[
+            {
+              v: "leads" as const,
+              icon: ListChecks,
+              label: t("partnerDashboard.sidebar.navLeads"),
+            },
+            {
+              v: "listings" as const,
+              icon: Home,
+              label: t("partnerDashboard.sidebar.navListings"),
+            },
+          ].map(({ v, icon: Icon, label }) => (
             <button
               key={v}
               type="button"
@@ -209,11 +276,28 @@ function PartnerDashboard() {
               {label}
             </button>
           ))}
+          {/* Property Request Marketplace lives at its own route (/partner/requests),
+              not as a client-state PartnerView — mirrors admin.tsx's Notification
+              Operations Link pattern for the same reason. */}
+          <Link
+            to="/partner/requests"
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+          >
+            <ClipboardList className="size-4 shrink-0" />
+            {t("partnerPropertyRequest.nav")}
+          </Link>
         </nav>
 
         <div className="border-t border-border px-3 py-4 space-y-2">
-          <Badge tone={partner!.subscription_status === "active" ? "success" : "warning"} className="w-full justify-center">
-            {partner!.subscription_status === "active" ? <CheckCircle className="size-3" /> : <Clock className="size-3" />}
+          <Badge
+            tone={partner!.subscription_status === "active" ? "success" : "warning"}
+            className="w-full justify-center"
+          >
+            {partner!.subscription_status === "active" ? (
+              <CheckCircle className="size-3" />
+            ) : (
+              <Clock className="size-3" />
+            )}
             {partner!.subscription_status}
           </Badge>
           <button
@@ -235,7 +319,9 @@ function PartnerDashboard() {
               <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
                 <Briefcase className="size-4" />
               </div>
-              <span className="truncate text-sm font-bold">{t("partnerDashboard.sidebar.brand")}</span>
+              <span className="truncate text-sm font-bold">
+                {t("partnerDashboard.sidebar.brand")}
+              </span>
             </div>
             <button
               type="button"
@@ -246,10 +332,18 @@ function PartnerDashboard() {
             </button>
           </div>
           <nav className="flex gap-1 px-3 pb-2">
-            {([
-              { v: "leads" as const,    icon: ListChecks, label: t("partnerDashboard.sidebar.navLeads") },
-              { v: "listings" as const, icon: Home,       label: t("partnerDashboard.sidebar.navListings") },
-            ]).map(({ v, icon: Icon, label }) => (
+            {[
+              {
+                v: "leads" as const,
+                icon: ListChecks,
+                label: t("partnerDashboard.sidebar.navLeads"),
+              },
+              {
+                v: "listings" as const,
+                icon: Home,
+                label: t("partnerDashboard.sidebar.navListings"),
+              },
+            ].map(({ v, icon: Icon, label }) => (
               <button
                 key={v}
                 type="button"
@@ -265,22 +359,31 @@ function PartnerDashboard() {
                 {label}
               </button>
             ))}
+            <Link
+              to="/partner/requests"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+            >
+              <ClipboardList className="size-4 shrink-0" />
+              {t("partnerPropertyRequest.nav")}
+            </Link>
           </nav>
         </div>
 
         <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-8">
-
           {/* ══ LEADS VIEW ══ */}
           {view === "leads" && (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2 space-y-8">
-
                 {/* Available Leads */}
                 <section className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold">{t("partnerDashboard.leads.availableLeads")}</h2>
+                    <h2 className="text-lg font-bold">
+                      {t("partnerDashboard.leads.availableLeads")}
+                    </h2>
                     {availableLeads.length > 0 && (
-                      <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-xs font-semibold text-warning">{t("partnerDashboard.leads.newCount", { count: availableLeads.length })}</span>
+                      <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-xs font-semibold text-warning">
+                        {t("partnerDashboard.leads.newCount", { count: availableLeads.length })}
+                      </span>
                     )}
                   </div>
                   {availableLeads.length === 0 && (
@@ -288,32 +391,63 @@ function PartnerDashboard() {
                       {t("partnerDashboard.leads.noNewLeads")}
                     </div>
                   )}
-                  {availableLeads.map(lead => {
+                  {availableLeads.map((lead) => {
                     const isConfirming = confirmingId === lead.id;
-                    const isAccepting  = acceptingId  === lead.id;
+                    const isAccepting = acceptingId === lead.id;
                     return (
-                      <div key={lead.id} className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-3">
+                      <div
+                        key={lead.id}
+                        className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-3"
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <MapPin className="size-4 text-muted-foreground" />
-                              <span className="font-semibold">{lead.area_name}, {lead.city}</span>
+                              <span className="font-semibold">
+                                {lead.area_name}, {lead.city}
+                              </span>
                               <Badge tone="warning">{t("partnerDashboard.leads.newBadge")}</Badge>
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {lead.bedrooms_needed ? t("partnerDashboard.leads.bedroomsPrefix", { count: lead.bedrooms_needed }) : ""}
-                              {lead.max_budget ? t("partnerDashboard.leads.budgetUpTo", { amount: formatSAR(lead.max_budget) }) : t("partnerDashboard.leads.budgetFlexible")}
-                              {lead.move_in_date ? t("partnerDashboard.leads.moveInSuffix", { date: lead.move_in_date }) : ""}
+                              {lead.bedrooms_needed
+                                ? t("partnerDashboard.leads.bedroomsPrefix", {
+                                    count: lead.bedrooms_needed,
+                                  })
+                                : ""}
+                              {lead.max_budget
+                                ? t("partnerDashboard.leads.budgetUpTo", {
+                                    amount: formatSAR(lead.max_budget),
+                                  })
+                                : t("partnerDashboard.leads.budgetFlexible")}
+                              {lead.move_in_date
+                                ? t("partnerDashboard.leads.moveInSuffix", {
+                                    date: lead.move_in_date,
+                                  })
+                                : ""}
                             </div>
-                            {lead.requirements_note && <p className="text-sm text-foreground line-clamp-2">{lead.requirements_note}</p>}
+                            {lead.requirements_note && (
+                              <p className="text-sm text-foreground line-clamp-2">
+                                {lead.requirements_note}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-surface px-4 py-3 text-sm text-muted-foreground">
-                          <span className="font-mono tracking-widest select-none">●●● ●●●●●●  ·  ●●●@●●●●.●●●</span>
-                          <span className="ml-auto text-xs">{t("partnerDashboard.leads.unlockedAfterPayment")}</span>
+                          <span className="font-mono tracking-widest select-none">
+                            ●●● ●●●●●● · ●●●@●●●●.●●●
+                          </span>
+                          <span className="ml-auto text-xs">
+                            {t("partnerDashboard.leads.unlockedAfterPayment")}
+                          </span>
                         </div>
                         {!isConfirming ? (
-                          <Button className="w-full" onClick={() => { setConfirmingId(lead.id); setAcceptError(null); }}>
+                          <Button
+                            className="w-full"
+                            onClick={() => {
+                              setConfirmingId(lead.id);
+                              setAcceptError(null);
+                            }}
+                          >
                             {t("partnerDashboard.leads.acceptLeadCta")}
                           </Button>
                         ) : (
@@ -322,12 +456,28 @@ function PartnerDashboard() {
                               <strong>{t("partnerDashboard.leads.confirmChargeAmount")}</strong>{" "}
                               {t("partnerDashboard.leads.confirmChargeSuffix")}
                             </p>
-                            {acceptError && <p className="text-xs text-destructive">{acceptError}</p>}
+                            {acceptError && (
+                              <p className="text-xs text-destructive">{acceptError}</p>
+                            )}
                             <div className="flex gap-2">
-                              <Button className="flex-1" onClick={() => handleConfirmAccept(lead.id)} disabled={isAccepting}>
-                                {isAccepting ? t("partnerDashboard.leads.processing") : t("partnerDashboard.leads.confirmAndPay")}
+                              <Button
+                                className="flex-1"
+                                onClick={() => handleConfirmAccept(lead.id)}
+                                disabled={isAccepting}
+                              >
+                                {isAccepting
+                                  ? t("partnerDashboard.leads.processing")
+                                  : t("partnerDashboard.leads.confirmAndPay")}
                               </Button>
-                              <Button variant="outline" className="flex-1" onClick={() => { setConfirmingId(null); setAcceptError(null); }} disabled={isAccepting}>
+                              <Button
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => {
+                                  setConfirmingId(null);
+                                  setAcceptError(null);
+                                }}
+                                disabled={isAccepting}
+                              >
                                 {t("partnerDashboard.leads.cancel")}
                               </Button>
                             </div>
@@ -346,42 +496,76 @@ function PartnerDashboard() {
                       {t("partnerDashboard.leads.noAcceptedLeads")}
                     </div>
                   )}
-                  {acceptedLeads.map(lead => (
+                  {acceptedLeads.map((lead) => (
                     <div
                       key={lead.id}
-                      onClick={() => navigate({ to: "/partner/leads/$leadId", params: { leadId: String(lead.id) } })}
+                      onClick={() =>
+                        navigate({
+                          to: "/partner/leads/$leadId",
+                          params: { leadId: String(lead.id) },
+                        })
+                      }
                       className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-3 cursor-pointer hover:border-primary/40 hover:shadow-md transition-all"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <MapPin className="size-4 text-muted-foreground" />
-                            <span className="font-semibold">{lead.area_name}, {lead.city}</span>
+                            <span className="font-semibold">
+                              {lead.area_name}, {lead.city}
+                            </span>
                             <Badge tone={lead.status === "pending_closure" ? "warning" : "success"}>
-                              {lead.status === "pending_closure" ? t("partnerDashboard.leads.closingBadge") : t("partnerDashboard.leads.inProgressBadge")}
+                              {lead.status === "pending_closure"
+                                ? t("partnerDashboard.leads.closingBadge")
+                                : t("partnerDashboard.leads.inProgressBadge")}
                             </Badge>
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {lead.bedrooms_needed ? t("partnerDashboard.leads.bedroomsPrefix", { count: lead.bedrooms_needed }) : ""}
-                            {lead.max_budget ? t("partnerDashboard.leads.budgetUpTo", { amount: formatSAR(lead.max_budget) }) : t("partnerDashboard.leads.budgetFlexible")}
+                            {lead.bedrooms_needed
+                              ? t("partnerDashboard.leads.bedroomsPrefix", {
+                                  count: lead.bedrooms_needed,
+                                })
+                              : ""}
+                            {lead.max_budget
+                              ? t("partnerDashboard.leads.budgetUpTo", {
+                                  amount: formatSAR(lead.max_budget),
+                                })
+                              : t("partnerDashboard.leads.budgetFlexible")}
                           </div>
                         </div>
                         <span className="flex items-center gap-1 text-xs text-primary font-medium">
-                          <MessageSquare className="size-3.5" /> {t("partnerDashboard.leads.openLabel")}
+                          <MessageSquare className="size-3.5" />{" "}
+                          {t("partnerDashboard.leads.openLabel")}
                         </span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
                           <Phone className="size-3.5 text-muted-foreground shrink-0" />
-                          <a href={`tel:${lead.customer_phone}`} onClick={e => e.stopPropagation()} className="font-medium text-primary hover:underline truncate">{lead.customer_phone}</a>
+                          <a
+                            href={`tel:${lead.customer_phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-medium text-primary hover:underline truncate"
+                          >
+                            {lead.customer_phone}
+                          </a>
                         </div>
                         <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
                           <Mail className="size-3.5 text-muted-foreground shrink-0" />
-                          <a href={`mailto:${lead.customer_email}`} onClick={e => e.stopPropagation()} className="truncate text-foreground hover:underline">{lead.customer_email}</a>
+                          <a
+                            href={`mailto:${lead.customer_email}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="truncate text-foreground hover:underline"
+                          >
+                            {lead.customer_email}
+                          </a>
                         </div>
                       </div>
                       <p className="text-sm font-medium">{lead.customer_name}</p>
-                      {lead.requirements_note && <p className="text-sm text-muted-foreground line-clamp-2">{lead.requirements_note}</p>}
+                      {lead.requirements_note && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {lead.requirements_note}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </section>
@@ -390,41 +574,59 @@ function PartnerDashboard() {
                 <section className="space-y-3">
                   <div className="flex items-center gap-2">
                     <h2 className="text-lg font-bold">{t("partnerDashboard.leads.closedLeads")}</h2>
-                    <Badge tone="neutral"><History className="size-3" /> {t("partnerDashboard.leads.historyBadge")}</Badge>
+                    <Badge tone="neutral">
+                      <History className="size-3" /> {t("partnerDashboard.leads.historyBadge")}
+                    </Badge>
                   </div>
                   {closedLeads.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                       {t("partnerDashboard.leads.noClosedLeads")}
                     </div>
-                  ) : closedLeads.map(lead => (
-                    <div
-                      key={lead.id}
-                      onClick={() => navigate({ to: "/partner/leads/$leadId", params: { leadId: String(lead.id) } })}
-                      className={cn(
-                        "rounded-2xl border p-5 space-y-1.5 cursor-pointer hover:shadow-md transition-all",
-                        lead.status === "closed_won"
-                          ? "border-success/30 bg-success/5 hover:border-success/50"
-                          : "border-border bg-card hover:border-primary/40",
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="size-4 text-muted-foreground" />
-                          <span className="font-semibold">{lead.area_name}, {lead.city}</span>
-                          <Badge tone={lead.status === "closed_won" ? "success" : "neutral"}>
-                            {lead.status === "closed_won" ? t("partnerDashboard.leads.foundBadge") : t("partnerDashboard.leads.noMatchBadge")}
-                          </Badge>
-                        </div>
-                        {lead.closed_at && (
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(lead.closed_at).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-SA", { day: "numeric", month: "short", year: "numeric" })}
-                          </span>
+                  ) : (
+                    closedLeads.map((lead) => (
+                      <div
+                        key={lead.id}
+                        onClick={() =>
+                          navigate({
+                            to: "/partner/leads/$leadId",
+                            params: { leadId: String(lead.id) },
+                          })
+                        }
+                        className={cn(
+                          "rounded-2xl border p-5 space-y-1.5 cursor-pointer hover:shadow-md transition-all",
+                          lead.status === "closed_won"
+                            ? "border-success/30 bg-success/5 hover:border-success/50"
+                            : "border-border bg-card hover:border-primary/40",
                         )}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="size-4 text-muted-foreground" />
+                            <span className="font-semibold">
+                              {lead.area_name}, {lead.city}
+                            </span>
+                            <Badge tone={lead.status === "closed_won" ? "success" : "neutral"}>
+                              {lead.status === "closed_won"
+                                ? t("partnerDashboard.leads.foundBadge")
+                                : t("partnerDashboard.leads.noMatchBadge")}
+                            </Badge>
+                          </div>
+                          {lead.closed_at && (
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(lead.closed_at).toLocaleDateString(
+                                lang === "ar" ? "ar-SA" : "en-SA",
+                                { day: "numeric", month: "short", year: "numeric" },
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{lead.customer_name}</p>
+                        <p className="text-xs text-primary font-medium">
+                          {t("partnerDashboard.leads.viewDetails")}
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground">{lead.customer_name}</p>
-                      <p className="text-xs text-primary font-medium">{t("partnerDashboard.leads.viewDetails")}</p>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </section>
               </div>
 
@@ -433,16 +635,21 @@ function PartnerDashboard() {
                 <h2 className="text-lg font-bold">{t("partnerDashboard.coveredAreas.heading")}</h2>
                 <div className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-3">
                   {partner!.areas.length === 0 && (
-                    <p className="text-sm text-muted-foreground">{t("partnerDashboard.coveredAreas.noAreasYet")}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("partnerDashboard.coveredAreas.noAreasYet")}
+                    </p>
                   )}
-                  {partner!.areas.map(area => (
+                  {partner!.areas.map((area) => (
                     <div key={area.id} className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 text-sm">
                         <MapPin className="size-3.5 text-muted-foreground" />
                         <span>{area.area_name}</span>
                         <span className="text-xs text-muted-foreground">{area.city}</span>
                       </div>
-                      <button onClick={() => handleRemoveArea(area.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                      <button
+                        onClick={() => handleRemoveArea(area.id)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                      >
                         <Trash2 className="size-3.5" />
                       </button>
                     </div>
@@ -450,35 +657,64 @@ function PartnerDashboard() {
                   <form onSubmit={handleAddArea} className="border-t border-border pt-3 space-y-2">
                     <select
                       value={newArea.area_name ? `${newArea.area_name}|${newArea.city}` : ""}
-                      onChange={e => {
+                      onChange={(e) => {
                         const [area_name, city] = e.target.value.split("|");
                         setNewArea({ area_name: area_name ?? "", city: city ?? "" });
                       }}
                       className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-primary"
                     >
                       <option value="">{t("partnerDashboard.coveredAreas.selectDistrict")}</option>
-                      {Array.from(new Set(availableAreas.map(a => a.city))).sort().map(city => {
-                        const taken = new Set(partner!.areas.filter(a => a.city === city).map(a => a.area_name));
-                        return (
-                          <optgroup key={city} label={city}>
-                            {availableAreas.filter(a => a.city === city).sort((a, b) => a.name.localeCompare(b.name)).map(area => (
-                              <option key={`${area.name}|${city}`} value={`${area.name}|${city}`} disabled={taken.has(area.name)}>
-                                {area.name}{taken.has(area.name) ? t("partnerDashboard.coveredAreas.addedSuffix") : ""}
-                              </option>
-                            ))}
-                          </optgroup>
-                        );
-                      })}
+                      {Array.from(new Set(availableAreas.map((a) => a.city)))
+                        .sort()
+                        .map((city) => {
+                          const taken = new Set(
+                            partner!.areas.filter((a) => a.city === city).map((a) => a.area_name),
+                          );
+                          return (
+                            <optgroup key={city} label={city}>
+                              {availableAreas
+                                .filter((a) => a.city === city)
+                                .sort((a, b) => a.name.localeCompare(b.name))
+                                .map((area) => (
+                                  <option
+                                    key={`${area.name}|${city}`}
+                                    value={`${area.name}|${city}`}
+                                    disabled={taken.has(area.name)}
+                                  >
+                                    {area.name}
+                                    {taken.has(area.name)
+                                      ? t("partnerDashboard.coveredAreas.addedSuffix")
+                                      : ""}
+                                  </option>
+                                ))}
+                            </optgroup>
+                          );
+                        })}
                     </select>
-                    <Button type="submit" size="sm" variant="outline" className="w-full" disabled={addingArea || !newArea.area_name.trim()}>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      disabled={addingArea || !newArea.area_name.trim()}
+                    >
                       <Plus className="size-3.5" /> {t("partnerDashboard.coveredAreas.addArea")}
                     </Button>
                   </form>
                 </div>
                 <div className="rounded-xl border border-border bg-surface p-4 text-xs text-muted-foreground space-y-1">
-                  <div><strong>{t("partnerDashboard.coveredAreas.subscriptionLabel")}</strong> {partner!.subscription_status}</div>
+                  <div>
+                    <strong>{t("partnerDashboard.coveredAreas.subscriptionLabel")}</strong>{" "}
+                    {partner!.subscription_status}
+                  </div>
                   {partner!.subscription_expires_at && (
-                    <div>{t("partnerDashboard.coveredAreas.expires", { date: new Date(partner!.subscription_expires_at).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-SA") })}</div>
+                    <div>
+                      {t("partnerDashboard.coveredAreas.expires", {
+                        date: new Date(partner!.subscription_expires_at).toLocaleDateString(
+                          lang === "ar" ? "ar-SA" : "en-SA",
+                        ),
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
@@ -492,7 +728,10 @@ function PartnerDashboard() {
                 <PartnerListingForm
                   areas={availableAreas}
                   editing={editingListing}
-                  onClose={() => { setListingFormOpen(false); setEditingListing(null); }}
+                  onClose={() => {
+                    setListingFormOpen(false);
+                    setEditingListing(null);
+                  }}
                   onSave={async (payload, imageUrls) => {
                     await handleSaveListing(payload, imageUrls, editingListing?.id);
                     setListingFormOpen(false);
@@ -504,12 +743,11 @@ function PartnerDashboard() {
                   listings={listings}
                   loading={loadingListings}
                   onAdd={() => setListingFormOpen(true)}
-                  onEdit={l => setEditingListing(l)}
+                  onEdit={(l) => setEditingListing(l)}
                 />
               )}
             </div>
           )}
-
         </main>
       </div>
     </div>
@@ -534,9 +772,15 @@ function PartnerListingsView({
     <div>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("partnerDashboard.listingsView.myPortfolio")}</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">{t("partnerDashboard.listingsView.heading")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.listingsView.subtitle")}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {t("partnerDashboard.listingsView.myPortfolio")}
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">
+            {t("partnerDashboard.listingsView.heading")}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("partnerDashboard.listingsView.subtitle")}
+          </p>
         </div>
         <Button onClick={onAdd} className="shrink-0">
           <Plus className="size-4" /> {t("partnerDashboard.listingsView.addListing")}
@@ -544,20 +788,26 @@ function PartnerListingsView({
       </div>
 
       {loading && (
-        <div className="py-16 text-center text-sm text-muted-foreground">{t("partnerDashboard.listingsView.loadingListings")}</div>
+        <div className="py-16 text-center text-sm text-muted-foreground">
+          {t("partnerDashboard.listingsView.loadingListings")}
+        </div>
       )}
 
       {!loading && listings.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border py-16 text-center space-y-3">
           <Home className="mx-auto size-10 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">{t("partnerDashboard.listingsView.noListingsYet")}</p>
-          <Button variant="outline" onClick={onAdd}><Plus className="size-4" /> {t("partnerDashboard.listingsView.addListing")}</Button>
+          <p className="text-sm text-muted-foreground">
+            {t("partnerDashboard.listingsView.noListingsYet")}
+          </p>
+          <Button variant="outline" onClick={onAdd}>
+            <Plus className="size-4" /> {t("partnerDashboard.listingsView.addListing")}
+          </Button>
         </div>
       )}
 
       {!loading && listings.length > 0 && (
         <div className="space-y-3">
-          {listings.map(l => {
+          {listings.map((l) => {
             const canEdit = l.status === "Published";
             return (
               <div key={l.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
@@ -573,19 +823,29 @@ function PartnerListingsView({
                       {l.bathrooms != null ? ` · ${l.bathrooms} BA` : ""}
                       {l.size_sq_m ? ` · ${l.size_sq_m} m²` : ""}
                     </p>
-                    <p className="text-sm font-semibold text-primary">SAR {formatSAR(l.monthly_rent)}/mo</p>
+                    <p className="text-sm font-semibold text-primary">
+                      SAR {formatSAR(l.monthly_rent ?? 0)}/mo
+                    </p>
                     {l.status === "Pending Approval" && (
-                      <p className="text-xs text-muted-foreground">{t("partnerDashboard.listingsView.underReview")}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("partnerDashboard.listingsView.underReview")}
+                      </p>
                     )}
                     {l.status === "Rejected" && (
-                      <p className="text-xs text-destructive">{t("partnerDashboard.listingsView.rejectedContact")}</p>
+                      <p className="text-xs text-destructive">
+                        {t("partnerDashboard.listingsView.rejectedContact")}
+                      </p>
                     )}
                   </div>
                   <button
                     type="button"
                     disabled={!canEdit}
                     onClick={() => canEdit && onEdit(l)}
-                    title={canEdit ? t("partnerDashboard.listingsView.editTitle") : t("partnerDashboard.listingsView.editLockedTitle")}
+                    title={
+                      canEdit
+                        ? t("partnerDashboard.listingsView.editTitle")
+                        : t("partnerDashboard.listingsView.editLockedTitle")
+                    }
                     className={cn(
                       "grid size-9 shrink-0 place-items-center rounded-xl border transition-colors",
                       canEdit
@@ -634,20 +894,22 @@ function PartnerListingForm({
 }) {
   const { t } = useLanguage();
   const [form, setForm] = useState<ListingFormState>({
-    title:         editing?.title         ?? "",
-    city:          editing?.city          ?? "",
-    district:      editing?.area          ?? "",
-    rent:          editing ? String(editing.monthly_rent) : "",
-    bedrooms:      editing?.bedrooms      != null ? String(editing.bedrooms)  : "3",
-    bathrooms:     editing?.bathrooms     != null ? String(editing.bathrooms) : "2",
-    size:          editing?.size_sq_m     != null ? String(editing.size_sq_m) : "",
-    owner_name:    editing?.owner_name    ?? "",
-    description:   editing?.description   ?? "",
+    title: editing?.title ?? "",
+    city: editing?.city ?? "",
+    district: editing?.area ?? "",
+    rent: editing ? String(editing.monthly_rent) : "",
+    bedrooms: editing?.bedrooms != null ? String(editing.bedrooms) : "3",
+    bathrooms: editing?.bathrooms != null ? String(editing.bathrooms) : "2",
+    size: editing?.size_sq_m != null ? String(editing.size_sq_m) : "",
+    owner_name: editing?.owner_name ?? "",
+    description: editing?.description ?? "",
     property_type: editing?.property_type ?? "",
-    furnished:     editing?.furnished     ?? "",
+    furnished: editing?.furnished ?? "",
   });
   const [media, setMedia] = useState<string[]>(
-    editing?.images?.length ? editing.images.sort((a, b) => a.display_order - b.display_order).map(i => i.url) : [],
+    editing?.images?.length
+      ? editing.images.sort((a, b) => a.display_order - b.display_order).map((i) => i.url)
+      : [],
   );
   const [urlInput, setUrlInput] = useState("");
   const [saving, setSaving] = useState(false);
@@ -655,34 +917,51 @@ function PartnerListingForm({
 
   // Districts for the selected city
   const districtOptions = areas
-    .filter(a => !form.city || a.city === form.city)
+    .filter((a) => !form.city || a.city === form.city)
     .sort((a, b) => a.name.localeCompare(b.name));
 
   async function submit() {
-    if (!form.city.trim())     { setError(t("partnerDashboard.listingForm.errors.selectCity"));     return; }
-    if (!form.district.trim()) { setError(t("partnerDashboard.listingForm.errors.selectDistrict")); return; }
+    if (!form.city.trim()) {
+      setError(t("partnerDashboard.listingForm.errors.selectCity"));
+      return;
+    }
+    if (!form.district.trim()) {
+      setError(t("partnerDashboard.listingForm.errors.selectDistrict"));
+      return;
+    }
     const rent = parseFloat(form.rent);
-    if (!rent || rent <= 0)    { setError(t("partnerDashboard.listingForm.errors.invalidRent")); return; }
-    if (!form.title.trim())    { setError(t("partnerDashboard.listingForm.errors.enterTitle")); return; }
+    if (!rent || rent <= 0) {
+      setError(t("partnerDashboard.listingForm.errors.invalidRent"));
+      return;
+    }
+    if (!form.title.trim()) {
+      setError(t("partnerDashboard.listingForm.errors.enterTitle"));
+      return;
+    }
 
     setSaving(true);
     setError(null);
     try {
-      await onSave({
-        title:         form.title.trim() || "Untitled listing",
-        city:          form.city.trim(),
-        area:          form.district.trim(),
-        monthly_rent:  rent,
-        bedrooms:      form.bedrooms      ? parseInt(form.bedrooms)    : undefined,
-        bathrooms:     form.bathrooms     ? parseInt(form.bathrooms)   : undefined,
-        size_sq_m:     form.size          ? parseInt(form.size)        : undefined,
-        owner_name:    form.owner_name.trim()    || undefined,
-        description:   form.description.trim()   || undefined,
-        property_type: form.property_type || undefined,
-        furnished:     form.furnished     || undefined,
-      }, media);
+      await onSave(
+        {
+          title: form.title.trim() || "Untitled listing",
+          city: form.city.trim(),
+          area: form.district.trim(),
+          monthly_rent: rent,
+          bedrooms: form.bedrooms ? parseInt(form.bedrooms) : undefined,
+          bathrooms: form.bathrooms ? parseInt(form.bathrooms) : undefined,
+          size_sq_m: form.size ? parseInt(form.size) : undefined,
+          owner_name: form.owner_name.trim() || undefined,
+          description: form.description.trim() || undefined,
+          property_type: form.property_type || undefined,
+          furnished: form.furnished || undefined,
+        },
+        media,
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("partnerDashboard.listingForm.errors.failedToSave"));
+      setError(
+        err instanceof Error ? err.message : t("partnerDashboard.listingForm.errors.failedToSave"),
+      );
       setSaving(false);
     }
   }
@@ -694,12 +973,22 @@ function PartnerListingForm({
       {/* Header */}
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <button type="button" onClick={onClose} className="mb-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={onClose}
+            className="mb-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
             {t("partnerDashboard.listingForm.backToListings")}
           </button>
-          <h1 className="text-2xl font-bold">{isEdit ? t("partnerDashboard.listingForm.editHeading") : t("partnerDashboard.listingForm.newHeading")}</h1>
+          <h1 className="text-2xl font-bold">
+            {isEdit
+              ? t("partnerDashboard.listingForm.editHeading")
+              : t("partnerDashboard.listingForm.newHeading")}
+          </h1>
           {isEdit && (
-            <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.listingForm.resubmitNote")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("partnerDashboard.listingForm.resubmitNote")}
+            </p>
           )}
         </div>
       </div>
@@ -707,12 +996,14 @@ function PartnerListingForm({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Left column */}
         <div className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-card">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t("partnerDashboard.listingForm.propertyDetails")}</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            {t("partnerDashboard.listingForm.propertyDetails")}
+          </h2>
 
           <FormField label={t("partnerDashboard.listingForm.listingTitle")}>
             <Input
               value={form.title}
-              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               placeholder={t("partnerDashboard.listingForm.listingTitlePlaceholder")}
             />
           </FormField>
@@ -721,24 +1012,32 @@ function PartnerListingForm({
             <FormField label={t("partnerDashboard.listingForm.city")}>
               <select
                 value={form.city}
-                onChange={e => setForm(f => ({ ...f, city: e.target.value, district: "" }))}
+                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value, district: "" }))}
                 className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               >
                 <option value="">{t("partnerDashboard.listingForm.selectCity")}</option>
-                {CITY_LIST.map(c => <option key={c.name} value={c.name}>{t(`cities.${c.name}`)}</option>)}
+                {CITY_LIST.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {t(`cities.${c.name}`)}
+                  </option>
+                ))}
               </select>
             </FormField>
 
             <FormField label={t("partnerDashboard.listingForm.district")}>
               <select
                 value={form.district}
-                onChange={e => setForm(f => ({ ...f, district: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, district: e.target.value }))}
                 disabled={!form.city}
                 className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
               >
                 <option value="">{t("partnerDashboard.listingForm.selectDistrict")}</option>
-                {districtOptions.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
-                {form.district && !districtOptions.find(a => a.name === form.district) && (
+                {districtOptions.map((a) => (
+                  <option key={a.name} value={a.name}>
+                    {a.name}
+                  </option>
+                ))}
+                {form.district && !districtOptions.find((a) => a.name === form.district) && (
                   <option value={form.district}>{form.district}</option>
                 )}
               </select>
@@ -750,20 +1049,36 @@ function PartnerListingForm({
               type="number"
               min={1}
               value={form.rent}
-              onChange={e => setForm(f => ({ ...f, rent: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, rent: e.target.value }))}
               placeholder={t("partnerDashboard.listingForm.monthlyRentPlaceholder")}
             />
           </FormField>
 
           <div className="grid grid-cols-3 gap-3">
             <FormField label={t("partnerDashboard.listingForm.bedrooms")}>
-              <Input type="number" min={0} value={form.bedrooms} onChange={e => setForm(f => ({ ...f, bedrooms: e.target.value }))} />
+              <Input
+                type="number"
+                min={0}
+                value={form.bedrooms}
+                onChange={(e) => setForm((f) => ({ ...f, bedrooms: e.target.value }))}
+              />
             </FormField>
             <FormField label={t("partnerDashboard.listingForm.bathrooms")}>
-              <Input type="number" min={0} value={form.bathrooms} onChange={e => setForm(f => ({ ...f, bathrooms: e.target.value }))} />
+              <Input
+                type="number"
+                min={0}
+                value={form.bathrooms}
+                onChange={(e) => setForm((f) => ({ ...f, bathrooms: e.target.value }))}
+              />
             </FormField>
             <FormField label={t("partnerDashboard.listingForm.areaSqm")}>
-              <Input type="number" min={1} value={form.size} onChange={e => setForm(f => ({ ...f, size: e.target.value }))} placeholder={t("partnerDashboard.listingForm.areaPlaceholder")} />
+              <Input
+                type="number"
+                min={1}
+                value={form.size}
+                onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))}
+                placeholder={t("partnerDashboard.listingForm.areaPlaceholder")}
+              />
             </FormField>
           </div>
 
@@ -771,7 +1086,7 @@ function PartnerListingForm({
             <FormField label={t("partnerDashboard.listingForm.propertyType")}>
               <select
                 value={form.property_type}
-                onChange={e => setForm(f => ({ ...f, property_type: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, property_type: e.target.value }))}
                 className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               >
                 <option value="">{t("partnerDashboard.listingForm.selectType")}</option>
@@ -785,7 +1100,7 @@ function PartnerListingForm({
             <FormField label={t("partnerDashboard.listingForm.furnishedStatus")}>
               <select
                 value={form.furnished}
-                onChange={e => setForm(f => ({ ...f, furnished: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, furnished: e.target.value }))}
                 className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               >
                 <option value="">{t("partnerDashboard.listingForm.selectDash")}</option>
@@ -797,28 +1112,41 @@ function PartnerListingForm({
           </div>
 
           <FormField label={t("partnerDashboard.listingForm.ownerName")}>
-            <Input value={form.owner_name} onChange={e => setForm(f => ({ ...f, owner_name: e.target.value }))} placeholder={t("partnerDashboard.listingForm.ownerNamePlaceholder")} />
+            <Input
+              value={form.owner_name}
+              onChange={(e) => setForm((f) => ({ ...f, owner_name: e.target.value }))}
+              placeholder={t("partnerDashboard.listingForm.ownerNamePlaceholder")}
+            />
           </FormField>
         </div>
 
         {/* Right column */}
         <div className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-card">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t("partnerDashboard.listingForm.photos")}</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            {t("partnerDashboard.listingForm.photos")}
+          </h2>
 
           {/* Photo thumbnails */}
           {media.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {media.map((url, i) => (
-                <div key={i} className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-border bg-surface-2">
+                <div
+                  key={i}
+                  className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-border bg-surface-2"
+                >
                   <img src={url} alt="" className="size-full object-cover" />
                   <button
                     type="button"
-                    onClick={() => setMedia(m => m.filter((_, idx) => idx !== i))}
+                    onClick={() => setMedia((m) => m.filter((_, idx) => idx !== i))}
                     className="absolute end-1 top-1 grid size-6 place-items-center rounded-md bg-background/90 opacity-0 transition-opacity hover:bg-background group-hover:opacity-100"
                   >
                     <X className="size-3.5" />
                   </button>
-                  {i === 0 && <span className="absolute bottom-1 start-1 rounded bg-foreground/85 px-1.5 py-0.5 text-[10px] font-bold uppercase text-background">{t("partnerDashboard.listingForm.coverBadge")}</span>}
+                  {i === 0 && (
+                    <span className="absolute bottom-1 start-1 rounded bg-foreground/85 px-1.5 py-0.5 text-[10px] font-bold uppercase text-background">
+                      {t("partnerDashboard.listingForm.coverBadge")}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -827,12 +1155,12 @@ function PartnerListingForm({
             <input
               type="url"
               value={urlInput}
-              onChange={e => setUrlInput(e.target.value)}
-              onKeyDown={e => {
+              onChange={(e) => setUrlInput(e.target.value)}
+              onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
                   const val = urlInput.trim();
-                  if (val && !media.includes(val)) setMedia(m => [...m, val]);
+                  if (val && !media.includes(val)) setMedia((m) => [...m, val]);
                   setUrlInput("");
                 }
               }}
@@ -845,7 +1173,7 @@ function PartnerListingForm({
               variant="outline"
               onClick={() => {
                 const val = urlInput.trim();
-                if (val && !media.includes(val)) setMedia(m => [...m, val]);
+                if (val && !media.includes(val)) setMedia((m) => [...m, val]);
                 setUrlInput("");
               }}
               disabled={!urlInput.trim()}
@@ -853,12 +1181,16 @@ function PartnerListingForm({
               <Plus className="size-4" /> {t("partnerDashboard.listingForm.add")}
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground">{t("partnerDashboard.listingForm.firstPhotoNote")}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {t("partnerDashboard.listingForm.firstPhotoNote")}
+          </p>
 
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground pt-2">{t("partnerDashboard.listingForm.description")}</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground pt-2">
+            {t("partnerDashboard.listingForm.description")}
+          </h2>
           <textarea
             value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             rows={6}
             placeholder={t("partnerDashboard.listingForm.descriptionPlaceholder")}
             className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
@@ -874,9 +1206,15 @@ function PartnerListingForm({
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={onClose} disabled={saving}>{t("partnerDashboard.listingForm.cancel")}</Button>
+            <Button variant="ghost" onClick={onClose} disabled={saving}>
+              {t("partnerDashboard.listingForm.cancel")}
+            </Button>
             <Button onClick={submit} disabled={saving} className="flex-1">
-              {saving ? t("partnerDashboard.listingForm.submitting") : isEdit ? t("partnerDashboard.listingForm.saveResubmit") : t("partnerDashboard.listingForm.submitForApproval")}
+              {saving
+                ? t("partnerDashboard.listingForm.submitting")
+                : isEdit
+                  ? t("partnerDashboard.listingForm.saveResubmit")
+                  : t("partnerDashboard.listingForm.submitForApproval")}
             </Button>
           </div>
         </div>
@@ -896,23 +1234,37 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
 
 // ── Partner login gate ───────────────────────────────────────────────────────
 
-function PartnerApprovalGate({ state, email, onSignOut }: { state: "pending" | "rejected"; email?: string; onSignOut: () => void }) {
+function PartnerApprovalGate({
+  state,
+  email,
+  onSignOut,
+}: {
+  state: "pending" | "rejected";
+  email?: string;
+  onSignOut: () => void;
+}) {
   const { t } = useLanguage();
   const pending = state === "pending";
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
-      <div className={cn(
-        "grid size-16 place-items-center rounded-2xl",
-        pending ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive",
-      )}>
+      <div
+        className={cn(
+          "grid size-16 place-items-center rounded-2xl",
+          pending ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive",
+        )}
+      >
         {pending ? <Clock className="size-8" /> : <X className="size-8" />}
       </div>
       <div className="max-w-md text-center">
         <h1 className="text-2xl font-bold">
-          {pending ? t("partnerDashboard.approvalGate.pendingHeading") : t("partnerDashboard.approvalGate.rejectedHeading")}
+          {pending
+            ? t("partnerDashboard.approvalGate.pendingHeading")
+            : t("partnerDashboard.approvalGate.rejectedHeading")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {pending ? t("partnerDashboard.approvalGate.pendingDesc") : t("partnerDashboard.approvalGate.rejectedDesc")}
+          {pending
+            ? t("partnerDashboard.approvalGate.pendingDesc")
+            : t("partnerDashboard.approvalGate.rejectedDesc")}
         </p>
         {email && (
           <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1 text-xs text-muted-foreground">
@@ -945,7 +1297,9 @@ function PartnerLoginGate() {
       setAuth(response.user, response.access_token);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      setError(msg && !msg.includes("Request failed") ? msg : t("partnerDashboard.loginGate.invalidCreds"));
+      setError(
+        msg && !msg.includes("Request failed") ? msg : t("partnerDashboard.loginGate.invalidCreds"),
+      );
     } finally {
       setLoading(false);
     }
@@ -960,33 +1314,42 @@ function PartnerLoginGate() {
           </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold">{t("partnerDashboard.loginGate.title")}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.loginGate.subtitle")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("partnerDashboard.loginGate.subtitle")}
+            </p>
           </div>
         </div>
-        <form className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-card" onSubmit={handleSubmit}>
+        <form
+          className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-card"
+          onSubmit={handleSubmit}
+        >
           <div>
-            <label className="mb-1.5 block text-sm font-medium">{t("partnerDashboard.loginGate.email")}</label>
+            <label className="mb-1.5 block text-sm font-medium">
+              {t("partnerDashboard.loginGate.email")}
+            </label>
             <input
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium">{t("partnerDashboard.loginGate.password")}</label>
+            <label className="mb-1.5 block text-sm font-medium">
+              {t("partnerDashboard.loginGate.password")}
+            </label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder={t("partnerDashboard.loginGate.password")}
                 className="h-11 w-full rounded-lg border border-border bg-background pe-10 ps-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(s => !s)}
+                onClick={() => setShowPassword((s) => !s)}
                 className="absolute end-3 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:text-foreground"
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -995,12 +1358,16 @@ function PartnerLoginGate() {
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={loading || !email || !password}>
-            {loading ? t("partnerDashboard.loginGate.signingIn") : t("partnerDashboard.loginGate.signInCta")}
+            {loading
+              ? t("partnerDashboard.loginGate.signingIn")
+              : t("partnerDashboard.loginGate.signInCta")}
           </Button>
         </form>
         <p className="mt-6 text-center text-sm text-muted-foreground">
           {t("partnerDashboard.loginGate.notPartnerYet")}{" "}
-          <a href="/partner/register" className="font-semibold text-primary hover:underline">{t("partnerDashboard.loginGate.registerHere")}</a>
+          <a href="/partner/register" className="font-semibold text-primary hover:underline">
+            {t("partnerDashboard.loginGate.registerHere")}
+          </a>
         </p>
       </div>
     </div>
