@@ -1,4 +1,6 @@
 import json
+import logging
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -7,16 +9,20 @@ from anthropic import beta_tool
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_admin_user, get_db
+from app.api.deps import get_admin_user, get_current_user, get_db
+from app.api.routes.contracts import _check_contract_access
 from app.core.ai import gateway
-from app.core.ai.prompts import ADMIN_ADVISOR, CUSTOMER_ADVISOR, PromptDefinition
+from app.core.ai.prompts import ADMIN_ADVISOR, CONTRACT_ASSISTANT, CUSTOMER_ADVISOR, PromptDefinition
 from app.core.config import settings
 from app.core.rate_limit import rate_limit_dependency
+from app.models.contract import Contract
 from app.models.lead import Lead
 from app.models.property import Property
 from app.models.area_intelligence import AreaIntelligence
 from app.models.mediator import Mediator, MediatorArea
 from app.models.user import User
+
+logger = logging.getLogger("app.api.routes.ai")
 
 router = APIRouter()
 
@@ -455,3 +461,180 @@ def ai_chat_stream(req: ChatRequest, db: Session = Depends(get_db)):
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured — set ANTHROPIC_API_KEY")
     return _stream_chat("customer_chat_stream", CUSTOMER_ADVISOR, _customer_tools(db), req)
+
+
+# ── AI Contract Assistant ───────────────────────────────────────────────────
+
+class ContractFlagRequest(BaseModel):
+    contract_id: int
+
+
+class ContractFlag(BaseModel):
+    category: str
+    severity: str
+    message: str
+
+
+class ContractFlagsResponse(BaseModel):
+    flags: list[ContractFlag]
+    district_avg_monthly_rent: float | None = None
+    generated_by: str  # "ai" | "fallback"
+
+
+_VALID_SEVERITIES = {"info", "warning", "high"}
+
+
+def _contract_district(contract: Contract) -> tuple[str | None, str | None]:
+    if contract.property is not None:
+        return contract.property.area, contract.property.city
+    if contract.lead is not None:
+        return contract.lead.area_name, contract.lead.city
+    return None, None
+
+
+def _district_avg_monthly_rent(db: Session, area: str | None, city: str | None) -> float | None:
+    if not area and not city:
+        return None
+    stmt = select(func.avg(Property.monthly_rent)).where(
+        Property.status == "Published", Property.listing_type == "rent"
+    )
+    if area:
+        stmt = stmt.where(Property.area.ilike(f"%{area}%"))
+    if city:
+        stmt = stmt.where(Property.city.ilike(f"%{city}%"))
+    avg = db.scalar(stmt)
+    return round(avg, 2) if avg is not None else None
+
+
+def _duration_months(contract: Contract) -> float:
+    return round((contract.end_date - contract.start_date).days / 30.44, 1)
+
+
+def _deterministic_flags(contract: Contract, avg_rent: float | None) -> list[ContractFlag]:
+    """Rule-based fallback used when the AI call fails, and to top up the AI's
+    output if it returns fewer than 3 flags — the acceptance bar (>=3 flag
+    categories) must hold even if the model call degrades."""
+    flags: list[ContractFlag] = []
+    months = _duration_months(contract)
+
+    if not contract.deposit_amount:
+        flags.append(ContractFlag(category="deposit", severity="warning", message="No deposit amount is set on this contract — confirm the deposit with the landlord before signing."))
+    elif contract.deposit_amount > contract.rent_amount * 2:
+        flags.append(ContractFlag(category="deposit", severity="high", message=f"The deposit (SAR {contract.deposit_amount:,.0f}) is more than double the monthly rent — well above the typical one-to-two-month norm."))
+    else:
+        flags.append(ContractFlag(category="deposit", severity="info", message=f"The deposit (SAR {contract.deposit_amount:,.0f}) is within the typical one-to-two-month range for Saudi rentals."))
+
+    if months < 6:
+        flags.append(ContractFlag(category="duration", severity="warning", message=f"This lease runs about {months} months — shorter than the typical 12-month Saudi rental term."))
+    elif months > 24:
+        flags.append(ContractFlag(category="duration", severity="warning", message=f"This lease runs about {months} months — longer than the typical 12-month Saudi rental term."))
+    else:
+        flags.append(ContractFlag(category="duration", severity="info", message=f"This lease runs about {months} months, in line with typical Saudi rental terms."))
+
+    if avg_rent:
+        diff_pct = round((contract.rent_amount - avg_rent) / avg_rent * 100)
+        if diff_pct >= 15:
+            flags.append(ContractFlag(category="rent_vs_market", severity="warning", message=f"This rent is about {diff_pct}% above the district average (SAR {avg_rent:,.0f}/mo) for published rentals."))
+        elif diff_pct <= -15:
+            flags.append(ContractFlag(category="rent_vs_market", severity="info", message=f"This rent is about {abs(diff_pct)}% below the district average (SAR {avg_rent:,.0f}/mo) — worth double-checking the listing is accurate."))
+
+    flags.append(ContractFlag(category="clauses", severity="warning", message="This digital contract only records rent, deposit, and dates — maintenance responsibility and other clauses aren't captured yet. Confirm those terms in writing with the landlord before signing."))
+    return flags
+
+
+def _extract_flags_json(raw: str) -> list[dict]:
+    match = re.search(r"\{.*\}", raw.strip(), re.DOTALL)
+    if not match:
+        raise ValueError("AI did not return a JSON object")
+    data = json.loads(match.group(0))
+    flags = data.get("flags")
+    if not isinstance(flags, list):
+        raise ValueError("AI response missing 'flags' list")
+    return flags
+
+
+def _sanitize_flags(raw_flags: list[dict]) -> list[ContractFlag]:
+    clean: list[ContractFlag] = []
+    for f in raw_flags:
+        if not isinstance(f, dict):
+            continue
+        category = str(f.get("category", "other"))[:40]
+        severity = f.get("severity") if f.get("severity") in _VALID_SEVERITIES else "info"
+        message = str(f.get("message", "")).strip()[:400]
+        if not message:
+            continue
+        clean.append(ContractFlag(category=category, severity=severity, message=message))
+    return clean[:6]
+
+
+@router.post(
+    "/contract-flags",
+    response_model=ContractFlagsResponse,
+    dependencies=[Depends(rate_limit_dependency("ai_contract_flags", limit=20, window_seconds=600, by_user=True))],
+)
+def contract_flags(
+    req: ContractFlagRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    contract = db.get(Contract, req.contract_id)
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found.")
+    _check_contract_access(contract, current_user, db)
+
+    area, city = _contract_district(contract)
+    avg_rent = _district_avg_monthly_rent(db, area, city)
+    months = _duration_months(contract)
+
+    if not settings.ANTHROPIC_API_KEY:
+        return ContractFlagsResponse(
+            flags=_deterministic_flags(contract, avg_rent),
+            district_avg_monthly_rent=avg_rent,
+            generated_by="fallback",
+        )
+
+    facts = "\n".join([
+        f"Monthly rent: SAR {contract.rent_amount:,.0f}",
+        f"Deposit: SAR {contract.deposit_amount:,.0f}" if contract.deposit_amount else "Deposit: not set",
+        f"Lease duration: about {months} months ({contract.start_date} to {contract.end_date})",
+        f"District: {area or 'unknown'}, {city or 'unknown'}",
+        f"District average monthly rent (published listings): SAR {avg_rent:,.0f}" if avg_rent else "District average monthly rent: no data available",
+    ])
+
+    status = "error"
+    result = None
+    try:
+        result = gateway.run_chat(
+            model=gateway.DEFAULT_MODEL,
+            system=CONTRACT_ASSISTANT.template,
+            tools=[],
+            messages=[{"role": "user", "content": f"Review this contract:\n{facts}\n\nRespond with the JSON flags object only."}],
+            max_tokens=700,
+        )
+        status = "ok"
+        flags = _sanitize_flags(_extract_flags_json(result.reply))
+        if len(flags) < 3:
+            flags = _deterministic_flags(contract, avg_rent)
+            generated_by = "fallback"
+        else:
+            generated_by = "ai"
+        return ContractFlagsResponse(flags=flags, district_avg_monthly_rent=avg_rent, generated_by=generated_by)
+    except Exception as exc:  # noqa: BLE001 — a flaky AI call must degrade to deterministic flags, never 500 on a pre-signing check
+        logger.warning("contract_flags: AI call failed, using deterministic fallback: %s", exc)
+        status = "error"
+        return ContractFlagsResponse(
+            flags=_deterministic_flags(contract, avg_rent),
+            district_avg_monthly_rent=avg_rent,
+            generated_by="fallback",
+        )
+    finally:
+        gateway.log_ai_call(
+            feature="contract_flags",
+            model=gateway.DEFAULT_MODEL,
+            prompt=CONTRACT_ASSISTANT,
+            latency_ms=result.latency_ms if result else 0.0,
+            status=status,
+            user_id=current_user.id,
+            input_tokens=result.input_tokens if result else None,
+            output_tokens=result.output_tokens if result else None,
+        )

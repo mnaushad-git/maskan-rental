@@ -219,6 +219,13 @@ function CustomerLeadPage() {
                     {t("leadDetail.assignmentAccepted", { id: acceptedAssignment.id })}
                   </p>
                 )}
+                {lead.status === "closed_won" && (
+                  <Link to="/contract/$leadId" params={{ leadId: String(lead.id) }}>
+                    <Button size="sm" variant="outline" className="mt-1">
+                      {t("leadDetail.viewContract")}
+                    </Button>
+                  </Link>
+                )}
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-border p-5 text-center space-y-2">

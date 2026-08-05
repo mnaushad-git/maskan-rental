@@ -1007,6 +1007,70 @@ export function markLeadMessagesRead(lead_id: number) {
   });
 }
 
+// ── Contracts ────────────────────────────────────────────────────────────────
+
+export type ApiContract = {
+  id: number;
+  lead_id: number;
+  tenant_user_id: number;
+  landlord_mediator_id: number;
+  property_id: number | null;
+  rent_amount: number;
+  deposit_amount: number | null;
+  start_date: string;
+  end_date: string;
+  status: string; // draft | pending_signature | active | expired
+  tenant_signed_at: string | null;
+  landlord_signed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  tenant_name: string | null;
+  landlord_agency_name: string | null;
+  property_title: string | null;
+};
+
+export function createContract(payload: {
+  lead_id: number;
+  property_id?: number;
+  rent_amount: number;
+  deposit_amount?: number;
+  start_date: string;
+  end_date: string;
+}) {
+  return requestJson<ApiContract>("/contracts/", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function fetchMyContracts() {
+  return requestJson<ApiContract[]>("/contracts/my");
+}
+
+export function fetchContract(contract_id: number) {
+  return requestJson<ApiContract>(`/contracts/${contract_id}`);
+}
+
+export function signContract(contract_id: number) {
+  return requestJson<ApiContract>(`/contracts/${contract_id}/sign`, { method: "POST" });
+}
+
+export type ApiContractFlag = {
+  category: string;
+  severity: "info" | "warning" | "high";
+  message: string;
+};
+
+export type ApiContractFlagsResponse = {
+  flags: ApiContractFlag[];
+  district_avg_monthly_rent: number | null;
+  generated_by: "ai" | "fallback";
+};
+
+export function fetchContractFlags(contract_id: number) {
+  return requestJson<ApiContractFlagsResponse>("/ai/contract-flags", {
+    method: "POST",
+    body: JSON.stringify({ contract_id }),
+  });
+}
+
 export function fetchAdminMediators() {
   return requestJson<ApiPartner[]>("/mediators/");
 }

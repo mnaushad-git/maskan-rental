@@ -78,7 +78,7 @@ The current **AI Rental Score / Fair Rent Analysis is a client-side heuristic** 
 
 | # | Feature | Status | Session(s) used | Next step |
 |---|---|---|---|---|
-| 1 | Digital rental contracts + AI assistant | Backend done | 1 | Frontend: contract page (view contract, sign button, download) + AI Assistant flag surfacing (reuse `ai.py`). Backend model/route/migration are done — see below. |
+| 1 | Digital rental contracts + AI assistant | Done | 2 | — |
 | 2 | Renter identity verification + AI trust badge | Not started | — | Mirror mediator verification pattern |
 | 3 | Renter premium tier + AI Alert Plus | Not started | — | Fix mocked Moyasar payment first (decide: fix now or accept mock) |
 | 4a | Short-term booking — backend | Not started | — | Design booking/availability model |

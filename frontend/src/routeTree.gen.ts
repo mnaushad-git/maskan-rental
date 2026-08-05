@@ -35,6 +35,7 @@ import { Route as PartnerRequestsRouteImport } from './routes/partner.requests'
 import { Route as PartnerRegisterRouteImport } from './routes/partner.register'
 import { Route as LeadNewRouteImport } from './routes/lead.new'
 import { Route as LeadLeadIdRouteImport } from './routes/lead.$leadId'
+import { Route as ContractLeadIdRouteImport } from './routes/contract.$leadId'
 import { Route as AgentIdRouteImport } from './routes/agent.$id'
 import { Route as AdminPropertyRequestsRouteImport } from './routes/admin_.property-requests'
 import { Route as AdminNotificationsRouteImport } from './routes/admin_.notifications'
@@ -172,6 +173,11 @@ const LeadLeadIdRoute = LeadLeadIdRouteImport.update({
   path: '/lead/$leadId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContractLeadIdRoute = ContractLeadIdRouteImport.update({
+  id: '/contract/$leadId',
+  path: '/contract/$leadId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgentIdRoute = AgentIdRouteImport.update({
   id: '/agent/$id',
   path: '/agent/$id',
@@ -227,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/property-requests': typeof AdminPropertyRequestsRoute
   '/agent/$id': typeof AgentIdRoute
+  '/contract/$leadId': typeof ContractLeadIdRoute
   '/lead/$leadId': typeof LeadLeadIdRoute
   '/lead/new': typeof LeadNewRoute
   '/partner/register': typeof PartnerRegisterRoute
@@ -261,6 +268,7 @@ export interface FileRoutesByTo {
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/property-requests': typeof AdminPropertyRequestsRoute
   '/agent/$id': typeof AgentIdRoute
+  '/contract/$leadId': typeof ContractLeadIdRoute
   '/lead/$leadId': typeof LeadLeadIdRoute
   '/lead/new': typeof LeadNewRoute
   '/partner/register': typeof PartnerRegisterRoute
@@ -296,6 +304,7 @@ export interface FileRoutesById {
   '/admin_/notifications': typeof AdminNotificationsRoute
   '/admin_/property-requests': typeof AdminPropertyRequestsRoute
   '/agent/$id': typeof AgentIdRoute
+  '/contract/$leadId': typeof ContractLeadIdRoute
   '/lead/$leadId': typeof LeadLeadIdRoute
   '/lead/new': typeof LeadNewRoute
   '/partner/register': typeof PartnerRegisterRoute
@@ -332,6 +341,7 @@ export interface FileRouteTypes {
     | '/admin/notifications'
     | '/admin/property-requests'
     | '/agent/$id'
+    | '/contract/$leadId'
     | '/lead/$leadId'
     | '/lead/new'
     | '/partner/register'
@@ -366,6 +376,7 @@ export interface FileRouteTypes {
     | '/admin/notifications'
     | '/admin/property-requests'
     | '/agent/$id'
+    | '/contract/$leadId'
     | '/lead/$leadId'
     | '/lead/new'
     | '/partner/register'
@@ -400,6 +411,7 @@ export interface FileRouteTypes {
     | '/admin_/notifications'
     | '/admin_/property-requests'
     | '/agent/$id'
+    | '/contract/$leadId'
     | '/lead/$leadId'
     | '/lead/new'
     | '/partner/register'
@@ -435,6 +447,7 @@ export interface RootRouteChildren {
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminPropertyRequestsRoute: typeof AdminPropertyRequestsRoute
   AgentIdRoute: typeof AgentIdRoute
+  ContractLeadIdRoute: typeof ContractLeadIdRoute
   LeadLeadIdRoute: typeof LeadLeadIdRoute
   LeadNewRoute: typeof LeadNewRoute
   PropertyIdRoute: typeof PropertyIdRoute
@@ -624,6 +637,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeadLeadIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/contract/$leadId': {
+      id: '/contract/$leadId'
+      path: '/contract/$leadId'
+      fullPath: '/contract/$leadId'
+      preLoaderRoute: typeof ContractLeadIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agent/$id': {
       id: '/agent/$id'
       path: '/agent/$id'
@@ -733,6 +753,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminPropertyRequestsRoute: AdminPropertyRequestsRoute,
   AgentIdRoute: AgentIdRoute,
+  ContractLeadIdRoute: ContractLeadIdRoute,
   LeadLeadIdRoute: LeadLeadIdRoute,
   LeadNewRoute: LeadNewRoute,
   PropertyIdRoute: PropertyIdRoute,
