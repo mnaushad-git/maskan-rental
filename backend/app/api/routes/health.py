@@ -40,6 +40,22 @@ def readiness_check(response: Response, db: Session = Depends(get_db)):
     # idempotency) already degrades gracefully on its own when it's down.
     checks["redis"] = "ok" if is_redis_available() else "unavailable"
 
+    # Push provider config diagnostic (Phase 16) — informational only, never
+    # blocks readiness: an unconfigured push provider degrades to in-app-only
+    # delivery (see app.core.notification_providers), it is not a correctness
+    # failure the way a dead Postgres connection is.
+    checks["push_provider"] = _push_provider_diagnostic()
+
     if not healthy:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return {"status": "ready" if healthy else "not_ready", "checks": checks}
+
+
+def _push_provider_diagnostic() -> str:
+    from app.core.config import settings
+
+    if not settings.FEATURE_PUSH_NOTIFICATIONS:
+        return "disabled"
+    if settings.PUSH_PROVIDER == "expo":
+        return "expo_configured" if settings.EXPO_ACCESS_TOKEN else "expo_no_access_token"
+    return f"{settings.PUSH_PROVIDER}_configured"

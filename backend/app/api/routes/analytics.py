@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_optional_current_user
+from app.core.rate_limit import rate_limit_dependency
+from app.models.analytics_event import ANALYTICS_EVENTS, AnalyticsEvent
 from app.models.property import Property
 from app.models.saved_property import SavedProperty
 from app.models.saved_search import SavedSearch
@@ -117,3 +120,76 @@ def price_trends(db: Session = Depends(get_db)):
         .order_by(Property.city)
     ).all()
     return {"trends": [{"city": row.city, "avg_rent": float(row.avg_rent or 0)} for row in rows]}
+
+
+# ── Client analytics ingestion (Phase 10) ────────────────────────────────────
+
+_MAX_EVENTS_PER_BATCH = 25
+_MAX_PROPERTIES_KEYS = 20
+
+
+class AnalyticsEventIn(BaseModel):
+    event_name: str
+    properties: dict = Field(default_factory=dict)
+
+    @field_validator("event_name")
+    @classmethod
+    def _known_event(cls, v: str) -> str:
+        if v not in ANALYTICS_EVENTS:
+            raise ValueError(f"unknown event_name: {v}")
+        return v
+
+    @field_validator("properties")
+    @classmethod
+    def _bounded_properties(cls, v: dict) -> dict:
+        # Defense-in-depth against accidentally logging message content or
+        # full search criteria (Phase 10 explicitly forbids both): cap key
+        # count and stringify+truncate every value rather than trusting the
+        # client to only ever send small, safe fields.
+        if len(v) > _MAX_PROPERTIES_KEYS:
+            raise ValueError(f"too many properties keys (max {_MAX_PROPERTIES_KEYS})")
+        return {str(k)[:60]: (str(val)[:200] if not isinstance(val, (int, float, bool)) else val) for k, val in v.items()}
+
+
+class AnalyticsEventBatch(BaseModel):
+    events: list[AnalyticsEventIn]
+
+    @field_validator("events")
+    @classmethod
+    def _bounded_batch(cls, v: list) -> list:
+        if not v:
+            raise ValueError("events must not be empty")
+        if len(v) > _MAX_EVENTS_PER_BATCH:
+            raise ValueError(f"too many events in one batch (max {_MAX_EVENTS_PER_BATCH})")
+        return v
+
+
+@router.post("/events", status_code=201)
+def ingest_analytics_events(
+    body: AnalyticsEventBatch,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+    _rl=Depends(rate_limit_dependency("analytics_events", limit=120, window_seconds=60)),
+):
+    """Batch analytics-event ingestion from mobile/web clients (Phase 10).
+    Auth-optional: some events (e.g. push_permission_prompt_shown) can fire
+    before login. Never accepts free-form event names or unbounded payloads
+    — see AnalyticsEventIn's validators — and never stores message content
+    or full search criteria; that is a client-side + validator contract, not
+    just documentation, since `properties` values are stringified+truncated
+    regardless of what a client sends."""
+    from app.core.request_context import get_request_id
+
+    trace_id = get_request_id()
+    for event in body.events:
+        db.add(
+            AnalyticsEvent(
+                event_name=event.event_name,
+                user_id=current_user.id if current_user else None,
+                properties=event.properties,
+                trace_id=trace_id,
+            )
+        )
+    db.commit()
+    return {"accepted": len(body.events)}

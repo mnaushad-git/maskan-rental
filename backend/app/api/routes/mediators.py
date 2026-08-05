@@ -10,6 +10,7 @@ _pwd = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 from app.api.deps import get_admin_user, get_current_user, get_db, get_mediator_user
 from app.core.cache import CacheService
 from app.core.config import settings
+from app.core.outbox import EventType, record_event
 from app.models.mediator import Mediator, MediatorArea
 from app.models.user import User
 from app.schemas.mediator import (
@@ -278,8 +279,17 @@ def admin_approve_mediator(
     mediator = db.get(Mediator, mediator_id)
     if not mediator:
         raise HTTPException(status_code=404, detail="Mediator not found.")
+    was_verified = mediator.is_verified
     mediator.approval_status = "approved"
     mediator.is_verified = True
+    if not was_verified:
+        record_event(
+            db,
+            event_type=EventType.MEDIATOR_VERIFIED,
+            aggregate_type="mediator",
+            aggregate_id=mediator.id,
+            payload={"mediator_id": mediator.id},
+        )
     db.commit()
     _invalidate_public_profile_cache(mediator.id)
     db.refresh(mediator)

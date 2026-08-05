@@ -10,6 +10,26 @@ from app.models.payment import Payment
 from app.models.review import Review
 from app.models.outbox_event import OutboxEvent
 from app.models.ai_call_log import AICallLog
+from app.models.saved_search_match import SavedSearchMatch
+from app.models.notification import Notification
+from app.models.notification_preference import NotificationPreference
+from app.models.device import Device
+from app.models.audit_log import AuditLog
+from app.models.digest_run import DigestRun
+from app.models.notification_delivery import NotificationDelivery
+from app.models.analytics_event import AnalyticsEvent
+from app.models.property_request import (
+    PropertyRequest,
+    PropertyRequestRevision,
+    PropertyRequestClarification,
+    PropertyRequestActivity,
+)
+from app.models.property_request_match import PropertyRequestMatch
+from app.models.property_request_mediator_response import (
+    PropertyRequestMediatorResponse,
+    PropertyRequestMediatorResponseProperty,
+)
+from app.models.property_request_scoring_config import PropertyRequestScoringConfig
 
 __all__ = [
     "User",
@@ -28,4 +48,12 @@ __all__ = [
     "Review",
     "OutboxEvent",
     "AICallLog",
+    "SavedSearchMatch",
+    "Notification",
+    "NotificationPreference",
+    "Device",
+    "AuditLog",
+    "DigestRun",
+    "NotificationDelivery",
+    "AnalyticsEvent",
 ]

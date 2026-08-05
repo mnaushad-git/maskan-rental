@@ -9,8 +9,12 @@ from app.core.errors import register_exception_handlers
 from app.core.logging_config import configure_logging
 from app.core.middleware import MetricsMiddleware, RequestIDMiddleware
 import app.models  # noqa: F401 — registers all SQLAlchemy models before any mapper is configured
+import app.tasks.notifications  # noqa: F401 — registers outbox event handlers (saved-search matching) at import time
+import app.tasks.lead_notifications  # noqa: F401 — registers outbox event handlers (generic lead notifications) at import time
+import app.tasks.property_requests  # noqa: F401 — registers outbox event handlers (property request matching) at import time
 from app.api.routes import properties, search, analytics, areas, auth, users, saved_searches, saved_properties, ai, health
-from app.api.routes import area_intelligence, mediators, leads, payments, reviews
+from app.api.routes import area_intelligence, mediators, leads, payments, reviews, notifications, devices
+from app.api.routes import property_requests, property_request_partner, property_request_admin
 
 configure_logging()
 
@@ -21,19 +25,34 @@ def _run_outbox_publisher() -> None:
     enqueue(publish_pending_events)
 
 
+def _run_digest_bucket() -> None:
+    from app.core.jobs import enqueue
+    from app.tasks.notifications import run_digest_bucket
+    enqueue(run_digest_bucket)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from apscheduler.schedulers.background import BackgroundScheduler
     from app.jobs.refresh_area_intelligence import refresh_all
     from app.jobs.expire_assignments import expire_stale_assignments
+    from app.jobs.expire_property_requests import process_property_request_expiry
     scheduler = BackgroundScheduler(timezone="Asia/Riyadh")
     scheduler.add_job(refresh_all, "cron", hour=0, minute=0)
     scheduler.add_job(expire_stale_assignments, "interval", minutes=30)
+    scheduler.add_job(process_property_request_expiry, "interval", minutes=30)
     # Outbox publisher: frequent, cheap poll. enqueue() dispatches it to
     # Celery's scheduled_jobs queue when a broker is available, or just runs
     # it inline in this process otherwise — either way pending events get
     # picked up within ~15s of being written.
     scheduler.add_job(_run_outbox_publisher, "interval", seconds=15)
+    # Per-user bucketed digest scheduler (Phase 5): runs every 15 minutes and
+    # processes whichever users' next_daily_digest_at/next_weekly_digest_at
+    # has arrived, so each user's digest fires at *their* configured local
+    # hour/weekday rather than one fixed platform-wide cron tick. Digest runs
+    # are themselves idempotent per (user, period, calendar day) — see
+    # DigestRun — so a missed/duplicate tick is always safe.
+    scheduler.add_job(_run_digest_bucket, "interval", minutes=15)
     scheduler.start()
     yield
     scheduler.shutdown(wait=False)
@@ -89,6 +108,12 @@ _ROUTERS = [
     (leads.router, "/leads", ["leads"]),
     (payments.router, "/payments", ["payments"]),
     (reviews.router, "/reviews", ["reviews"]),
+    (notifications.router, "/notifications", ["notifications"]),
+    (notifications.preferences_router, "/notification-preferences", ["notification-preferences"]),
+    (devices.router, "/devices", ["devices"]),
+    (property_requests.router, "/property-requests", ["property-requests"]),
+    (property_request_partner.router, "/partner/property-requests", ["partner-property-requests"]),
+    (property_request_admin.router, "/admin/property-requests", ["admin-property-requests"]),
 ]
 
 for router, path, tags in _ROUTERS:

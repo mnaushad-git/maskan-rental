@@ -9,7 +9,7 @@ first-token time as perceived by the client, image-load failures) need a
 telemetry SDK shipping events *from* the mobile/web apps to some ingestion
 endpoint — that's a separate, much larger initiative and out of scope here.
 """
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 
 # ── HTTP ─────────────────────────────────────────────────────────────────
 http_requests_total = Counter(
@@ -47,6 +47,30 @@ job_executions_total = Counter("maskan_job_executions_total", "Background job ex
 leads_created_total = Counter("maskan_leads_created_total", "Leads created")
 properties_published_total = Counter("maskan_properties_published_total", "Properties published")
 payment_webhooks_total = Counter("maskan_payment_webhooks_total", "Payment webhook events processed", ["event_type"])
+
+# ── Saved search alerts / notifications ─────────────────────────────────────
+saved_searches_created_total = Counter("maskan_saved_searches_created_total", "Saved searches created")
+alerts_generated_total = Counter("maskan_alerts_generated_total", "Saved-search matches generated", ["change_type"])
+notifications_created_total = Counter("maskan_notifications_created_total", "Notifications created", ["type"])
+notifications_opened_total = Counter("maskan_notifications_opened_total", "Notifications marked read/opened", ["type"])
+notification_delivery_total = Counter("maskan_notification_delivery_total", "Notification delivery attempts", ["channel", "status"])
+digest_delivered_total = Counter("maskan_digest_delivered_total", "Digests delivered", ["period"])
+digest_failed_total = Counter("maskan_digest_failed_total", "Digest runs that failed", ["period"])
+
+# ── Notification platform (Phase 16) ────────────────────────────────────────
+push_attempted_total = Counter("maskan_push_attempted_total", "Push sends attempted", ["provider"])
+push_accepted_total = Counter("maskan_push_accepted_total", "Push sends accepted by the provider", ["provider"])
+push_failed_total = Counter("maskan_push_failed_total", "Push sends that failed", ["provider", "reason"])
+push_invalid_token_total = Counter("maskan_push_invalid_token_total", "Push sends rejected for an invalid/unregistered token", ["provider"])
+push_delivery_latency_seconds = Histogram("maskan_push_delivery_latency_seconds", "Push provider round-trip latency", ["provider"])
+notification_stream_connections = Gauge("maskan_notification_stream_connections", "Currently-open SSE notification stream connections")
+notification_stream_reconnects_total = Counter("maskan_notification_stream_reconnects_total", "SSE stream reconnect attempts observed server-side")
+digest_generated_total = Counter("maskan_digest_generated_total", "Digest runs that produced at least one notification", ["period"])
+lead_notifications_total = Counter("maskan_lead_notifications_total", "Generic lead notifications created", ["event_type"])
+notification_job_retries_total = Counter("maskan_notification_job_retries_total", "Notification-related Celery task retries", ["task"])
+notification_deep_link_failures_total = Counter("maskan_notification_deep_link_failures_total", "Client-reported deep-link resolution failures", ["platform"])
+device_registration_total = Counter("maskan_device_registration_total", "Device registrations", ["platform"])
+active_devices_total = Gauge("maskan_active_devices_total", "Currently-enabled devices", ["platform"])
 
 
 def record_cache_event(result: str) -> None:

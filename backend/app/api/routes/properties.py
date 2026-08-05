@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.api.deps import get_admin_user, get_db, get_mediator_user, get_optional_admin_user
+from app.core.config import settings
 from app.core.geo import coords_for
 from app.core.metrics import properties_published_total
 from app.core.outbox import EventType, record_event
@@ -169,9 +170,25 @@ def update_partner_property(
     if prop.status != "Published":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only published listings can be edited")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changed_fields = payload.model_dump(exclude_unset=True)
+    for field, value in changed_fields.items():
         setattr(prop, field, value)
     prop.status = "Pending Approval"  # Re-submit for approval after any edit
+
+    record_event(
+        db,
+        event_type=EventType.PROPERTY_UPDATED,
+        aggregate_type="property",
+        aggregate_id=prop.id,
+        payload={"property_id": prop.id, "status": prop.status, "changed_fields": list(changed_fields.keys())},
+    )
+    record_event(
+        db,
+        event_type=EventType.PROPERTY_UNPUBLISHED,
+        aggregate_type="property",
+        aggregate_id=prop.id,
+        payload={"property_id": prop.id},
+    )
 
     db.commit()
     db.refresh(prop)
@@ -218,6 +235,9 @@ def create_property(
     return property_obj
 
 
+_MEANINGFUL_DETAIL_FIELDS = ("bedrooms", "bathrooms", "property_type", "furnished", "size_sq_m")
+
+
 @router.patch("/{property_id}", response_model=PropertyOut)
 def update_property(
     property_id: int,
@@ -230,21 +250,75 @@ def update_property(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
 
     previous_status = property_obj.status
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    previous_monthly_rent = property_obj.monthly_rent
+    previous_sale_price = property_obj.sale_price
+    previous_details = {f: getattr(property_obj, f) for f in _MEANINGFUL_DETAIL_FIELDS}
+    was_ever_published = previous_status == "Published"
+
+    changed_fields = payload.model_dump(exclude_unset=True)
+    for field, value in changed_fields.items():
         setattr(property_obj, field, value)
 
+    detail_changed = any(previous_details[f] != getattr(property_obj, f) for f in _MEANINGFUL_DETAIL_FIELDS)
     record_event(
         db,
         event_type=EventType.PROPERTY_UPDATED,
         aggregate_type="property",
         aggregate_id=property_obj.id,
-        payload={"property_id": property_obj.id, "status": property_obj.status},
+        payload={
+            "property_id": property_obj.id,
+            "status": property_obj.status,
+            "changed_fields": list(changed_fields.keys()),
+            "previous_details": previous_details,
+            "detail_changed": detail_changed,
+        },
     )
     if previous_status != "Published" and property_obj.status == "Published":
-        record_event(db, event_type=EventType.PROPERTY_PUBLISHED, aggregate_type="property", aggregate_id=property_obj.id, payload={"property_id": property_obj.id})
+        record_event(
+            db,
+            event_type=EventType.PROPERTY_PUBLISHED,
+            aggregate_type="property",
+            aggregate_id=property_obj.id,
+            payload={"property_id": property_obj.id, "republished": was_ever_published},
+        )
         properties_published_total.inc()
     elif previous_status == "Published" and property_obj.status != "Published":
-        record_event(db, event_type=EventType.PROPERTY_UNPUBLISHED, aggregate_type="property", aggregate_id=property_obj.id, payload={"property_id": property_obj.id})
+        record_event(
+            db,
+            event_type=EventType.PROPERTY_UNPUBLISHED,
+            aggregate_type="property",
+            aggregate_id=property_obj.id,
+            payload={"property_id": property_obj.id},
+        )
+        record_event(
+            db,
+            event_type=EventType.PROPERTY_AVAILABILITY_CHANGED,
+            aggregate_type="property",
+            aggregate_id=property_obj.id,
+            payload={"property_id": property_obj.id, "available": False},
+        )
+
+    # Price-change detection: only meaningful (and only alert-worthy) once
+    # the property is actually visible to searchers.
+    if property_obj.status == "Published":
+        old_price = previous_sale_price if property_obj.listing_type == "sale" else previous_monthly_rent
+        new_price = property_obj.sale_price if property_obj.listing_type == "sale" else property_obj.monthly_rent
+        if old_price is not None and new_price is not None and old_price != new_price:
+            pct_change = abs(new_price - old_price) / old_price * 100 if old_price else 100
+            abs_change = abs(new_price - old_price)
+            if pct_change >= settings.PRICE_CHANGE_THRESHOLD_PERCENT and abs_change >= settings.PRICE_CHANGE_THRESHOLD_ABS_SAR:
+                record_event(
+                    db,
+                    event_type=EventType.PROPERTY_PRICE_CHANGED,
+                    aggregate_type="property",
+                    aggregate_id=property_obj.id,
+                    payload={
+                        "property_id": property_obj.id,
+                        "old_price": old_price,
+                        "new_price": new_price,
+                        "direction": "down" if new_price < old_price else "up",
+                    },
+                )
 
     db.commit()
     db.refresh(property_obj)

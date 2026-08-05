@@ -38,7 +38,7 @@ celery_app = Celery(
     "maskan",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["app.tasks.leads", "app.tasks.area_intelligence", "app.tasks.outbox"],
+    include=["app.tasks.leads", "app.tasks.area_intelligence", "app.tasks.outbox", "app.tasks.notifications", "app.tasks.lead_notifications", "app.tasks.property_requests"],
 )
 
 celery_app.conf.update(
@@ -47,6 +47,9 @@ celery_app.conf.update(
         "app.tasks.leads.*": {"queue": QUEUE_DEFAULT},
         "app.tasks.area_intelligence.*": {"queue": QUEUE_DATA_INGESTION},
         "app.tasks.outbox.*": {"queue": QUEUE_SCHEDULED_JOBS},
+        "app.tasks.notifications.*": {"queue": QUEUE_NOTIFICATIONS},
+        "app.tasks.lead_notifications.*": {"queue": QUEUE_NOTIFICATIONS},
+        "app.tasks.property_requests.*": {"queue": QUEUE_NOTIFICATIONS},
     },
     # A task that's already running when its worker is killed goes back on
     # the queue instead of being silently lost.
@@ -78,5 +81,8 @@ def _on_task_failure(sender=None, **kwargs):
 
 @task_retry.connect
 def _on_task_retry(sender=None, **kwargs):
-    from app.core.metrics import record_job_execution
-    record_job_execution(task=sender.name if sender else "unknown", outcome="retry")
+    from app.core.metrics import notification_job_retries_total, record_job_execution
+    name = sender.name if sender else "unknown"
+    record_job_execution(task=name, outcome="retry")
+    if name.startswith("app.tasks.notifications.") or name.startswith("app.tasks.lead_notifications."):
+        notification_job_retries_total.labels(task=name).inc()

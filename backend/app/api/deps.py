@@ -64,6 +64,15 @@ def get_admin_user(
     return user
 
 
+def get_optional_current_user(
+    token: str | None = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db),
+) -> User | None:
+    if not token:
+        return None
+    return _decode_user(token, db)
+
+
 def get_optional_admin_user(
     token: str | None = Depends(oauth2_scheme_optional),
     db: Session = Depends(get_db),

@@ -27,16 +27,20 @@ logger = logging.getLogger("app.tasks.outbox")
 BATCH_SIZE = 100
 MAX_RETRIES = 5
 
-_HANDLERS: dict[str, Callable[[OutboxEvent], None]] = {}
+_HANDLERS: dict[str, list[Callable[[OutboxEvent], None]]] = {}
 
 
 def register_handler(event_type: str):
     """Decorator: register a handler that runs when an event of this type is
-    published. A handler that raises causes that one event to be retried
-    (up to MAX_RETRIES) without affecting the rest of the batch."""
+    published. Multiple handlers may register for the same event type (e.g.
+    both `app.tasks.notifications` and `app.tasks.property_requests` react to
+    `property.published`) — they all run, in registration order. A handler
+    that raises causes the whole event to be retried (up to MAX_RETRIES)
+    without affecting the rest of the batch; it does not stop the other
+    handlers already registered for that event type from having run."""
 
     def _decorator(fn: Callable[[OutboxEvent], None]):
-        _HANDLERS[event_type] = fn
+        _HANDLERS.setdefault(event_type, []).append(fn)
         return fn
 
     return _decorator
@@ -75,9 +79,9 @@ def _publish_batch() -> dict:
             .all()
         )
         for event in rows:
-            handler = _HANDLERS.get(event.event_type)
+            handlers = _HANDLERS.get(event.event_type, [])
             try:
-                if handler:
+                for handler in handlers:
                     handler(event)
                 event.status = "published"
                 event.published_at = datetime.now(timezone.utc)

@@ -343,9 +343,15 @@ def accept_lead(
 
     lead.status = "in_progress"
     mediator.total_leads_accepted += 1
+    record_event(
+        db,
+        event_type=EventType.LEAD_ASSIGNED,
+        aggregate_type="lead",
+        aggregate_id=lead.id,
+        payload={"lead_id": lead.id, "mediator_id": mediator.id, "actor_user_id": _user.id},
+    )
     db.commit()
 
-    # TODO: send email to customer with mediator contact details
     return {"status": "accepted", "lead_id": lead_id, "payment_amount": settings.LEAD_PICKUP_FEE_SAR}
 
 
@@ -468,6 +474,14 @@ def send_message(
         content=body.content,
     )
     db.add(msg)
+    db.flush()
+    record_event(
+        db,
+        event_type=EventType.LEAD_MESSAGE_ADDED,
+        aggregate_type="lead",
+        aggregate_id=lead_id,
+        payload={"lead_id": lead_id, "message_id": msg.id, "sender_role": role, "actor_user_id": current_user.id},
+    )
     db.commit()
     db.refresh(msg)
     return msg
@@ -525,6 +539,7 @@ def admin_approve_lead(
     if lead.status != "pending_review":
         raise HTTPException(status_code=400, detail="Lead is not pending review.")
     lead.status = "open"
+    record_event(db, event_type=EventType.LEAD_APPROVED, aggregate_type="lead", aggregate_id=lead.id, payload={"lead_id": lead.id})
     db.commit()
     db.refresh(lead)
     return lead
@@ -543,6 +558,7 @@ def admin_reject_lead(
     if lead.status != "pending_review":
         raise HTTPException(status_code=400, detail="Lead is not pending review.")
     lead.status = "rejected"
+    record_event(db, event_type=EventType.LEAD_REJECTED, aggregate_type="lead", aggregate_id=lead.id, payload={"lead_id": lead.id})
     db.commit()
     db.refresh(lead)
     return lead
@@ -562,6 +578,7 @@ def admin_approve_closure(
         raise HTTPException(status_code=400, detail="Lead has no pending closure request.")
     lead.status = lead.closure_outcome  # "closed_won" or "closed_lost"
     lead.closed_at = datetime.now(timezone.utc)
+    record_event(db, event_type=EventType.LEAD_CLOSED, aggregate_type="lead", aggregate_id=lead.id, payload={"lead_id": lead.id, "outcome": lead.status})
     db.commit()
     db.refresh(lead)
     return lead
@@ -645,6 +662,7 @@ def admin_assign_lead(
     )
     db.add(assignment)
     lead.status = "assigned"
+    record_event(db, event_type=EventType.LEAD_ASSIGNED, aggregate_type="lead", aggregate_id=lead.id, payload={"lead_id": lead.id, "mediator_id": mediator_id})
     db.commit()
     return {"status": "assigned", "lead_id": lead_id, "mediator_id": mediator_id}
 
@@ -666,6 +684,14 @@ def admin_send_message(
         content=body.content,
     )
     db.add(msg)
+    db.flush()
+    record_event(
+        db,
+        event_type=EventType.LEAD_MESSAGE_ADDED,
+        aggregate_type="lead",
+        aggregate_id=lead_id,
+        payload={"lead_id": lead_id, "message_id": msg.id, "sender_role": "admin", "actor_user_id": admin.id},
+    )
     db.commit()
     db.refresh(msg)
     return msg
