@@ -11,33 +11,36 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useRouter } from "expo-router";
-import { Send, Sparkles, Plus, Square, RotateCcw } from "lucide-react-native";
+import { Send, Sparkles, Plus, Square, RotateCcw, SearchCheck, ChevronRight } from "lucide-react-native";
 import Markdown from "react-native-markdown-display";
 import { streamAdvisorChat } from "@/lib/api/maskan";
 import { useLanguage } from "@/lib/i18n/context";
+import { colors } from "@/lib/colors";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 // Style the AI's markdown to match the app: compact spacing, green links/accents,
 // slate body text. Internal links (e.g. /areas?…) are non-navigating on mobile.
-const mdStyles = {
-  body: { color: "#2B211A", fontSize: 14, lineHeight: 20 },
+// Exported so other AI chat surfaces (e.g. the Property Request AI Agent panel
+// in app/property-requests/[id].tsx) render replies with the same visual theme.
+export const mdStyles = {
+  body: { color: colors.foreground, fontSize: 14, lineHeight: 20 },
   paragraph: { marginTop: 0, marginBottom: 8 },
-  heading1: { fontSize: 18, fontWeight: "700" as const, color: "#2B211A", marginTop: 4, marginBottom: 6 },
-  heading2: { fontSize: 16, fontWeight: "700" as const, color: "#2B211A", marginTop: 4, marginBottom: 6 },
-  heading3: { fontSize: 15, fontWeight: "700" as const, color: "#2B211A", marginTop: 4, marginBottom: 4 },
+  heading1: { fontSize: 18, fontWeight: "700" as const, color: colors.foreground, marginTop: 4, marginBottom: 6 },
+  heading2: { fontSize: 16, fontWeight: "700" as const, color: colors.foreground, marginTop: 4, marginBottom: 6 },
+  heading3: { fontSize: 15, fontWeight: "700" as const, color: colors.foreground, marginTop: 4, marginBottom: 4 },
   strong: { fontWeight: "700" as const },
-  link: { color: "#2563EB", fontWeight: "600" as const },
+  link: { color: colors.primary, fontWeight: "600" as const },
   bullet_list: { marginBottom: 4 },
   ordered_list: { marginBottom: 4 },
   list_item: { marginBottom: 2 },
-  code_inline: { backgroundColor: "#F5EAD9", color: "#2B211A", borderRadius: 4, paddingHorizontal: 4, fontFamily: "monospace" },
-  fence: { backgroundColor: "#F5EAD9", borderRadius: 8, padding: 10 },
-  table: { borderWidth: 1, borderColor: "#E7D9C4", borderRadius: 8, marginBottom: 8 },
-  th: { padding: 6, fontWeight: "700" as const, backgroundColor: "#FDF6EC" },
-  td: { padding: 6, borderColor: "#E7D9C4" },
-  tr: { borderBottomWidth: 1, borderColor: "#E7D9C4" },
-  blockquote: { backgroundColor: "#FDF6EC", borderLeftColor: "#2563EB", borderLeftWidth: 3, paddingHorizontal: 10, paddingVertical: 4 },
+  code_inline: { backgroundColor: colors.surface2, color: colors.foreground, borderRadius: 4, paddingHorizontal: 4, fontFamily: "monospace" },
+  fence: { backgroundColor: colors.surface2, borderRadius: 8, padding: 10 },
+  table: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, marginBottom: 8 },
+  th: { padding: 6, fontWeight: "700" as const, backgroundColor: colors.surface },
+  td: { padding: 6, borderColor: colors.border },
+  tr: { borderBottomWidth: 1, borderColor: colors.border },
+  blockquote: { backgroundColor: colors.surface, borderLeftColor: colors.primary, borderLeftWidth: 3, paddingHorizontal: 10, paddingVertical: 4 },
 };
 
 export default function AdvisorScreen() {
@@ -134,7 +137,7 @@ export default function AdvisorScreen() {
           headerRight: () =>
             messages.length > 0 ? (
               <Pressable onPress={() => setMessages([])} className="flex-row items-center gap-1 pr-1">
-                <Plus size={16} color="#2563EB" />
+                <Plus size={16} color={colors.primary} />
                 <Text className="text-sm font-medium text-primary">{t("advisor.newChat")}</Text>
               </Pressable>
             ) : null,
@@ -150,7 +153,7 @@ export default function AdvisorScreen() {
             <View className="gap-4 pt-6">
               <View className="items-center gap-2">
                 <View className="size-14 items-center justify-center rounded-2xl bg-primary/10">
-                  <Sparkles size={26} color="#2563EB" />
+                  <Sparkles size={26} color={colors.primary} />
                 </View>
                 <Text className="text-center text-lg font-bold text-foreground">{t("advisor.emptyState.title")}</Text>
                 <Text className="text-center text-sm text-muted-foreground">{t("advisor.emptyState.desc")}</Text>
@@ -166,6 +169,23 @@ export default function AdvisorScreen() {
                   </Pressable>
                 ))}
               </View>
+
+              {/* Cross-link into the standalone Property Request flow — the advisor
+                  is a one-off Q&A session, while a property request keeps matching
+                  new listings automatically over time. */}
+              <Pressable
+                onPress={() => router.push("/property-requests/new")}
+                className="flex-row items-center gap-3 rounded-2xl border border-ai/30 bg-ai-soft p-4"
+              >
+                <View className="size-10 items-center justify-center rounded-full bg-ai/15">
+                  <SearchCheck size={18} color={colors.ai} />
+                </View>
+                <View className="flex-1 gap-0.5">
+                  <Text className="text-sm font-bold text-foreground">{t("propertyRequest.entryPoint.advisorBannerTitle")}</Text>
+                  <Text className="text-xs text-muted-foreground">{t("propertyRequest.entryPoint.advisorBannerDesc")}</Text>
+                </View>
+                <ChevronRight size={18} color={colors.ai} />
+              </Pressable>
             </View>
           ) : (
             messages.map((m, i) => {
@@ -188,7 +208,7 @@ export default function AdvisorScreen() {
           )}
           {busy && messages[messages.length - 1]?.content === "" && (
             <View className="self-start rounded-2xl border border-border bg-card px-4 py-3">
-              <ActivityIndicator color="#2563EB" size="small" />
+              <ActivityIndicator color={colors.primary} size="small" />
             </View>
           )}
           {!busy && lastFailedMessage && (
@@ -198,7 +218,7 @@ export default function AdvisorScreen() {
               accessibilityLabel={t("advisor.retry")}
               className="mt-1 flex-row items-center gap-1.5 self-start rounded-full border border-border bg-card px-3.5 py-2"
             >
-              <RotateCcw size={14} color="#2563EB" />
+              <RotateCcw size={14} color={colors.primary} />
               <Text className="text-sm font-medium text-primary">{t("advisor.retry")}</Text>
             </Pressable>
           )}
@@ -210,7 +230,7 @@ export default function AdvisorScreen() {
               value={draft}
               onChangeText={setDraft}
               placeholder={t("advisor.inputPlaceholder")}
-              placeholderTextColor="#A8A29E"
+              placeholderTextColor={colors.neutral400}
               className="flex-1 rounded-full border border-border bg-card px-4 py-2.5 text-sm text-foreground"
               multiline
             />

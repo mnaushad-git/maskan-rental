@@ -2,6 +2,7 @@ import { View, Text } from "react-native";
 import { Sparkles, ShieldCheck, Flame, TrendingDown, Star } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useLanguage } from "@/lib/i18n/context";
+import { colors } from "@/lib/colors";
 
 type Tone = "primary" | "secondary" | "ai" | "success" | "warning" | "info" | "neutral";
 
@@ -47,11 +48,11 @@ export function Badge({
 export function RecommendationBadge({ label }: { label: string }) {
   const { t } = useLanguage();
   const map: Record<string, { tone: Tone; icon: ReactNode }> = {
-    "Best Match": { tone: "ai", icon: <Sparkles size={14} color="#7C3AED" /> },
-    Verified: { tone: "success", icon: <ShieldCheck size={14} color="#15803D" /> },
+    "Best Match": { tone: "ai", icon: <Sparkles size={14} color={colors.ai} /> },
+    Verified: { tone: "success", icon: <ShieldCheck size={14} color={colors.success} /> },
     Hot: { tone: "warning", icon: <Flame size={14} color="#B45309" /> },
-    "Price Drop": { tone: "info", icon: <TrendingDown size={14} color="#0369A1" /> },
-    New: { tone: "primary", icon: <Star size={14} color="#2B211A" /> },
+    "Price Drop": { tone: "info", icon: <TrendingDown size={14} color={colors.info} /> },
+    New: { tone: "primary", icon: <Star size={14} color={colors.foreground} /> },
   };
   const cfg = map[label] ?? { tone: "neutral" as Tone, icon: null };
   return (
@@ -71,4 +72,27 @@ export function StatusBadge({ status }: { status: "Available" | "Reserved" | "Re
       {t(`badges.${status}`)}
     </Badge>
   );
+}
+
+const PROPERTY_REQUEST_STATUS_TONE: Record<string, Tone> = {
+  draft: "neutral",
+  awaiting_clarification: "warning",
+  active: "success",
+  paused: "neutral",
+  matched: "ai",
+  negotiating: "info",
+  fulfilled: "success",
+  expired: "neutral",
+  closed: "neutral",
+  cancelled: "neutral",
+};
+
+/** Status pill for a PropertyRequest (see app/property-requests/*) — a
+ * separate enum/tone map from the listing StatusBadge above since a request
+ * moves through its own lifecycle (draft → awaiting_clarification → active →
+ * matched/negotiating → fulfilled/expired/closed/cancelled), not a listing's. */
+export function PropertyRequestStatusBadge({ status }: { status: string }) {
+  const { t } = useLanguage();
+  const tone = PROPERTY_REQUEST_STATUS_TONE[status] ?? "neutral";
+  return <Badge tone={tone}>{t(`propertyRequest.status.${status}`)}</Badge>;
 }

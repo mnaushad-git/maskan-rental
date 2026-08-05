@@ -13,6 +13,7 @@ import type { SearchProperty } from "@/lib/maskan-search-data";
 import { formatSAR } from "@/lib/maskan-data";
 import { CITY_CENTERS, DISTRICT_COORDS } from "@/lib/geo";
 import { useLanguage } from "@/lib/i18n/context";
+import { colors } from "@/lib/colors";
 
 // Fallback for any property the backend hasn't backfilled real coordinates
 // for yet — derives an approximate district-center pin, same as the server does.
@@ -152,13 +153,13 @@ export function PropertyMapView({
         radius={50}
         minPoints={3}
         spiralEnabled={false}
-        clusterColor="#2563EB"
+        clusterColor={colors.primary}
         clusterTextColor="#FFFFFF"
       >
         {properties.map((p, i) => {
           const [lat, lng] = pinFor(p, i);
           const isSale = p.listingType === "sale";
-          const color = isSale ? "#0F766E" : "#2563EB";
+          const color = isSale ? colors.sale : colors.primary;
           const priceLabel = isSale ? formatPinPrice(p.price) : `${formatPinPrice(p.price / 12)}/mo`;
 
           return (
@@ -198,7 +199,7 @@ export function PropertyMapView({
 
       {!chromeless && (
         <View className="absolute start-3 top-3 flex-row items-center gap-1 rounded-xl border border-border bg-background/95 px-3 py-1.5">
-          <MapPin size={14} color="#2563EB" />
+          <MapPin size={14} color={colors.primary} />
           <Text className="text-xs font-semibold text-foreground">
             {t(properties.length === 1 ? "map.propertyCountSingular" : "map.propertyCountPlural", {
               count: properties.length,
@@ -220,7 +221,7 @@ export function PropertyMapView({
               accessibilityLabel={t("common.close")}
               className="absolute end-2 top-2 size-7 items-center justify-center rounded-full bg-background/90"
             >
-              <X size={14} color="#2B211A" />
+              <X size={14} color={colors.foreground} />
             </Pressable>
           </View>
           <View className="p-4">
@@ -228,7 +229,7 @@ export function PropertyMapView({
               {selected.title}
             </Text>
             <View className="mt-0.5 flex-row items-center gap-1">
-              <MapPin size={12} color="#79716B" />
+              <MapPin size={12} color={colors.mutedForeground} />
               <Text className="text-xs text-muted-foreground">
                 {selected.district}, {selected.city}
               </Text>
@@ -236,13 +237,13 @@ export function PropertyMapView({
             <Text className="mt-1 text-[11px] text-muted-foreground">{t("map.approxLocation")}</Text>
             <View className="mt-2 flex-row items-center gap-3">
               <View className="flex-row items-center gap-1">
-                <BedDouble size={14} color="#79716B" />
+                <BedDouble size={14} color={colors.mutedForeground} />
                 <Text className="text-xs text-muted-foreground">
                   {selected.bedrooms} {t("map.bedroomsAbbr")}
                 </Text>
               </View>
               <View className="flex-row items-center gap-1">
-                <Bath size={14} color="#79716B" />
+                <Bath size={14} color={colors.mutedForeground} />
                 <Text className="text-xs text-muted-foreground">
                   {selected.bathrooms} {t("map.bathroomsAbbr")}
                 </Text>

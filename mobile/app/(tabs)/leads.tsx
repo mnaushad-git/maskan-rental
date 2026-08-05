@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { View, Text, FlatList, Pressable, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { ChevronRight, FileText, MapPin } from "lucide-react-native";
 import { fetchMyLeads, type ApiLeadSummary } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
@@ -10,6 +10,7 @@ import { useLanguage } from "@/lib/i18n/context";
 import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { colors } from "@/lib/colors";
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   pending_review: { bg: "#FEF3C7", fg: "#92400E" },
@@ -19,7 +20,7 @@ const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   in_progress: { bg: "#DCFCE7", fg: "#166534" },
   pending_closure: { bg: "#FEF3C7", fg: "#92400E" },
   closed_won: { bg: "#DCFCE7", fg: "#166534" },
-  closed_lost: { bg: "#F5EAD9", fg: "#57534E" },
+  closed_lost: { bg: colors.surface2, fg: "#57534E" },
 };
 
 export default function MyLeadsScreen() {
@@ -55,7 +56,6 @@ export default function MyLeadsScreen() {
   if (!user) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center gap-4 bg-background p-6">
-        <Stack.Screen options={{ title: t("nav.myLeads") }} />
         <Text className="text-center text-base text-muted-foreground">{t("myLeads.signInToView")}</Text>
         <Button onPress={() => router.push("/auth/login")}>{t("myLeads.signIn")}</Button>
       </SafeAreaView>
@@ -65,7 +65,6 @@ export default function MyLeadsScreen() {
   if (loading) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 gap-3 bg-background p-4">
-        <Stack.Screen options={{ title: t("nav.myLeads") }} />
         {Array.from({ length: 4 }).map((_, i) => (
           <View key={i} className="gap-2.5 rounded-xl border border-border bg-card p-4">
             <Skeleton width="60%" height={16} />
@@ -80,7 +79,6 @@ export default function MyLeadsScreen() {
   if (error && leads.length === 0) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
-        <Stack.Screen options={{ title: t("nav.myLeads") }} />
         <ErrorState onRetry={load} />
       </SafeAreaView>
     );
@@ -89,8 +87,7 @@ export default function MyLeadsScreen() {
   if (leads.length === 0) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center gap-3 bg-background p-6">
-        <Stack.Screen options={{ title: t("nav.myLeads") }} />
-        <FileText size={40} color="#A8A29E" />
+        <FileText size={40} color={colors.neutral400} />
         <Text className="text-center text-lg font-semibold text-foreground">{t("myLeads.empty.heading")}</Text>
         <Text className="text-center text-sm text-muted-foreground">{t("myLeads.empty.desc")}</Text>
         <Button className="mt-2" onPress={() => router.push("/lead/new")}>
@@ -102,7 +99,6 @@ export default function MyLeadsScreen() {
 
   return (
     <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
-      <Stack.Screen options={{ title: t("nav.myLeads") }} />
       <FlatList
         data={leads}
         keyExtractor={(lead) => String(lead.id)}
@@ -114,7 +110,7 @@ export default function MyLeadsScreen() {
               setRefreshing(true);
               load();
             }}
-            tintColor="#2563EB"
+            tintColor={colors.primary}
           />
         }
         renderItem={({ item: lead }) => {
@@ -126,7 +122,7 @@ export default function MyLeadsScreen() {
             >
               <View className="flex-1 gap-1.5">
                 <View className="flex-row items-center gap-1">
-                  <MapPin size={14} color="#79716B" />
+                  <MapPin size={14} color={colors.mutedForeground} />
                   <Text className="text-sm font-semibold text-foreground">
                     {lead.area_name}, {lead.city}
                   </Text>
@@ -145,7 +141,7 @@ export default function MyLeadsScreen() {
                   </View>
                 </View>
               </View>
-              <ChevronRight size={18} color="#A8A29E" />
+              <ChevronRight size={18} color={colors.neutral400} />
             </Pressable>
           );
         }}

@@ -9,6 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { duration, easing } from "@/lib/theme";
+import { colors } from "@/lib/colors";
 
 const DISMISS_THRESHOLD = 120;
 
@@ -78,7 +79,7 @@ export function BottomSheet({
               right: 0,
               bottom: 0,
               paddingBottom: insets.bottom,
-              backgroundColor: "#FDF6EC",
+              backgroundColor: colors.surface,
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
               maxHeight: "85%",

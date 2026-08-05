@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CheckCircle2, XCircle, Info } from "lucide-react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { duration, zIndex } from "@/lib/theme";
+import { colors } from "@/lib/colors";
 
 type ToastTone = "success" | "error" | "info";
 type ToastState = { id: number; message: string; tone: ToastTone } | null;
@@ -15,7 +16,7 @@ const TONE_ICON: Record<ToastTone, React.ComponentType<{ size: number; color: st
   error: XCircle,
   info: Info,
 };
-const TONE_COLOR: Record<ToastTone, string> = { success: "#15803D", error: "#DC2626", info: "#0369A1" };
+const TONE_COLOR: Record<ToastTone, string> = { success: colors.success, error: colors.destructive, info: colors.info };
 
 const AUTO_DISMISS_MS = 3000;
 

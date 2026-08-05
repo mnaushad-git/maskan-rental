@@ -47,6 +47,14 @@
         {
           "locationWhenInUsePermission": "myHome uses your location to show nearby rentals and sales on the map."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#2563EB",
+          "defaultChannel": "default"
+        }
       ]
     ],
     "experiments": {

@@ -3,6 +3,7 @@ import { Pressable, Text, View, type LayoutChangeEvent } from "react-native";
 import { ChevronDown } from "lucide-react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { duration, easing } from "@/lib/theme";
+import { colors } from "@/lib/colors";
 
 /** Expandable section — for methodology/FAQ-style content (e.g. the
  * lifestyle-score breakdown, limitations list) where showing everything at
@@ -40,7 +41,7 @@ export function Accordion({ title, children, defaultOpen = false }: { title: str
       >
         <Text className="flex-1 text-sm font-semibold text-foreground">{title}</Text>
         <Animated.View style={useAnimatedStyle(() => ({ transform: [{ rotate: `${animatedHeight.value * 180}deg` }] }))}>
-          <ChevronDown size={18} color="#79716B" />
+          <ChevronDown size={18} color={colors.mutedForeground} />
         </Animated.View>
       </Pressable>
       <Animated.View style={[{ overflow: "hidden" }, containerStyle]}>

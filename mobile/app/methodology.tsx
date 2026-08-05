@@ -3,14 +3,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
 import { Sparkles, Clock, ArrowRight } from "lucide-react-native";
 import { useLanguage } from "@/lib/i18n/context";
+import { colors } from "@/lib/colors";
 
 const SCORE_KEYS = ["area", "school", "healthcare", "traffic", "family"] as const;
 const BANDS = [
-  { key: "excellent", range: "85–100", color: "#15803D" },
+  { key: "excellent", range: "85–100", color: colors.success },
   { key: "strong", range: "70–84", color: "#65A30D" },
   { key: "good", range: "55–69", color: "#B45309" },
-  { key: "belowAverage", range: "40–54", color: "#DC2626" },
-  { key: "limitedData", range: "—", color: "#A8A29E" },
+  { key: "belowAverage", range: "40–54", color: colors.destructive },
+  { key: "limitedData", range: "—", color: colors.neutral400 },
 ] as const;
 const LIFESTYLE = ["restaurants", "gyms", "mosques", "malls", "parks"] as const;
 
@@ -25,7 +26,7 @@ export default function MethodologyScreen() {
         {/* Hero */}
         <View className="gap-2">
           <View className="flex-row items-center gap-1.5 self-start rounded-full bg-primary/10 px-3 py-1">
-            <Sparkles size={13} color="#2563EB" />
+            <Sparkles size={13} color={colors.primary} />
             <Text className="text-xs font-medium text-primary">{t("methodology.badge")}</Text>
           </View>
           <Text className="text-2xl font-bold text-foreground">{t("methodology.heading")}</Text>
@@ -37,7 +38,7 @@ export default function MethodologyScreen() {
         {/* Data freshness */}
         <View className="gap-2 rounded-xl border border-border bg-card p-4">
           <View className="flex-row items-center gap-2">
-            <Clock size={16} color="#2563EB" />
+            <Clock size={16} color={colors.primary} />
             <Text className="text-sm font-semibold text-foreground">{t("methodology.dataFreshness")}</Text>
           </View>
           <Text className="text-sm leading-5 text-muted-foreground">

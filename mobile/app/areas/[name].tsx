@@ -6,13 +6,14 @@ import { GraduationCap, Building2, TrendingUp, FileText } from "lucide-react-nat
 import { fetchAreaIntelligence, type ApiAreaIntelligence } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
 import { useLanguage } from "@/lib/i18n/context";
+import { colors } from "@/lib/colors";
 
 function scoreColor(score: number | null): string {
-  if (score == null) return "#A8A29E";
-  if (score >= 85) return "#15803D";
+  if (score == null) return colors.neutral400;
+  if (score >= 85) return colors.success;
   if (score >= 70) return "#65A30D";
   if (score >= 55) return "#B45309";
-  return "#DC2626";
+  return colors.destructive;
 }
 
 export default function AreaDetailScreen() {
@@ -38,7 +39,7 @@ export default function AreaDetailScreen() {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center bg-background">
         <Stack.Screen options={{ title: name ?? "" }} />
-        <ActivityIndicator color="#2563EB" />
+        <ActivityIndicator color={colors.primary} />
       </SafeAreaView>
     );
   }
@@ -87,7 +88,7 @@ export default function AreaDetailScreen() {
         {latestRent && (
           <View className="gap-2 rounded-xl border border-border bg-card p-4">
             <View className="flex-row items-center gap-2">
-              <TrendingUp size={16} color="#15803D" />
+              <TrendingUp size={16} color={colors.success} />
               <Text className="text-sm font-semibold text-foreground">{t("areas.detail.avgAnnualRent")}</Text>
             </View>
             <Text className="text-2xl font-bold text-foreground">SAR {formatSAR(latestRent.avg_rent_annual)}</Text>
@@ -106,7 +107,7 @@ export default function AreaDetailScreen() {
         {area.schools.length > 0 && (
           <View className="gap-2">
             <View className="flex-row items-center gap-2">
-              <GraduationCap size={16} color="#79716B" />
+              <GraduationCap size={16} color={colors.mutedForeground} />
               <Text className="text-sm font-semibold text-foreground">{t("areas.detail.schools")}</Text>
             </View>
             {area.schools.slice(0, 6).map((s, i) => (
@@ -125,7 +126,7 @@ export default function AreaDetailScreen() {
         {area.hospitals.length > 0 && (
           <View className="gap-2">
             <View className="flex-row items-center gap-2">
-              <Building2 size={16} color="#79716B" />
+              <Building2 size={16} color={colors.mutedForeground} />
               <Text className="text-sm font-semibold text-foreground">{t("areas.detail.healthcare")}</Text>
             </View>
             {area.hospitals.slice(0, 6).map((h, i) => (
@@ -144,7 +145,7 @@ export default function AreaDetailScreen() {
         {area.market_notes.length > 0 && (
           <View className="gap-2">
             <View className="flex-row items-center gap-2">
-              <FileText size={16} color="#79716B" />
+              <FileText size={16} color={colors.mutedForeground} />
               <Text className="text-sm font-semibold text-foreground">{t("areas.detail.marketNote")}</Text>
             </View>
             {area.market_notes.map((note, i) => (

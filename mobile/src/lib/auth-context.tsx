@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { AuthUser } from "./api/maskan";
 import { onUnauthorized } from "./api/maskan";
 import { readStoredToken, readStoredUser, writeStoredAuth, clearStoredAuth } from "./auth-storage";
+import { reregisterIfPermittedAsync, unregisterCurrentDeviceAsync } from "./push";
+import { useLanguage } from "./i18n/context";
 
 type AuthState = {
   user: AuthUser | null;
@@ -14,6 +16,7 @@ type AuthState = {
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { lang } = useLanguage();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -38,9 +41,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await writeStoredAuth(nextUser, nextToken);
     setUser(nextUser);
     setToken(nextToken);
+    // Quiet re-registration only — never prompts for OS permission here;
+    // if the user already granted it in an earlier session (or on another
+    // device with the same install), this keeps the backend's device row
+    // pointing at a fresh token. First-time permission is only ever asked
+    // via the contextual PushPermissionPrompt.
+    reregisterIfPermittedAsync(lang).catch(() => {});
   }
 
   async function clearAuth() {
+    // Unregister BEFORE clearing stored auth — unregisterDevice() needs a
+    // valid bearer token to identify which user's device row to delete.
+    await unregisterCurrentDeviceAsync();
     await clearStoredAuth();
     setUser(null);
     setToken(null);

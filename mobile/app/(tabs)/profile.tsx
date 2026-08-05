@@ -1,9 +1,10 @@
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { LogOut, Globe, FileText, ClipboardList, ChevronRight, Sparkles, Map, BookOpen, Scale, Calculator } from "lucide-react-native";
+import { LogOut, Globe, FileText, ChevronRight, Map, BookOpen, Scale, Calculator, Bell, BellRing, Settings, SearchCheck } from "lucide-react-native";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
+import { colors } from "@/lib/colors";
 
 export default function ProfileScreen() {
   const { t, lang, setLang } = useLanguage();
@@ -13,7 +14,7 @@ export default function ProfileScreen() {
   if (authLoading) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator color="#2563EB" />
+        <ActivityIndicator color={colors.primary} />
       </SafeAreaView>
     );
   }
@@ -38,80 +39,102 @@ export default function ProfileScreen() {
         onPress={() => setLang(lang === "en" ? "ar" : "en")}
         className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
       >
-        <Globe size={18} color="#2B211A" />
+        <Globe size={18} color={colors.foreground} />
         <Text className="flex-1 text-sm font-medium text-foreground">{t("common.language")}</Text>
         <Text className="text-sm text-muted-foreground">{lang === "en" ? "English" : "العربية"}</Text>
       </Pressable>
+
+      {user && (
+        <View className="gap-2">
+          <Pressable
+            onPress={() => router.push("/notifications")}
+            className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
+          >
+            <BellRing size={18} color={colors.foreground} />
+            <Text className="flex-1 text-sm font-medium text-foreground">{t("notificationCenter.heading")}</Text>
+            <ChevronRight size={18} color={colors.neutral400} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/saved-searches")}
+            className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
+          >
+            <Bell size={18} color={colors.foreground} />
+            <Text className="flex-1 text-sm font-medium text-foreground">{t("savedSearches.heading")}</Text>
+            <ChevronRight size={18} color={colors.neutral400} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/property-requests")}
+            className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
+          >
+            <SearchCheck size={18} color={colors.foreground} />
+            <Text className="flex-1 text-sm font-medium text-foreground">{t("propertyRequest.entryPoint.profileLink")}</Text>
+            <ChevronRight size={18} color={colors.neutral400} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/notification-settings")}
+            className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
+          >
+            <Settings size={18} color={colors.foreground} />
+            <Text className="flex-1 text-sm font-medium text-foreground">{t("notificationSettings.heading")}</Text>
+            <ChevronRight size={18} color={colors.neutral400} />
+          </Pressable>
+        </View>
+      )}
 
       <View className="gap-2">
         <Pressable
           onPress={() => router.push("/lead/new")}
           className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
         >
-          <FileText size={18} color="#2B211A" />
+          <FileText size={18} color={colors.foreground} />
           <Text className="flex-1 text-sm font-medium text-foreground">{t("leadNew.heading")}</Text>
-          <ChevronRight size={18} color="#A8A29E" />
-        </Pressable>
-
-        <Pressable
-          onPress={() => router.push("/leads")}
-          className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
-        >
-          <ClipboardList size={18} color="#2B211A" />
-          <Text className="flex-1 text-sm font-medium text-foreground">{t("nav.myLeads")}</Text>
-          <ChevronRight size={18} color="#A8A29E" />
-        </Pressable>
-
-        <Pressable
-          onPress={() => router.push("/advisor")}
-          className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
-        >
-          <Sparkles size={18} color="#2563EB" />
-          <Text className="flex-1 text-sm font-medium text-foreground">{t("nav.aiAdvisor")}</Text>
-          <ChevronRight size={18} color="#A8A29E" />
+          <ChevronRight size={18} color={colors.neutral400} />
         </Pressable>
 
         <Pressable
           onPress={() => router.push("/areas")}
           className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
         >
-          <Map size={18} color="#2B211A" />
+          <Map size={18} color={colors.foreground} />
           <Text className="flex-1 text-sm font-medium text-foreground">{t("nav.exploreAreas")}</Text>
-          <ChevronRight size={18} color="#A8A29E" />
+          <ChevronRight size={18} color={colors.neutral400} />
         </Pressable>
 
         <Pressable
           onPress={() => router.push("/estimate")}
           className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
         >
-          <Calculator size={18} color="#2B211A" />
+          <Calculator size={18} color={colors.foreground} />
           <Text className="flex-1 text-sm font-medium text-foreground">{t("estimate.badge")}</Text>
-          <ChevronRight size={18} color="#A8A29E" />
+          <ChevronRight size={18} color={colors.neutral400} />
         </Pressable>
 
         <Pressable
           onPress={() => router.push("/compare")}
           className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
         >
-          <Scale size={18} color="#2B211A" />
+          <Scale size={18} color={colors.foreground} />
           <Text className="flex-1 text-sm font-medium text-foreground">{t("nav.compare")}</Text>
-          <ChevronRight size={18} color="#A8A29E" />
+          <ChevronRight size={18} color={colors.neutral400} />
         </Pressable>
 
         <Pressable
           onPress={() => router.push("/methodology")}
           className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
         >
-          <BookOpen size={18} color="#2B211A" />
+          <BookOpen size={18} color={colors.foreground} />
           <Text className="flex-1 text-sm font-medium text-foreground">{t("methodology.badge")}</Text>
-          <ChevronRight size={18} color="#A8A29E" />
+          <ChevronRight size={18} color={colors.neutral400} />
         </Pressable>
       </View>
 
       {user && (
         <Pressable onPress={() => clearAuth()} className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3">
-          <LogOut size={18} color="#DC2626" />
-          <Text className="text-sm font-medium" style={{ color: "#DC2626" }}>
+          <LogOut size={18} color={colors.destructive} />
+          <Text className="text-sm font-medium" style={{ color: colors.destructive }}>
             {t("navAuth.signOut")}
           </Text>
         </Pressable>

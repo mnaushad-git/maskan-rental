@@ -23,6 +23,7 @@ import {
 import { formatSAR } from "@/lib/maskan-data";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
+import { colors } from "@/lib/colors";
 
 const PARTNER_ACTIVE = ["assigned", "in_progress", "pending_closure", "closed_won"];
 const CAN_CHAT = [...PARTNER_ACTIVE, "pending_review"];
@@ -117,7 +118,7 @@ export default function LeadDetailScreen() {
   if (loading) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator color="#2563EB" />
+        <ActivityIndicator color={colors.primary} />
       </SafeAreaView>
     );
   }
@@ -169,27 +170,27 @@ export default function LeadDetailScreen() {
           {/* Requirements */}
           <View className="gap-3 rounded-xl border border-border bg-card p-4">
             <Text className="text-sm font-semibold text-foreground">{t("leadDetail.yourRequirements")}</Text>
-            <Row icon={<MapPin size={16} color="#79716B" />} label={t("leadDetail.location")} value={`${lead.area_name}, ${lead.city}`} />
+            <Row icon={<MapPin size={16} color={colors.mutedForeground} />} label={t("leadDetail.location")} value={`${lead.area_name}, ${lead.city}`} />
             {lead.bedrooms_needed != null && (
               <Row
-                icon={<BedDouble size={16} color="#79716B" />}
+                icon={<BedDouble size={16} color={colors.mutedForeground} />}
                 label={t("leadDetail.bedrooms")}
                 value={t("leadDetail.bedroomsValue", { count: lead.bedrooms_needed })}
               />
             )}
             <Row
-              icon={<Wallet size={16} color="#79716B" />}
+              icon={<Wallet size={16} color={colors.mutedForeground} />}
               label={t("leadDetail.budget")}
               value={lead.max_budget ? t("leadDetail.perMonth", { amount: formatSAR(lead.max_budget) }) : t("myLeads.budgetFlexible")}
             />
             {lead.move_in_date && (
-              <Row icon={<CalendarDays size={16} color="#79716B" />} label={t("leadDetail.moveIn")} value={lead.move_in_date} />
+              <Row icon={<CalendarDays size={16} color={colors.mutedForeground} />} label={t("leadDetail.moveIn")} value={lead.move_in_date} />
             )}
           </View>
 
           {/* Partner / matching */}
           {accepted ? (
-            <View className="gap-1 rounded-xl border p-4" style={{ borderColor: "#15803D", backgroundColor: "rgba(21,128,61,0.06)" }}>
+            <View className="gap-1 rounded-xl border p-4" style={{ borderColor: colors.success, backgroundColor: "rgba(21,128,61,0.06)" }}>
               <Text className="text-sm font-semibold text-foreground">{t("leadDetail.partnerAssigned")}</Text>
               <Text className="text-sm text-muted-foreground">{t("leadDetail.partnerAssignedDesc", { area: lead.area_name })}</Text>
             </View>
@@ -211,7 +212,7 @@ export default function LeadDetailScreen() {
                   className="flex-row items-center gap-3 rounded-xl border border-border bg-card p-3"
                 >
                   <View className="size-9 items-center justify-center rounded-lg bg-muted">
-                    <Home size={16} color="#79716B" />
+                    <Home size={16} color={colors.mutedForeground} />
                   </View>
                   <View className="flex-1">
                     <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
@@ -266,7 +267,7 @@ export default function LeadDetailScreen() {
             onChangeText={setDraft}
             editable={canChat}
             placeholder={placeholder}
-            placeholderTextColor="#A8A29E"
+            placeholderTextColor={colors.neutral400}
             className="flex-1 rounded-full border border-border bg-card px-4 py-2.5 text-sm text-foreground"
             multiline
           />

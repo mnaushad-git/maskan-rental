@@ -11,32 +11,11 @@ import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PropertyCardSkeleton } from "@/components/ui/Skeleton";
-import type { Property } from "@/lib/maskan-data";
+import { toCardProperty, type Property } from "@/lib/maskan-data";
+import { colors } from "@/lib/colors";
 
 function toUiProperty(saved: ApiSavedProperty): Property {
-  const p = mapApiSearchProperty(saved.property);
-  return {
-    id: p.id,
-    title: p.title,
-    district: p.district,
-    city: p.city,
-    price: p.price,
-    listingType: p.listingType,
-    bedrooms: p.bedrooms,
-    bathrooms: p.bathrooms,
-    area: p.area,
-    type: p.type,
-    image: p.image,
-    images: [p.image],
-    matchScore: p.matchScore,
-    badges: p.isVerified ? ["Verified"] : [],
-    status: "Available",
-    pricePerSqm: p.area > 0 ? Math.round(p.price / p.area) : 0,
-    agent: "myHome Agent",
-    agentPhone: p.agentPhone,
-    agentProfileImage: null,
-    mediatorId: null,
-  };
+  return toCardProperty(mapApiSearchProperty(saved.property));
 }
 
 export default function SavedScreen() {
@@ -107,11 +86,17 @@ export default function SavedScreen() {
         data={saved}
         keyExtractor={(s) => String(s.id)}
         contentContainerClassName="gap-4 p-4"
-        renderItem={({ item }) => <PropertyCard p={toUiProperty(item)} />}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#2563EB" />}
+        renderItem={({ item }) => (
+          <PropertyCard
+            p={toUiProperty(item)}
+            initialSavedId={item.id}
+            onUnsaved={() => setSaved((prev) => prev.filter((s) => s.id !== item.id))}
+          />
+        )}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
         ListEmptyComponent={
           <EmptyState
-            icon={<Heart size={32} color="#79716B" />}
+            icon={<Heart size={32} color={colors.mutedForeground} />}
             title={t("saved.empty.heading")}
             description={t("saved.empty.desc")}
             actionLabel={t("saved.empty.browseProperties")}

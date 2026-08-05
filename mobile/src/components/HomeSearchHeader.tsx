@@ -4,6 +4,8 @@ import { useLanguage } from "@/lib/i18n/context";
 import { mainCategories, type ListingType } from "@/lib/listingCategories";
 import { Chip } from "@/components/ui/Chip";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { NotificationBell } from "@/components/NotificationBell";
+import { colors } from "@/lib/colors";
 
 export function HomeSearchHeader({
   listingType,
@@ -28,8 +30,8 @@ export function HomeSearchHeader({
         <View className="flex-1">
           <SegmentedControl
             options={[
-              { value: "rent" as ListingType, label: t("listingCategories.rent"), icon: <DoorOpen size={16} color={listingType === "rent" ? "#FFFFFF" : "#79716B"} /> },
-              { value: "sale" as ListingType, label: t("listingCategories.sale"), icon: <Key size={16} color={listingType === "sale" ? "#FFFFFF" : "#79716B"} /> },
+              { value: "rent" as ListingType, label: t("listingCategories.rent"), icon: <DoorOpen size={16} color={listingType === "rent" ? "#FFFFFF" : colors.mutedForeground} /> },
+              { value: "sale" as ListingType, label: t("listingCategories.sale"), icon: <Key size={16} color={listingType === "sale" ? "#FFFFFF" : colors.mutedForeground} /> },
             ]}
             value={listingType}
             onChange={onListingType}
@@ -39,9 +41,12 @@ export function HomeSearchHeader({
           onPress={onFilters}
           className="flex-row items-center gap-1.5 rounded-xl border border-primary px-3 py-2"
         >
-          <SlidersHorizontal size={15} color="#2563EB" />
+          <SlidersHorizontal size={15} color={colors.primary} />
           <Text className="text-sm font-semibold text-primary">{t("searchBar.allFilters")}</Text>
         </Pressable>
+        <View className="items-center justify-center rounded-full border border-border bg-background p-2.5 shadow-card">
+          <NotificationBell size={17} />
+        </View>
       </View>
 
       {/* Property-type chips */}

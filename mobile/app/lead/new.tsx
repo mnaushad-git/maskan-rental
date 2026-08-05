@@ -8,6 +8,8 @@ import { districtsByCity } from "@/lib/maskan-search-data";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { SelectField, OptionModal } from "@/components/SelectField";
+import { PushPermissionPrompt, usePushPermissionPrompt } from "@/components/PushPermissionPrompt";
+import { colors } from "@/lib/colors";
 
 const BEDROOM_OPTIONS = ["Any", "1", "2", "3", "4", "5"];
 
@@ -15,6 +17,7 @@ export default function LeadNewScreen() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const router = useRouter();
+  const pushPrompt = usePushPermissionPrompt();
 
   const [city, setCity] = useState<string>("Riyadh");
   const [district, setDistrict] = useState<string>("Any");
@@ -51,6 +54,7 @@ export default function LeadNewScreen() {
         <Pressable onPress={() => router.back()} className="mt-4 rounded-lg bg-primary px-5 py-2.5">
           <Text className="text-sm font-semibold text-primary-foreground">{t("leadNew.success.browseProperties")}</Text>
         </Pressable>
+        <PushPermissionPrompt visible={pushPrompt.visible} onClose={pushPrompt.close} />
       </SafeAreaView>
     );
   }
@@ -72,6 +76,10 @@ export default function LeadNewScreen() {
         requirements_note: requirements || undefined,
       });
       setSuccess(true);
+      // A submitted lead is exactly the "we'll follow up with you" moment —
+      // a good time to ask whether the user wants push alerts for lead
+      // status updates and partner replies, without asking on cold launch.
+      pushPrompt.trigger();
     } catch {
       setError(t("leadNew.failedToSubmit"));
     } finally {
@@ -92,7 +100,7 @@ export default function LeadNewScreen() {
             label={t("leadNew.city")}
             value={t(`cities.${city}`)}
             onPress={() => setOpenModal("city")}
-            icon={<MapPin size={18} color="#79716B" />}
+            icon={<MapPin size={18} color={colors.mutedForeground} />}
           />
           <View className="border-t border-border">
             <SelectField
@@ -151,7 +159,7 @@ export default function LeadNewScreen() {
           className="rounded-xl border border-border px-4 py-3 text-foreground"
         />
 
-        {error && <Text className="text-sm" style={{ color: "#DC2626" }}>{error}</Text>}
+        {error && <Text className="text-sm" style={{ color: colors.destructive }}>{error}</Text>}
 
         <Pressable
           onPress={handleSubmit}

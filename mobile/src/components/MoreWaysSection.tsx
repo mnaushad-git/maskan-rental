@@ -2,19 +2,21 @@ import { useEffect, useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { useRouter, type Href } from "expo-router";
-import { Briefcase, Sparkles, Calculator, ChevronRight } from "lucide-react-native";
+import { Briefcase, Sparkles, Calculator, ChevronRight, SearchCheck } from "lucide-react-native";
 import { fetchPublicPartners, type ApiPartnerPublic } from "@/lib/api/maskan";
 import { useLanguage } from "@/lib/i18n/context";
+import { colors } from "@/lib/colors";
 
-type TabKey = "partner" | "advisor" | "estimate";
+type TabKey = "partner" | "advisor" | "estimate" | "requests";
 
 const ACCENTS: Record<TabKey, { tabBg: string; tabText: string; cardBg: string; accent: string }> = {
-  partner: { tabBg: "#E0F2FE", tabText: "#0369A1", cardBg: "#F0F9FF", accent: "#0369A1" },
+  partner: { tabBg: "#E0F2FE", tabText: colors.info, cardBg: "#F0F9FF", accent: colors.info },
   advisor: { tabBg: "#EDE9FE", tabText: "#6D28D9", cardBg: "#F5F3FF", accent: "#6D28D9" },
-  estimate: { tabBg: "#DCFCE7", tabText: "#15803D", cardBg: "#F0FDF4", accent: "#15803D" },
+  estimate: { tabBg: "#DCFCE7", tabText: colors.success, cardBg: "#F0FDF4", accent: colors.success },
+  requests: { tabBg: colors.primarySoft, tabText: colors.primary, cardBg: "#EFF6FF", accent: colors.primary },
 };
 
-const AVATAR_COLORS = ["#2563EB", "#7C3AED", "#0EA5E9", "#F59E0B", "#DC2626"];
+const AVATAR_COLORS = [colors.primary, colors.ai, "#0EA5E9", "#F59E0B", colors.destructive];
 
 export function MoreWaysSection() {
   const { t } = useLanguage();
@@ -32,12 +34,18 @@ export function MoreWaysSection() {
     { key: "partner", icon: Briefcase, label: t("home.truPartner.badge"), to: "/lead/new" },
     { key: "advisor", icon: Sparkles, label: t("home.truAIAdvisor.badge"), to: "/advisor" },
     { key: "estimate", icon: Calculator, label: t("home.truEstimate.badge"), to: "/estimate" },
+    { key: "requests", icon: SearchCheck, label: t("propertyRequest.entryPoint.cta"), to: "/property-requests/new" },
   ];
 
   const content: Record<TabKey, { newLabel?: string; title: string; body: string }> = {
     partner: { newLabel: t("home.truPartner.new"), title: t("home.truPartner.title"), body: t("home.truPartner.body") },
     advisor: { newLabel: t("home.truAIAdvisor.new"), title: t("home.truAIAdvisor.title"), body: t("home.truAIAdvisor.body") },
     estimate: { title: t("home.truEstimate.title"), body: t("home.truEstimate.body") },
+    requests: {
+      newLabel: t("home.truAIAdvisor.new"),
+      title: t("propertyRequest.entryPoint.homeTitle"),
+      body: t("propertyRequest.entryPoint.homeDesc"),
+    },
   };
 
   const activeTab = tabs.find((tb) => tb.key === active)!;
@@ -61,11 +69,11 @@ export function MoreWaysSection() {
               className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl px-2 py-2.5"
               style={isActive ? { backgroundColor: a.tabBg } : undefined}
             >
-              <Icon size={15} color={isActive ? a.tabText : "#79716B"} />
+              <Icon size={15} color={isActive ? a.tabText : colors.mutedForeground} />
               <Text
                 numberOfLines={1}
                 className="text-xs font-semibold"
-                style={{ color: isActive ? a.tabText : "#79716B" }}
+                style={{ color: isActive ? a.tabText : colors.mutedForeground }}
               >
                 {tab.label}
               </Text>
@@ -82,7 +90,7 @@ export function MoreWaysSection() {
       >
         <View>
           {c.newLabel && (
-            <View className="mb-2 self-start rounded-full px-2.5 py-1" style={{ backgroundColor: "#0369A1" }}>
+            <View className="mb-2 self-start rounded-full px-2.5 py-1" style={{ backgroundColor: colors.info }}>
               <Text className="text-[11px] font-bold text-white">{c.newLabel}</Text>
             </View>
           )}
@@ -116,6 +124,10 @@ export function MoreWaysSection() {
           ) : active === "estimate" ? (
             <Text className="text-sm font-semibold" style={{ color: accent.accent }}>
               {t("home.truEstimate.getStarted")}
+            </Text>
+          ) : active === "requests" ? (
+            <Text className="text-sm font-semibold" style={{ color: accent.accent }}>
+              {t("propertyRequest.list.newRequest")}
             </Text>
           ) : (
             <View />

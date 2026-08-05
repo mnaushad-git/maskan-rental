@@ -7,6 +7,7 @@ import { districtsByCity } from "@/lib/maskan-search-data";
 import { markOnboardingSeen } from "@/lib/onboarding-storage";
 import { useLanguage } from "@/lib/i18n/context";
 import { OptionModal } from "./SelectField";
+import { colors } from "@/lib/colors";
 
 // Mirrors frontend/src/components/maskan/LocationOnboarding.tsx's flow, ported
 // to expo-location + a native modal instead of the browser geolocation API.
@@ -87,13 +88,13 @@ export function LocationOnboarding({
             accessibilityLabel={t("common.close")}
             className="absolute end-4 top-4 z-10 size-8 items-center justify-center rounded-full"
           >
-            <X size={16} color="#79716B" />
+            <X size={16} color={colors.mutedForeground} />
           </Pressable>
 
           {step === "intro" ? (
             <View className="items-center gap-5">
               <View className="size-14 items-center justify-center rounded-2xl bg-primary-soft">
-                <LocateFixed size={28} color="#2563EB" />
+                <LocateFixed size={28} color={colors.primary} />
               </View>
               <View className="items-center gap-1.5">
                 <Text className="text-center text-xl font-bold text-foreground">
@@ -137,7 +138,7 @@ export function LocationOnboarding({
             <View className="gap-5">
               <View className="items-center gap-1.5">
                 <View className="size-14 items-center justify-center rounded-2xl bg-primary-soft">
-                  <MapPin size={28} color="#2563EB" />
+                  <MapPin size={28} color={colors.primary} />
                 </View>
                 <Text className="text-center text-xl font-bold text-foreground">
                   {t("onboarding.whereLookingTitle")}
@@ -161,7 +162,7 @@ export function LocationOnboarding({
                     >
                       <Text
                         className="text-sm font-semibold"
-                        style={{ color: city === c ? "#FFFFFF" : "#2B211A" }}
+                        style={{ color: city === c ? "#FFFFFF" : colors.foreground }}
                       >
                         {t(`cities.${c}`)}
                       </Text>
@@ -189,10 +190,10 @@ export function LocationOnboarding({
                     onPress={() => setPropertyType("Any")}
                     className={`flex-row items-center gap-1.5 rounded-xl border px-3 py-2 ${propertyType === "Any" ? "border-primary bg-primary" : "border-border bg-surface"}`}
                   >
-                    <Home size={16} color={propertyType === "Any" ? "#FFFFFF" : "#2B211A"} />
+                    <Home size={16} color={propertyType === "Any" ? "#FFFFFF" : colors.foreground} />
                     <Text
                       className="text-sm font-semibold"
-                      style={{ color: propertyType === "Any" ? "#FFFFFF" : "#2B211A" }}
+                      style={{ color: propertyType === "Any" ? "#FFFFFF" : colors.foreground }}
                     >
                       {t("onboarding.any")}
                     </Text>
@@ -203,10 +204,10 @@ export function LocationOnboarding({
                       onPress={() => setPropertyType(pt)}
                       className={`flex-row items-center gap-1.5 rounded-xl border px-3 py-2 ${propertyType === pt ? "border-primary bg-primary" : "border-border bg-surface"}`}
                     >
-                      <Building2 size={16} color={propertyType === pt ? "#FFFFFF" : "#2B211A"} />
+                      <Building2 size={16} color={propertyType === pt ? "#FFFFFF" : colors.foreground} />
                       <Text
                         className="text-sm font-semibold"
-                        style={{ color: propertyType === pt ? "#FFFFFF" : "#2B211A" }}
+                        style={{ color: propertyType === pt ? "#FFFFFF" : colors.foreground }}
                       >
                         {t(`propertyTypes.${pt}`)}
                       </Text>

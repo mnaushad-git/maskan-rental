@@ -7,13 +7,14 @@ import { fetchAreaIntelligenceList, type ApiAreaIntelligenceSummary } from "@/li
 import { useLanguage } from "@/lib/i18n/context";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { colors } from "@/lib/colors";
 
 function scoreColor(score: number | null): string {
-  if (score == null) return "#A8A29E";
-  if (score >= 85) return "#15803D";
+  if (score == null) return colors.neutral400;
+  if (score >= 85) return colors.success;
   if (score >= 70) return "#65A30D";
   if (score >= 55) return "#B45309";
-  return "#DC2626";
+  return colors.destructive;
 }
 
 export default function AreasScreen() {
@@ -67,12 +68,12 @@ export default function AreasScreen() {
           <View className="gap-3">
             <Text className="text-sm text-muted-foreground">{t("areas.subtitle")}</Text>
             <View className="flex-row items-center gap-2 rounded-xl border border-border bg-card px-3">
-              <Search size={16} color="#A8A29E" />
+              <Search size={16} color={colors.neutral400} />
               <TextInput
                 value={query}
                 onChangeText={setQuery}
                 placeholder={t("areas.searchPlaceholder")}
-                placeholderTextColor="#A8A29E"
+                placeholderTextColor={colors.neutral400}
                 className="flex-1 py-2.5 text-sm text-foreground"
               />
             </View>
@@ -80,7 +81,7 @@ export default function AreasScreen() {
         }
         ListHeaderComponentStyle={{ marginBottom: 12 }}
         ListEmptyComponent={
-          <EmptyState icon={<SearchX size={28} color="#79716B" />} title={t("areas.table.noMatches")} />
+          <EmptyState icon={<SearchX size={28} color={colors.mutedForeground} />} title={t("areas.table.noMatches")} />
         }
         ListFooterComponent={
           <Text className="mt-2 text-center text-xs text-muted-foreground">{t("areas.footerNote")}</Text>
@@ -92,14 +93,14 @@ export default function AreasScreen() {
           >
             <View className="flex-row items-center justify-between">
               <View className="flex-1 flex-row items-center gap-1.5">
-                <MapPin size={14} color="#79716B" />
+                <MapPin size={14} color={colors.mutedForeground} />
                 <Text className="text-base font-semibold text-foreground">{a.area_name}</Text>
               </View>
               <View className="flex-row items-center gap-2">
                 <View className="rounded-lg px-2.5 py-1" style={{ backgroundColor: scoreColor(a.area_score) }}>
                   <Text className="text-sm font-bold text-white">{a.area_score != null ? Math.round(a.area_score) : "—"}</Text>
                 </View>
-                <ChevronRight size={18} color="#A8A29E" />
+                <ChevronRight size={18} color={colors.neutral400} />
               </View>
             </View>
             <Text className="text-xs text-muted-foreground">{a.city}</Text>

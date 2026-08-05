@@ -7,6 +7,7 @@ import { Plus, X, Search, BedDouble, Bath, Maximize, Sparkles, Trophy } from "lu
 import { fetchProperties, mapApiSearchProperty, mapApiProperty, type ApiProperty } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
 import { useLanguage } from "@/lib/i18n/context";
+import { colors } from "@/lib/colors";
 
 type Scored = {
   raw: ApiProperty;
@@ -88,7 +89,7 @@ export default function CompareScreen() {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center bg-background">
         <Stack.Screen options={{ title: t("compare.heading") }} />
-        <ActivityIndicator color="#2563EB" />
+        <ActivityIndicator color={colors.primary} />
       </SafeAreaView>
     );
   }
@@ -114,7 +115,7 @@ export default function CompareScreen() {
                 <View
                   key={i}
                   className="flex-1 gap-1 rounded-xl border bg-card p-2"
-                  style={isTop ? { borderColor: "#2563EB", borderWidth: 2 } : { borderColor: "#E7D9C4" }}
+                  style={isTop ? { borderColor: colors.primary, borderWidth: 2 } : { borderColor: colors.border }}
                 >
                   {isTop && (
                     <View className="flex-row items-center gap-1 self-start rounded-full bg-primary px-1.5 py-0.5">
@@ -129,7 +130,7 @@ export default function CompareScreen() {
                     onPress={() => setSelected((prev) => prev.filter((s) => s.id !== p.id))}
                     className="mt-0.5 flex-row items-center justify-center gap-1 rounded-md bg-muted py-1"
                   >
-                    <X size={11} color="#79716B" />
+                    <X size={11} color={colors.mutedForeground} />
                     <Text className="text-[10px] text-muted-foreground">Remove</Text>
                   </Pressable>
                 </View>
@@ -141,7 +142,7 @@ export default function CompareScreen() {
                 onPress={() => setPickerOpen(true)}
                 className="h-40 flex-1 items-center justify-center gap-1 rounded-xl border border-dashed border-border"
               >
-                <Plus size={20} color="#A8A29E" />
+                <Plus size={20} color={colors.neutral400} />
                 <Text className="text-[10px] text-muted-foreground">{t("compare.addSlot.addProperty")}</Text>
               </Pressable>
             );
@@ -152,9 +153,9 @@ export default function CompareScreen() {
         {selected.length >= 2 && (
           <View className="gap-0 rounded-xl border border-border">
             <MetricRow label={t("compare.rows.annualRent")} values={selected.map((p) => `SAR ${formatSAR(p.price)}`)} />
-            <MetricRow label={t("compare.rows.bedrooms")} values={selected.map((p) => String(p.bedrooms))} icon={<BedDouble size={13} color="#79716B" />} />
-            <MetricRow label={t("compare.rows.bathrooms")} values={selected.map((p) => String(p.bathrooms))} icon={<Bath size={13} color="#79716B" />} />
-            <MetricRow label={t("compare.rows.area")} values={selected.map((p) => `${p.area} m²`)} icon={<Maximize size={13} color="#79716B" />} />
+            <MetricRow label={t("compare.rows.bedrooms")} values={selected.map((p) => String(p.bedrooms))} icon={<BedDouble size={13} color={colors.mutedForeground} />} />
+            <MetricRow label={t("compare.rows.bathrooms")} values={selected.map((p) => String(p.bathrooms))} icon={<Bath size={13} color={colors.mutedForeground} />} />
+            <MetricRow label={t("compare.rows.area")} values={selected.map((p) => `${p.area} m²`)} icon={<Maximize size={13} color={colors.mutedForeground} />} />
             <MetricRow label={t("compare.rows.pricePerSqm")} values={selected.map((p) => `${formatSAR(Math.round(p.price / Math.max(1, p.area)))}`)} />
             <MetricRow label={t("compare.rows.areaScore")} values={selected.map((p) => String(p.areaScore))} highlight={selected.map((p) => p.areaScore === Math.max(...selected.map((x) => x.areaScore)))} />
             <MetricRow label={t("compare.rentalLabel")} values={selected.map((p) => String(p.rentalScore))} highlight={selected.map((p) => p.rentalScore === Math.max(...selected.map((x) => x.rentalScore)))} />
@@ -164,9 +165,9 @@ export default function CompareScreen() {
 
         {/* AI recommendation */}
         {topPick && (
-          <View className="gap-2 rounded-2xl border p-4" style={{ borderColor: "#2563EB", backgroundColor: "rgba(194,65,12,0.05)" }}>
+          <View className="gap-2 rounded-2xl border p-4" style={{ borderColor: colors.primary, backgroundColor: "rgba(194,65,12,0.05)" }}>
             <View className="flex-row items-center gap-1.5">
-              <Sparkles size={14} color="#2563EB" />
+              <Sparkles size={14} color={colors.primary} />
               <Text className="text-xs font-bold text-primary">{t("compare.aiReco.badge")}</Text>
             </View>
             <Text className="text-base font-bold text-foreground">
@@ -197,12 +198,12 @@ export default function CompareScreen() {
           <Pressable className="max-h-[80%] rounded-t-2xl bg-background p-4" onPress={() => {}}>
             <Text className="mb-2 text-base font-bold text-foreground">{t("compare.picker.addTitle")}</Text>
             <View className="mb-2 flex-row items-center gap-2 rounded-xl border border-border px-3">
-              <Search size={16} color="#A8A29E" />
+              <Search size={16} color={colors.neutral400} />
               <TextInput
                 value={query}
                 onChangeText={setQuery}
                 placeholder={t("compare.picker.searchPlaceholder")}
-                placeholderTextColor="#A8A29E"
+                placeholderTextColor={colors.neutral400}
                 className="flex-1 py-2.5 text-sm text-foreground"
               />
             </View>
@@ -217,7 +218,7 @@ export default function CompareScreen() {
                     <Text className="text-sm font-medium text-foreground" numberOfLines={1}>{item.title}</Text>
                     <Text className="text-xs text-muted-foreground">{item.district}, {item.city} · SAR {formatSAR(item.price)}</Text>
                   </View>
-                  <Plus size={18} color="#2563EB" />
+                  <Plus size={18} color={colors.primary} />
                 </Pressable>
               )}
             />

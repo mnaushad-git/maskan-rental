@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, ScrollView, Pressable, Linking, Dimensions } from "react-native";
-import { Image } from "expo-image";
+import { View, Text, ScrollView, Pressable, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { BedDouble, Bath, Maximize, MapPin, Phone, MessageCircle, Heart, FileText, ChevronRight } from "lucide-react-native";
-import { fetchProperty, mapApiProperty, saveProperty } from "@/lib/api/maskan";
+import { fetchProperty, mapApiProperty, saveProperty, deleteSavedProperty } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
 import type { Property } from "@/lib/maskan-data";
 import { useAuth } from "@/lib/auth-context";
@@ -14,8 +13,13 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
-
-const { width } = Dimensions.get("window");
+import { PropertyImageGallery } from "@/components/PropertyImageGallery";
+import { PropertyAreaInsights } from "@/components/PropertyAreaInsights";
+import { PropertySimilarListings } from "@/components/PropertySimilarListings";
+import { PropertyLocationMap } from "@/components/PropertyLocationMap";
+import { ScoreRing } from "@/components/ScoreIndicator";
+import { whatsappLink } from "@/lib/whatsapp";
+import { colors } from "@/lib/colors";
 
 export default function PropertyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,7 +30,9 @@ export default function PropertyDetailScreen() {
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [savedId, setSavedId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const saved = savedId !== null;
 
   const load = useCallback(() => {
     if (!id || Number.isNaN(Number(id))) {
@@ -36,6 +42,7 @@ export default function PropertyDetailScreen() {
     }
     setLoading(true);
     setError(false);
+    setSavedId(null);
     fetchProperty(Number(id))
       .then((raw) => setProperty(mapApiProperty(raw)))
       .catch(() => setError(true))
@@ -46,18 +53,33 @@ export default function PropertyDetailScreen() {
     load();
   }, [load]);
 
-  async function handleSave() {
+  async function handleToggleSave() {
     if (!user) {
       router.push("/auth/login");
       return;
     }
-    if (saved || !property) return;
+    if (!property || saving) return;
+    setSaving(true);
+    if (saved) {
+      const prevId = savedId;
+      setSavedId(null);
+      try {
+        await deleteSavedProperty(prevId!);
+      } catch {
+        setSavedId(prevId);
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     try {
-      await saveProperty(user.id, Number(property.id));
-      setSaved(true);
+      const result = await saveProperty(user.id, Number(property.id));
+      setSavedId(result.id);
       showToast(t("property.actions.savedToFavorites"));
     } catch {
       // ignore duplicate-save errors
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -86,21 +108,32 @@ export default function PropertyDetailScreen() {
   }
 
   const isSale = property.listingType === "sale";
-  const waLink = property.agentPhone
-    ? `https://wa.me/${property.agentPhone.replace(/\D/g, "").replace(/^0/, "966")}`
-    : undefined;
+  const waLink = property.agentPhone ? whatsappLink(property.agentPhone) : undefined;
 
   return (
-    <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
+    <View className="flex-1 bg-background">
       <Stack.Screen options={{ title: property.title }} />
-      <ScrollView>
-        <Image source={{ uri: property.image }} style={{ width, height: width * 0.7 }} contentFit="cover" />
+      <ScrollView contentContainerStyle={{ paddingBottom: 96 }}>
+        <View className="relative">
+          <PropertyImageGallery images={property.images} />
+          <IconButton
+            onPress={handleToggleSave}
+            accessibilityLabel={t(saved ? "property.actions.saved" : "property.actions.save")}
+            accessibilityState={{ selected: saved }}
+            className="absolute end-4 top-4 border border-border bg-background/95"
+          >
+            <Heart size={18} color={saved ? colors.destructive : colors.foreground} fill={saved ? colors.destructive : "none"} />
+          </IconButton>
+        </View>
 
-        <View className="gap-4 p-5">
+        <View className="gap-5 p-5">
           <View>
-            <Text className="font-bold text-xl text-foreground">{property.title}</Text>
+            <View className="flex-row items-start justify-between gap-3">
+              <Text className="flex-1 font-bold text-xl text-foreground">{property.title}</Text>
+              <ScoreRing score={property.matchScore} size={44} />
+            </View>
             <View className="mt-1 flex-row items-center gap-1">
-              <MapPin size={14} color="#79716B" />
+              <MapPin size={14} color={colors.mutedForeground} />
               <Text className="text-sm text-muted-foreground">
                 {property.district}, {property.city}
               </Text>
@@ -109,61 +142,17 @@ export default function PropertyDetailScreen() {
 
           <View className="flex-row items-center gap-5 border-y border-border py-4">
             <View className="flex-row items-center gap-1.5">
-              <BedDouble size={18} color="#2B211A" />
+              <BedDouble size={18} color={colors.foreground} />
               <Text className="text-sm text-foreground">{property.bedrooms} {t("property.summary.bedrooms")}</Text>
             </View>
             <View className="flex-row items-center gap-1.5">
-              <Bath size={18} color="#2B211A" />
+              <Bath size={18} color={colors.foreground} />
               <Text className="text-sm text-foreground">{property.bathrooms} {t("property.summary.bathrooms")}</Text>
             </View>
             <View className="flex-row items-center gap-1.5">
-              <Maximize size={18} color="#2B211A" />
+              <Maximize size={18} color={colors.foreground} />
               <Text className="text-sm text-foreground">{property.area} m²</Text>
             </View>
-          </View>
-
-          <View className="flex-row items-end justify-between">
-            <View>
-              <Text className="text-xs text-muted-foreground">
-                {isSale ? t("propertyCard.salePrice") : t("propertyCard.annualRent")}
-              </Text>
-              <Text className="font-bold text-2xl text-foreground">
-                SAR {formatSAR(property.price)}
-                {!isSale && <Text className="text-sm font-medium text-muted-foreground"> {t("propertyCard.perYear")}</Text>}
-              </Text>
-            </View>
-            <IconButton
-              onPress={handleSave}
-              accessibilityLabel={t(saved ? "property.actions.saved" : "property.actions.save")}
-              accessibilityState={{ selected: saved }}
-              className="border border-border"
-            >
-              <Heart size={18} color={saved ? "#DC2626" : "#2B211A"} fill={saved ? "#DC2626" : "none"} />
-            </IconButton>
-          </View>
-
-          <View className="flex-row gap-2">
-            {property.agentPhone && (
-              <Pressable
-                onPress={() => Linking.openURL(`tel:${property.agentPhone}`)}
-                className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg border border-border py-3"
-              >
-                <Phone size={16} color="#2B211A" />
-                <Text className="text-sm font-medium text-foreground">{t("propertyCard.call")}</Text>
-              </Pressable>
-            )}
-            {waLink && (
-              <Pressable
-                onPress={() => Linking.openURL(waLink)}
-                className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg border py-3"
-                style={{ borderColor: "#25D366", backgroundColor: "rgba(37,211,102,0.1)" }}
-              >
-                <MessageCircle size={16} color="#128C7E" />
-                <Text className="text-sm font-medium" style={{ color: "#128C7E" }}>
-                  {t("propertyCard.whatsapp")}
-                </Text>
-              </Pressable>
-            )}
           </View>
 
           <Pressable
@@ -175,14 +164,60 @@ export default function PropertyDetailScreen() {
               <Text className="text-sm font-semibold text-foreground">{t("property.landlord.listedBy")}</Text>
               <Text className="mt-1 text-sm text-muted-foreground">{property.agent}</Text>
             </View>
-            {property.mediatorId ? <ChevronRight size={18} color="#A8A29E" /> : null}
+            {property.mediatorId ? <ChevronRight size={18} color={colors.neutral400} /> : null}
           </Pressable>
 
-          <Button onPress={() => router.push("/lead/new")} icon={<FileText size={16} color="#FFFFFF" />} fullWidth>
-            {t("property.actions.submitLeadRequest")}
-          </Button>
+          <PropertyAreaInsights district={property.district} city={property.city} />
+
+          <PropertyLocationMap
+            latitude={property.latitude}
+            longitude={property.longitude}
+            district={property.district}
+            city={property.city}
+            title={property.title}
+          />
+
+          <PropertySimilarListings excludeId={property.id} district={property.district} city={property.city} />
         </View>
       </ScrollView>
-    </SafeAreaView>
+
+      {/* Sticky bottom action bar — price + primary contact CTA stay reachable
+          without scrolling back up, mirroring the web app's mobile sticky bar. */}
+      <SafeAreaView edges={["bottom"]} className="border-t border-border bg-background/95 px-4 pt-3">
+        <View className="flex-row items-center gap-3 pb-3">
+          <View className="min-w-0 flex-1">
+            <Text className="text-[11px] text-muted-foreground">
+              {isSale ? t("propertyCard.salePrice") : t("propertyCard.annualRent")}
+            </Text>
+            <Text numberOfLines={1} className="text-base font-bold text-foreground">
+              SAR {formatSAR(property.price)}
+              {!isSale && <Text className="text-xs font-normal text-muted-foreground"> {t("propertyCard.perYear")}</Text>}
+            </Text>
+          </View>
+          {property.agentPhone ? (
+            <>
+              <Pressable
+                onPress={() => waLink && Linking.openURL(waLink)}
+                className="flex-row items-center gap-1.5 rounded-xl bg-whatsapp px-4 py-2.5"
+              >
+                <MessageCircle size={16} color="#FFFFFF" />
+                <Text className="text-sm font-semibold text-white">{t("propertyCard.whatsapp")}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => Linking.openURL(`tel:${property.agentPhone}`)}
+                className="flex-row items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5"
+              >
+                <Phone size={16} color={colors.foreground} />
+                <Text className="text-sm font-semibold text-foreground">{t("propertyCard.call")}</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Button onPress={() => router.push("/lead/new")} icon={<FileText size={16} color="#FFFFFF" />}>
+              {t("property.actions.submitLeadRequest")}
+            </Button>
+          )}
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }

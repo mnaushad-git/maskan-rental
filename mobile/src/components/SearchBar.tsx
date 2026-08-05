@@ -6,6 +6,7 @@ import { districtsByCity } from "@/lib/maskan-search-data";
 import { useLanguage } from "@/lib/i18n/context";
 import { allCategories, type ListingType } from "@/lib/listingCategories";
 import { SelectField, OptionModal } from "./SelectField";
+import { colors } from "@/lib/colors";
 
 type LocationOption = { label: string; city: string; district: string };
 
@@ -114,7 +115,7 @@ export function SearchBar({
           onPress={() => switchListingType("rent")}
           className={`flex-row items-center gap-1.5 rounded-lg px-4 py-2 ${listingType === "rent" ? "bg-primary" : ""}`}
         >
-          <DoorOpen size={16} color={listingType === "rent" ? "#FFFFFF" : "#79716B"} />
+          <DoorOpen size={16} color={listingType === "rent" ? "#FFFFFF" : colors.mutedForeground} />
           <Text className={`text-sm font-semibold ${listingType === "rent" ? "text-primary-foreground" : "text-muted-foreground"}`}>
             {t("listingCategories.rent")}
           </Text>
@@ -123,7 +124,7 @@ export function SearchBar({
           onPress={() => switchListingType("sale")}
           className={`flex-row items-center gap-1.5 rounded-lg px-4 py-2 ${listingType === "sale" ? "bg-primary" : ""}`}
         >
-          <Key size={16} color={listingType === "sale" ? "#FFFFFF" : "#79716B"} />
+          <Key size={16} color={listingType === "sale" ? "#FFFFFF" : colors.mutedForeground} />
           <Text className={`text-sm font-semibold ${listingType === "sale" ? "text-primary-foreground" : "text-muted-foreground"}`}>
             {t("listingCategories.sale")}
           </Text>
@@ -134,7 +135,7 @@ export function SearchBar({
         label={t("searchBar.location")}
         value={location?.label ?? t("searchBar.cityOrDistrict")}
         onPress={() => setOpenModal("location")}
-        icon={<MapPin size={18} color="#79716B" />}
+        icon={<MapPin size={18} color={colors.mutedForeground} />}
       />
       <View className="flex-row">
         <SelectField
@@ -156,7 +157,7 @@ export function SearchBar({
           accessibilityRole="button"
           accessibilityLabel={t("searchBar.allFilters")}
         >
-          <SlidersHorizontal size={18} color="#2B211A" />
+          <SlidersHorizontal size={18} color={colors.foreground} />
         </Pressable>
         <Pressable className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg bg-primary py-2.5" onPress={handleSearch}>
           <Search size={16} color="#FFFFFF" />

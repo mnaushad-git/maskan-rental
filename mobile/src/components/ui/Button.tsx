@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import { ActivityIndicator, Pressable, Text, View, type PressableProps } from "react-native";
 import { MIN_TOUCH_TARGET } from "@/lib/theme";
+import { colors } from "@/lib/colors";
 
 type Variant = "primary" | "secondary" | "outline" | "ghost" | "destructive";
 type Size = "sm" | "md" | "lg";
@@ -66,7 +67,7 @@ export const Button = forwardRef<View, ButtonProps>(function Button(
       {...props}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={variant === "outline" || variant === "ghost" ? "#2563EB" : "#FFFFFF"} />
+        <ActivityIndicator size="small" color={variant === "outline" || variant === "ghost" ? colors.primary : "#FFFFFF"} />
       ) : (
         icon
       )}

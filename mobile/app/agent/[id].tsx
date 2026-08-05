@@ -17,10 +17,8 @@ import {
 } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
 import { useLanguage } from "@/lib/i18n/context";
-
-function waLink(phone: string) {
-  return `https://wa.me/${phone.replace(/\D/g, "").replace(/^0/, "966")}`;
-}
+import { colors } from "@/lib/colors";
+import { whatsappLink as waLink } from "@/lib/whatsapp";
 
 export default function AgentProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -61,7 +59,7 @@ export default function AgentProfileScreen() {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center bg-background">
         <Stack.Screen options={{ title: t("agent.loadingProfile") }} />
-        <ActivityIndicator color="#2563EB" />
+        <ActivityIndicator color={colors.primary} />
       </SafeAreaView>
     );
   }
@@ -99,7 +97,7 @@ export default function AgentProfileScreen() {
               )}
               <View className="flex-row items-center gap-1.5">
                 <Text className="text-lg font-bold text-foreground">{name}</Text>
-                {partner.is_verified && <BadgeCheck size={18} color="#15803D" />}
+                {partner.is_verified && <BadgeCheck size={18} color={colors.success} />}
               </View>
               <Text className="text-xs text-muted-foreground">{t("agent.memberSince", { date: memberSince })}</Text>
 
@@ -139,10 +137,10 @@ export default function AgentProfileScreen() {
               <Pressable
                 onPress={() => Linking.openURL(waLink(partner.phone))}
                 className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl border py-3"
-                style={{ borderColor: "#25D366", backgroundColor: "rgba(37,211,102,0.1)" }}
+                style={{ borderColor: colors.whatsapp, backgroundColor: "rgba(37,211,102,0.1)" }}
               >
-                <MessageCircle size={16} color="#128C7E" />
-                <Text className="text-sm font-semibold" style={{ color: "#128C7E" }}>
+                <MessageCircle size={16} color={colors.whatsappForeground} />
+                <Text className="text-sm font-semibold" style={{ color: colors.whatsappForeground }}>
                   {t("agent.whatsapp")}
                 </Text>
               </Pressable>
@@ -155,7 +153,7 @@ export default function AgentProfileScreen() {
                 <View className="flex-row flex-wrap gap-2">
                   {partner.areas.map((a) => (
                     <View key={a.id} className="flex-row items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5">
-                      <MapPin size={12} color="#79716B" />
+                      <MapPin size={12} color={colors.mutedForeground} />
                       <Text className="text-xs text-foreground">{a.area_name}</Text>
                     </View>
                   ))}
@@ -180,7 +178,7 @@ export default function AgentProfileScreen() {
                 <Image source={{ uri: p.image }} className="size-14 rounded-lg" contentFit="cover" />
               ) : (
                 <View className="size-14 items-center justify-center rounded-lg bg-muted">
-                  <Home size={18} color="#79716B" />
+                  <Home size={18} color={colors.mutedForeground} />
                 </View>
               )}
               <View className="flex-1">

@@ -8,6 +8,7 @@ import { fetchAreas, type ApiAreaSummary } from "@/lib/api/maskan";
 import { districtsByCity } from "@/lib/maskan-search-data";
 import { formatSAR } from "@/lib/maskan-data";
 import { useLanguage } from "@/lib/i18n/context";
+import { colors } from "@/lib/colors";
 
 const TYPE_FACTORS: Record<string, number> = { Apartment: 1, Villa: 1.35, Penthouse: 1.5, Townhouse: 1.15 };
 const CITIES = Object.keys(districtsByCity);
@@ -59,7 +60,7 @@ export default function EstimateScreen() {
       <ScrollView contentContainerClassName="gap-4 p-4">
         <View className="gap-1">
           <View className="flex-row items-center gap-1.5 self-start rounded-full bg-primary/10 px-3 py-1">
-            <Calculator size={13} color="#2563EB" />
+            <Calculator size={13} color={colors.primary} />
             <Text className="text-xs font-medium text-primary">{t("estimate.badge")}</Text>
           </View>
           <Text className="text-xl font-bold text-foreground">{t("estimate.heading")}</Text>
@@ -85,7 +86,7 @@ export default function EstimateScreen() {
                 accessibilityLabel={t("estimate.decreaseBedrooms")}
                 className="size-9 items-center justify-center rounded-lg border border-border"
               >
-                <Minus size={16} color="#2B211A" />
+                <Minus size={16} color={colors.foreground} />
               </Pressable>
               <Text className="w-8 text-center text-base font-bold text-foreground">{bedrooms}</Text>
               <Pressable
@@ -94,7 +95,7 @@ export default function EstimateScreen() {
                 accessibilityLabel={t("estimate.increaseBedrooms")}
                 className="size-9 items-center justify-center rounded-lg border border-border"
               >
-                <Plus size={16} color="#2B211A" />
+                <Plus size={16} color={colors.foreground} />
               </Pressable>
             </View>
           </View>
@@ -108,7 +109,7 @@ export default function EstimateScreen() {
               onChangeText={setSize}
               keyboardType="numeric"
               placeholder={t("estimate.sizePlaceholder", { size: bedrooms * 70 })}
-              placeholderTextColor="#A8A29E"
+              placeholderTextColor={colors.neutral400}
               className="rounded-lg border border-border px-3 py-2.5 text-sm text-foreground"
             />
           </View>
@@ -127,7 +128,7 @@ export default function EstimateScreen() {
             <Text className="text-center text-sm text-muted-foreground">{t("estimate.emptyPrompt")}</Text>
           </View>
         ) : (
-          <View className="gap-3 rounded-2xl border p-5" style={{ borderColor: "#2563EB", backgroundColor: "rgba(194,65,12,0.05)" }}>
+          <View className="gap-3 rounded-2xl border p-5" style={{ borderColor: colors.primary, backgroundColor: "rgba(194,65,12,0.05)" }}>
             <Text className="text-sm font-semibold text-foreground">{t("estimate.resultHeading")}</Text>
             <Text className="text-xs text-muted-foreground">
               {estimate.sampleSize > 0
@@ -199,7 +200,7 @@ function SelectRow({ label, value, onPress }: { label: string; value: string; on
       <Text className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</Text>
       <View className="flex-row items-center justify-between rounded-lg border border-border px-3 py-2.5">
         <Text className="text-sm font-medium text-foreground">{value}</Text>
-        <ChevronDown size={16} color="#A8A29E" />
+        <ChevronDown size={16} color={colors.neutral400} />
       </View>
     </Pressable>
   );

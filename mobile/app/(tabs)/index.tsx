@@ -14,6 +14,7 @@ import { MoreWaysSection } from "@/components/MoreWaysSection";
 import { HomeFilterSheet, type HomeFilterValue } from "@/components/HomeFilterSheet";
 import { LocationOnboarding } from "@/components/LocationOnboarding";
 import { ErrorState } from "@/components/ErrorState";
+import { colors } from "@/lib/colors";
 
 const NO_MAX = Number.MAX_SAFE_INTEGER;
 const DEFAULT_FILTERS: HomeFilterValue = {
@@ -90,7 +91,7 @@ export default function HomeScreen() {
       <View className="flex-1" style={{ zIndex: mapCardOpen ? 20 : 0 }}>
         {loading ? (
           <View className="flex-1 items-center justify-center bg-surface">
-            <ActivityIndicator color="#2563EB" />
+            <ActivityIndicator color={colors.primary} />
           </View>
         ) : error && properties.length === 0 ? (
           <View className="flex-1 items-center justify-center bg-surface">

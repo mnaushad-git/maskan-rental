@@ -6,6 +6,7 @@ import { login } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/Button";
+import { colors } from "@/lib/colors";
 
 export default function LoginScreen() {
   const { t } = useLanguage();
@@ -53,7 +54,7 @@ export default function LoginScreen() {
         />
       </View>
 
-      {error && <Text className="text-sm" style={{ color: "#DC2626" }}>{error}</Text>}
+      {error && <Text className="text-sm" style={{ color: colors.destructive }}>{error}</Text>}
 
       <Button onPress={handleSubmit} loading={loading} disabled={!email || !password} fullWidth>
         {t("auth.signIn")}

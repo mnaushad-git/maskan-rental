@@ -5,6 +5,7 @@ import { OptionModal } from "./SelectField";
 import { districtsByCity } from "@/lib/maskan-search-data";
 import { allCategories, type ListingType } from "@/lib/listingCategories";
 import { useLanguage } from "@/lib/i18n/context";
+import { colors } from "@/lib/colors";
 
 const RENT_BUDGETS = [
   { min: 0, max: Number.MAX_SAFE_INTEGER },
@@ -127,8 +128,8 @@ export function HomeFilterSheet({
                 onPress={() => setListing("rent")}
                 className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-xl border py-3 ${draft.listingType === "rent" ? "border-primary bg-primary" : "border-border"}`}
               >
-                <DoorOpen size={16} color={draft.listingType === "rent" ? "#FFFFFF" : "#79716B"} />
-                <Text className="text-sm font-semibold" style={{ color: draft.listingType === "rent" ? "#FFFFFF" : "#79716B" }}>
+                <DoorOpen size={16} color={draft.listingType === "rent" ? "#FFFFFF" : colors.mutedForeground} />
+                <Text className="text-sm font-semibold" style={{ color: draft.listingType === "rent" ? "#FFFFFF" : colors.mutedForeground }}>
                   {t("listingCategories.rent")}
                 </Text>
               </Pressable>
@@ -136,21 +137,21 @@ export function HomeFilterSheet({
                 onPress={() => setListing("sale")}
                 className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-xl border py-3 ${draft.listingType === "sale" ? "border-primary bg-primary" : "border-border"}`}
               >
-                <Key size={16} color={draft.listingType === "sale" ? "#FFFFFF" : "#79716B"} />
-                <Text className="text-sm font-semibold" style={{ color: draft.listingType === "sale" ? "#FFFFFF" : "#79716B" }}>
+                <Key size={16} color={draft.listingType === "sale" ? "#FFFFFF" : colors.mutedForeground} />
+                <Text className="text-sm font-semibold" style={{ color: draft.listingType === "sale" ? "#FFFFFF" : colors.mutedForeground }}>
                   {t("listingCategories.sale")}
                 </Text>
               </Pressable>
             </View>
 
             <Row
-              icon={<MapPin size={16} color="#79716B" />}
+              icon={<MapPin size={16} color={colors.mutedForeground} />}
               label={t("estimate.city")}
               value={draft.city === "Any" ? t("map.allCities") : draft.city}
               onPress={() => setPicker("city")}
             />
             <Row
-              icon={<Building2 size={16} color="#79716B" />}
+              icon={<Building2 size={16} color={colors.mutedForeground} />}
               label={t("estimate.areaDistrict")}
               value={draft.district === "Any" ? t("propertyTypes.Any") : draft.district}
               onPress={() => draft.city !== "Any" && setPicker("district")}
@@ -162,7 +163,7 @@ export function HomeFilterSheet({
               onPress={() => setPicker("type")}
             />
             <Row
-              icon={<Wallet size={16} color="#79716B" />}
+              icon={<Wallet size={16} color={colors.mutedForeground} />}
               label={draft.listingType === "sale" ? t("searchBar.budget") : t("searchBar.budgetPerYear")}
               value={t(budgetKeys[draft.budgetIdx])}
               onPress={() => setPicker("budget")}
@@ -247,7 +248,7 @@ function Row({
           {icon}
           <Text className="text-sm font-medium text-foreground">{value}</Text>
         </View>
-        <ChevronDown size={16} color="#A8A29E" />
+        <ChevronDown size={16} color={colors.neutral400} />
       </View>
     </Pressable>
   );

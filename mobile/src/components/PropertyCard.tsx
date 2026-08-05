@@ -5,29 +5,55 @@ import { Link, useRouter } from "expo-router";
 import { Bath, BedDouble, Heart, MapPin, Maximize, Phone, MessageCircle } from "lucide-react-native";
 import type { Property } from "@/lib/maskan-data";
 import { formatSAR } from "@/lib/maskan-data";
-import { saveProperty } from "@/lib/api/maskan";
+import { saveProperty, deleteSavedProperty } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { RecommendationBadge, StatusBadge } from "./Badges";
 import { ScoreRing } from "./ScoreIndicator";
+import { colors } from "@/lib/colors";
+import { whatsappLink } from "@/lib/whatsapp";
 
-export function PropertyCard({ p }: { p: Property }) {
+export function PropertyCard({
+  p,
+  initialSavedId,
+  onUnsaved,
+}: {
+  p: Property;
+  /** Pass the saved-properties record id when this card is known to already be saved (e.g. Saved screen). */
+  initialSavedId?: number;
+  /** Called once an unsave is confirmed by the server, so the parent list can drop this item. */
+  onUnsaved?: () => void;
+}) {
   const { user } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
-  const [saved, setSaved] = useState(false);
+  const [savedId, setSavedId] = useState<number | null>(initialSavedId ?? null);
   const [saving, setSaving] = useState(false);
+  const saved = savedId !== null;
 
-  async function handleSave() {
+  async function handleToggleSave() {
     if (!user) {
       router.push("/auth/login");
       return;
     }
-    if (saved || saving) return;
+    if (saving) return;
     setSaving(true);
+    if (saved) {
+      const prevId = savedId;
+      setSavedId(null);
+      try {
+        await deleteSavedProperty(prevId!);
+        onUnsaved?.();
+      } catch {
+        setSavedId(prevId);
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     try {
-      await saveProperty(user.id, Number(p.id));
-      setSaved(true);
+      const result = await saveProperty(user.id, Number(p.id));
+      setSavedId(result.id);
     } catch {
       // silently ignore duplicate-save errors (unique constraint)
     } finally {
@@ -36,9 +62,7 @@ export function PropertyCard({ p }: { p: Property }) {
   }
 
   const hasPhone = !!p.agentPhone;
-  const waLink = hasPhone
-    ? `https://wa.me/${p.agentPhone!.replace(/\D/g, "").replace(/^0/, "966")}`
-    : undefined;
+  const waLink = hasPhone ? whatsappLink(p.agentPhone!) : undefined;
 
   return (
     <View className="overflow-hidden rounded-2xl border border-border bg-background shadow-card">
@@ -53,12 +77,12 @@ export function PropertyCard({ p }: { p: Property }) {
                 ))}
               </View>
               <Pressable
-                accessibilityLabel={saved ? "Saved" : "Save"}
-                onPress={handleSave}
+                accessibilityLabel={saved ? "Unsave" : "Save"}
+                onPress={handleToggleSave}
                 disabled={saving}
                 className="size-9 items-center justify-center rounded-full bg-background/95 shadow-card"
               >
-                <Heart size={16} color={saved ? "#DC2626" : "#2B211A"} fill={saved ? "#DC2626" : "none"} />
+                <Heart size={16} color={saved ? colors.destructive : colors.foreground} fill={saved ? colors.destructive : "none"} />
               </Pressable>
             </View>
             <View className="absolute bottom-3 start-3">
@@ -73,7 +97,7 @@ export function PropertyCard({ p }: { p: Property }) {
                   {p.title}
                 </Text>
                 <View className="mt-1 flex-row items-center gap-1">
-                  <MapPin size={14} color="#79716B" />
+                  <MapPin size={14} color={colors.mutedForeground} />
                   <Text className="text-sm text-muted-foreground">
                     {p.district}, {p.city}
                   </Text>
@@ -84,15 +108,15 @@ export function PropertyCard({ p }: { p: Property }) {
 
             <View className="flex-row items-center gap-4">
               <View className="flex-row items-center gap-1.5">
-                <BedDouble size={16} color="#79716B" />
+                <BedDouble size={16} color={colors.mutedForeground} />
                 <Text className="text-sm text-muted-foreground">{p.bedrooms}</Text>
               </View>
               <View className="flex-row items-center gap-1.5">
-                <Bath size={16} color="#79716B" />
+                <Bath size={16} color={colors.mutedForeground} />
                 <Text className="text-sm text-muted-foreground">{p.bathrooms}</Text>
               </View>
               <View className="flex-row items-center gap-1.5">
-                <Maximize size={16} color="#79716B" />
+                <Maximize size={16} color={colors.mutedForeground} />
                 <Text className="text-sm text-muted-foreground">{p.area} m²</Text>
               </View>
             </View>
@@ -121,16 +145,16 @@ export function PropertyCard({ p }: { p: Property }) {
             onPress={() => Linking.openURL(`tel:${p.agentPhone}`)}
             className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg border border-border py-2"
           >
-            <Phone size={14} color="#2B211A" />
+            <Phone size={14} color={colors.foreground} />
             <Text className="text-xs font-medium text-foreground">{t("propertyCard.call")}</Text>
           </Pressable>
           <Pressable
             onPress={() => waLink && Linking.openURL(waLink)}
             className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg border py-2"
-            style={{ borderColor: "#25D366", backgroundColor: "rgba(37,211,102,0.1)" }}
+            style={{ borderColor: colors.whatsapp, backgroundColor: "rgba(37,211,102,0.1)" }}
           >
-            <MessageCircle size={14} color="#128C7E" />
-            <Text className="text-xs font-medium" style={{ color: "#128C7E" }}>
+            <MessageCircle size={14} color={colors.whatsappForeground} />
+            <Text className="text-xs font-medium" style={{ color: colors.whatsappForeground }}>
               {t("propertyCard.whatsapp")}
             </Text>
           </Pressable>
