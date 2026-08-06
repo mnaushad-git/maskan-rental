@@ -55,7 +55,7 @@ Confirmed by codebase audit (2026-08-05): Maskan already has map search, saved-s
 - **Aqar has:** "Aqar Plus" — paid tier with extra search/filtering/marketing tools.
 - **Maskan gap:** subscriptions exist only on the mediator (B2B/landlord) side; nothing for renters.
 - **AI flavor:** premium unlocks "AI Alert Plus" — instant (not daily/weekly) AI-summarized alerts on saved searches, and unlimited AI Advisor chat vs. a free-tier message cap.
-- **Dependency note:** the existing mediator subscription payment is currently **mocked** (no real Moyasar call yet — see `mediators.py:62-63,116` TODO). Fix that gateway integration first, or this tier will inherit the same mock, which is fine for a demo but worth flagging explicitly so it's a conscious choice, not a surprise later.
+- **Dependency note (resolved):** the mediator subscription payment gateway integration is now real (`app/core/moyasar.py`, wired into `mediators.py`'s `/me/subscribe` and `/me/renew`), gated by `USE_REAL_PAYMENTS` + `MOYASAR_SECRET_KEY`. **Currently running in mock mode** — no live Moyasar keys are configured in this environment, so the flag defaults off and behavior is unchanged from before. This tier can either flip the flag on (once real keys exist) or knowingly build against the same mock — a conscious choice either way, not a surprise.
 - **Why it fits one session:** mostly reuses the existing subscription model/pattern from `Mediator`, applied to `User`.
 - **Acceptance criteria:** renter can subscribe, gated features actually check the subscription flag, downgrade/expiry works.
 
@@ -84,7 +84,7 @@ The current **AI Rental Score / Fair Rent Analysis is a client-side heuristic** 
 |---|---|---|---|---|
 | 1 | Digital rental contracts + AI assistant | Done | 2 | — |
 | 2 | Renter identity verification + AI trust badge | Done | 1 | — |
-| 3 | Renter premium tier + AI Alert Plus | Not started | — | Fix mocked Moyasar payment first (decide: fix now or accept mock) |
+| 3 | Renter premium tier + AI Alert Plus | Not started | — | Mediator Moyasar gateway now real, behind `USE_REAL_PAYMENTS` (default **off** → mock still active; no live Moyasar keys in this environment). Build renter premium tier next; reuse `app.core.moyasar` |
 | 4a | Short-term booking — backend | Not started | — | Design booking/availability model |
 | 4b | Short-term booking — frontend | Not started | — | Depends on 4a |
 | 5 | Rent financing (waitlist stub) | Not started | — | Low priority — do last |

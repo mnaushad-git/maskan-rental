@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     GOOGLE_MAPS_API_KEY: str | None = None     # can be the same key as above
 
     # ── Mediator payments (Moyasar) ───────────────────────────────────────────
+    # USE_REAL_PAYMENTS gates the real Moyasar API calls in mediators.py
+    # (subscribe/renew). Off by default so the original mock (instant
+    # activation, no network call) keeps working with zero config. Turning it
+    # on also requires MOYASAR_SECRET_KEY — see app.core.moyasar and
+    # .env.example for the full checklist; without a secret key the code
+    # falls back to the mock even if this is true.
+    USE_REAL_PAYMENTS: bool = False
     MOYASAR_PUBLISHABLE_KEY: str | None = None  # TODO: add real key when available
     MOYASAR_SECRET_KEY: str | None = None
     MOYASAR_WEBHOOK_SECRET: str | None = None

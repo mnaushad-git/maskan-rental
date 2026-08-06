@@ -10,8 +10,10 @@ _pwd = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 from app.api.deps import get_admin_user, get_current_user, get_db, get_mediator_user
 from app.core.cache import CacheService
 from app.core.config import settings
+from app.core.moyasar import get_payment_gateway_provider
 from app.core.outbox import EventType, record_event
 from app.models.mediator import Mediator, MediatorArea
+from app.models.payment import Payment
 from app.models.user import User
 from app.schemas.mediator import (
     AdminPartnerCreate,
@@ -59,8 +61,8 @@ def register_mediator(
     db.add(mediator)
     db.commit()
     db.refresh(mediator)
-    # TODO: generate Moyasar payment URL for SAR 99 subscription and return it
-    # payment_url = moyasar_client.create_payment(amount=settings.SUBSCRIPTION_FEE_SAR * 100, ...)
+    # Payment is a separate step: call POST /me/subscribe to get the
+    # Moyasar payment_url (real or mocked, per USE_REAL_PAYMENTS).
     return mediator
 
 
@@ -94,7 +96,17 @@ def update_my_mediator_profile(
     return mediator
 
 
-# ── Subscription payment (mock) ───────────────────────────────────────────────
+# ── Subscription payment ─────────────────────────────────────────────────────
+# Real vs mock is decided per-call by settings.USE_REAL_PAYMENTS (and requires
+# MOYASAR_SECRET_KEY) — see app.core.moyasar. With it on, these endpoints only
+# *start* a Moyasar charge and record a `pending` Payment; activation happens
+# asynchronously via the /api/payments/webhook/moyasar handler once Moyasar
+# confirms the charge. With it off, behavior is byte-for-byte the original
+# instant-activation mock.
+
+def _real_payments_enabled() -> bool:
+    return bool(settings.USE_REAL_PAYMENTS and settings.MOYASAR_SECRET_KEY)
+
 
 @router.post("/me/subscribe")
 def subscribe_mediator(
@@ -103,8 +115,8 @@ def subscribe_mediator(
 ):
     """
     Initiate the SAR 99/month subscription payment via Moyasar.
-    TODO: Replace mock with real Moyasar API call when key is available.
-    Returns a payment_url for the frontend to redirect to.
+    Returns a payment_url for the frontend to redirect to (real flow), or
+    activates immediately (mock flow — USE_REAL_PAYMENTS unset/false).
     """
     mediator = db.query(Mediator).filter(Mediator.user_id == current_user.id).first()
     if not mediator:
@@ -112,7 +124,37 @@ def subscribe_mediator(
     if mediator.subscription_status == "active":
         raise HTTPException(status_code=400, detail="Subscription is already active.")
 
-    # MOCK: simulate successful payment — in production, create Moyasar payment and return URL
+    if _real_payments_enabled():
+        result = get_payment_gateway_provider().create_subscription_invoice(
+            mediator_id=mediator.id,
+            amount_sar=settings.SUBSCRIPTION_FEE_SAR,
+            description=f"Maskan mediator subscription (SAR {settings.SUBSCRIPTION_FEE_SAR}/month)",
+        )
+        if not result.success:
+            raise HTTPException(status_code=502, detail=f"Could not start payment with Moyasar: {result.error}")
+        payment = Payment(
+            mediator_id=mediator.id,
+            payment_type="subscription",
+            amount=settings.SUBSCRIPTION_FEE_SAR,
+            currency="SAR",
+            status="pending",
+            gateway="moyasar",
+            gateway_payment_id=result.gateway_payment_id,
+            gateway_raw=result.raw,
+            description="Mediator subscription — SAR 99/month",
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+        return {
+            "status": "pending",
+            "message": "Redirect to payment_url to complete payment via Moyasar. Subscription activates once the charge clears.",
+            "payment_url": result.payment_url,
+            "payment_id": payment.id,
+        }
+
+    # MOCK: simulate successful payment. Set USE_REAL_PAYMENTS=true (with
+    # MOYASAR_SECRET_KEY configured) to use the real charge/webhook flow above.
     mediator.subscription_status = "active"
     mediator.subscription_started_at = datetime.now(timezone.utc)
     mediator.subscription_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
@@ -123,9 +165,8 @@ def subscribe_mediator(
 
     return {
         "status": "active",
-        "message": "Subscription activated (mock). Replace with Moyasar payment flow.",
+        "message": "Subscription activated (mock). Set USE_REAL_PAYMENTS=true for the real Moyasar payment flow.",
         "subscription_expires_at": mediator.subscription_expires_at,
-        # TODO: "payment_url": moyasar_payment_url
     }
 
 
@@ -134,13 +175,47 @@ def renew_subscription(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Renew subscription manually for another 30 days."""
+    """Renew subscription for another 30 days."""
     mediator = db.query(Mediator).filter(Mediator.user_id == current_user.id).first()
     if not mediator:
         raise HTTPException(status_code=404, detail="No mediator profile found.")
 
-    # MOCK: simulate successful renewal payment
-    # TODO: charge mediator.moyasar_card_token via Moyasar API
+    if _real_payments_enabled():
+        if not mediator.moyasar_card_token or mediator.moyasar_card_token == "mock_card_token_replace_with_real":
+            raise HTTPException(
+                status_code=400,
+                detail="No saved card on file. Complete a subscription payment via POST /me/subscribe first.",
+            )
+        result = get_payment_gateway_provider().charge_saved_card(
+            mediator_id=mediator.id,
+            token=mediator.moyasar_card_token,
+            amount_sar=settings.SUBSCRIPTION_FEE_SAR,
+            description=f"Maskan mediator subscription renewal (SAR {settings.SUBSCRIPTION_FEE_SAR}/month)",
+        )
+        if not result.success:
+            raise HTTPException(status_code=502, detail=f"Renewal charge failed: {result.error}")
+        payment = Payment(
+            mediator_id=mediator.id,
+            payment_type="subscription",
+            amount=settings.SUBSCRIPTION_FEE_SAR,
+            currency="SAR",
+            status="pending",
+            gateway="moyasar",
+            gateway_payment_id=result.gateway_payment_id,
+            gateway_raw=result.raw,
+            description="Mediator subscription renewal — SAR 99/month",
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+        return {
+            "status": "pending",
+            "message": "Renewal charge submitted to Moyasar. Subscription extends once the charge clears.",
+            "payment_id": payment.id,
+        }
+
+    # MOCK: simulate successful renewal payment. Set USE_REAL_PAYMENTS=true
+    # (with a saved card on file) for the real Moyasar charge/webhook flow above.
     now = datetime.now(timezone.utc)
     base = mediator.subscription_expires_at if mediator.subscription_expires_at and mediator.subscription_expires_at > now else now
     mediator.subscription_expires_at = base + timedelta(days=30)
