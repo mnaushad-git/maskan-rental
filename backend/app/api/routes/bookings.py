@@ -11,7 +11,7 @@ from app.models.booking import Booking
 from app.models.mediator import Mediator
 from app.models.property import Property
 from app.models.user import User
-from app.schemas.booking import AvailabilityOut, BookingCreate, BookingOut
+from app.schemas.booking import AvailabilityInsightOut, AvailabilityOut, BookingCreate, BookingOut
 
 router = APIRouter()
 
@@ -51,6 +51,60 @@ def check_availability(
         check_in=check_in,
         check_out=check_out,
         available=_is_available(db, property_id, check_in, check_out),
+    )
+
+
+# A property needs at least this many bookings before its own history is
+# trusted for the lead-time note — below that we fall back to a platform-wide
+# average (and below that, a generic message) rather than showing a stat
+# derived from 1-2 data points.
+_MIN_INSIGHT_SAMPLE = 3
+
+
+def _avg_lead_time_days(db: Session, property_id: int | None) -> tuple[float | None, int]:
+    query = db.query(Booking.check_in, Booking.created_at).filter(Booking.status != "cancelled")
+    if property_id is not None:
+        query = query.filter(Booking.property_id == property_id)
+    lead_times = [
+        (check_in - created_at.date()).days
+        for check_in, created_at in query.all()
+        if check_in >= created_at.date()
+    ]
+    if not lead_times:
+        return None, 0
+    return sum(lead_times) / len(lead_times), len(lead_times)
+
+
+@router.get("/property/{property_id}/insights", response_model=AvailabilityInsightOut)
+def property_booking_insights(
+    property_id: int,
+    db: Session = Depends(get_db),
+):
+    prop = db.get(Property, property_id)
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found.")
+
+    avg_days, sample_size = _avg_lead_time_days(db, property_id)
+    if sample_size < _MIN_INSIGHT_SAMPLE or avg_days is None:
+        platform_avg_days, platform_sample = _avg_lead_time_days(db, None)
+        if platform_sample >= _MIN_INSIGHT_SAMPLE and platform_avg_days is not None:
+            weeks = max(1, round(platform_avg_days / 7))
+            note = (
+                f"Not enough booking history for this property yet — renters on Maskan typically book "
+                f"about {weeks} week{'s' if weeks != 1 else ''} ahead."
+            )
+        else:
+            note = "Not enough booking history yet — book early to secure your preferred dates."
+        return AvailabilityInsightOut(
+            property_id=property_id, average_lead_time_days=None, sample_size=sample_size, note=note
+        )
+
+    weeks = max(1, round(avg_days / 7))
+    return AvailabilityInsightOut(
+        property_id=property_id,
+        average_lead_time_days=round(avg_days, 1),
+        sample_size=sample_size,
+        note=f"This property is usually booked about {weeks} week{'s' if weeks != 1 else ''} out.",
     )
 
 

@@ -182,6 +182,47 @@ def test_cancelled_booking_frees_the_dates(client, db_session, unique_email):
     assert again.status_code == 201, again.text
 
 
+def test_insights_generic_note_when_no_history(client, db_session):
+    prop = _make_property(db_session)
+    db_session.commit()
+
+    resp = client.get(f"/api/bookings/property/{prop.id}/insights")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["sample_size"] == 0
+    assert body["average_lead_time_days"] is None
+    assert body["note"]
+
+
+def test_insights_uses_property_average_lead_time(client, db_session, unique_email):
+    prop = _make_property(db_session)
+    db_session.commit()
+    token = _signup(client, unique_email)
+
+    # Three non-overlapping bookings, each made "today" for a check-in
+    # 14/21/28 days out — average lead time is 21 days (3 weeks).
+    for offset in (14, 21, 28):
+        resp = client.post("/api/bookings/", json={
+            "property_id": prop.id,
+            "check_in": str(date.today() + timedelta(days=offset)),
+            "check_out": str(date.today() + timedelta(days=offset + 2)),
+            "total_price": 1000,
+        }, headers=_auth(token))
+        assert resp.status_code == 201, resp.text
+
+    resp = client.get(f"/api/bookings/property/{prop.id}/insights")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["sample_size"] == 3
+    assert body["average_lead_time_days"] == 21.0
+    assert "3 weeks" in body["note"]
+
+
+def test_insights_404_for_missing_property(client):
+    resp = client.get("/api/bookings/property/999999/insights")
+    assert resp.status_code == 404
+
+
 def test_property_bookings_blocked_for_non_owner(client, db_session, unique_email):
     mediator = _make_mediator(db_session, f"mediator-{unique_email}")
     prop = _make_property(db_session, mediator_id=mediator.id)

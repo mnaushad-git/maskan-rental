@@ -189,3 +189,72 @@ def test_customer_chat_endpoint_logs_ai_call(client, db_session, monkeypatch):
     assert row.status == "ok"
     assert row.input_tokens == 42
     assert row.prompt_name == "customer_advisor"
+
+
+# ── AI dynamic pricing suggestion (short-term booking nightly rate) ──────
+
+def _signup(client, email) -> str:
+    resp = client.post("/api/auth/signup", json={"email": email, "password": "S3cret!23"})
+    assert resp.status_code == 201, resp.text
+    return resp.json()["access_token"]
+
+
+def _auth(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_pricing_suggestion_requires_auth(client):
+    resp = client.post("/api/ai/pricing-suggestion", json={"area": "Al Yasmin", "city": "Riyadh", "monthly_rent": 6000})
+    assert resp.status_code == 401
+
+
+def test_pricing_suggestion_fallback_without_api_key(client, unique_email, monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.ANTHROPIC_API_KEY", "")
+    token = _signup(client, unique_email)
+
+    resp = client.post(
+        "/api/ai/pricing-suggestion",
+        json={"area": "Al Yasmin", "city": "Riyadh", "monthly_rent": 6000},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["generated_by"] == "fallback"
+    assert 0 < body["suggested_nightly_min"] < body["suggested_nightly_max"]
+    assert body["reasoning"]
+
+
+def test_pricing_suggestion_uses_ai_when_available(client, unique_email, monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.ANTHROPIC_API_KEY", "sk-ant-fake-for-test")
+    fake_result = gateway.ChatResult(
+        reply='{"suggested_nightly_min": 250, "suggested_nightly_max": 400, "reasoning": "Winter season premium over long-term baseline."}',
+        input_tokens=30, output_tokens=25, latency_ms=100.0,
+    )
+    monkeypatch.setattr(gateway, "run_chat", lambda **kwargs: fake_result)
+    token = _signup(client, unique_email)
+
+    resp = client.post(
+        "/api/ai/pricing-suggestion",
+        json={"area": "Al Yasmin", "city": "Riyadh", "monthly_rent": 6000},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["generated_by"] == "ai"
+    assert body["suggested_nightly_min"] == 250
+    assert body["suggested_nightly_max"] == 400
+
+
+def test_pricing_suggestion_falls_back_on_malformed_ai_response(client, unique_email, monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.ANTHROPIC_API_KEY", "sk-ant-fake-for-test")
+    fake_result = gateway.ChatResult(reply="not json at all", input_tokens=10, output_tokens=5, latency_ms=50.0)
+    monkeypatch.setattr(gateway, "run_chat", lambda **kwargs: fake_result)
+    token = _signup(client, unique_email)
+
+    resp = client.post(
+        "/api/ai/pricing-suggestion",
+        json={"area": "Al Yasmin", "city": "Riyadh", "monthly_rent": 6000},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["generated_by"] == "fallback"

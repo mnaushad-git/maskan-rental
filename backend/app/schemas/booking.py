@@ -37,3 +37,10 @@ class AvailabilityOut(BaseModel):
     check_in: date
     check_out: date
     available: bool
+
+
+class AvailabilityInsightOut(BaseModel):
+    property_id: int
+    average_lead_time_days: float | None
+    sample_size: int
+    note: str

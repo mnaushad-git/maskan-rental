@@ -17,6 +17,7 @@ import {
   Pencil,
   Phone,
   Plus,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -40,11 +41,13 @@ import {
   patchPartnerListing,
   addPartnerPropertyImage,
   deletePartnerPropertyImage,
+  fetchPricingSuggestion,
   type ApiAreaSummary,
   type ApiPartner,
   type ApiLeadDetail,
   type ApiLeadAvailable,
   type ApiProperty,
+  type ApiPricingSuggestion,
   type PartnerPropertyPayload,
 } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
@@ -914,6 +917,30 @@ function PartnerListingForm({
   const [urlInput, setUrlInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pricing, setPricing] = useState<ApiPricingSuggestion | null>(null);
+  const [pricingLoading, setPricingLoading] = useState(false);
+  const [pricingError, setPricingError] = useState<string | null>(null);
+
+  async function handleGetPricing() {
+    const rent = parseFloat(form.rent);
+    setPricingLoading(true);
+    setPricingError(null);
+    setPricing(null);
+    try {
+      const result = await fetchPricingSuggestion({
+        area: form.district.trim(),
+        city: form.city.trim(),
+        monthly_rent: rent > 0 ? rent : undefined,
+      });
+      setPricing(result);
+    } catch (err) {
+      setPricingError(
+        err instanceof Error ? err.message : t("partnerDashboard.listingForm.pricingSuggestion.failed"),
+      );
+    } finally {
+      setPricingLoading(false);
+    }
+  }
 
   // Districts for the selected city
   const districtOptions = areas
@@ -1053,6 +1080,53 @@ function PartnerListingForm({
               placeholder={t("partnerDashboard.listingForm.monthlyRentPlaceholder")}
             />
           </FormField>
+
+          {/* AI dynamic pricing suggestion — nightly rate for short-term
+              (Airbnb-style) bookings, distinct from the long-term monthly
+              rent above. Reuses backend/app/api/routes/ai.py's
+              /pricing-suggestion endpoint. */}
+          <div className="rounded-xl border border-ai/20 bg-ai-soft p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-ai">
+                <Sparkles className="size-4" /> {t("partnerDashboard.listingForm.pricingSuggestion.title")}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!form.city.trim() || !form.district.trim() || pricingLoading}
+                onClick={() => void handleGetPricing()}
+              >
+                {pricingLoading
+                  ? t("partnerDashboard.listingForm.pricingSuggestion.loading")
+                  : t("partnerDashboard.listingForm.pricingSuggestion.cta")}
+              </Button>
+            </div>
+            {!form.city.trim() || !form.district.trim() ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {t("partnerDashboard.listingForm.pricingSuggestion.needsAreaCity")}
+              </p>
+            ) : null}
+            {pricingError && <p className="mt-2 text-xs text-destructive">{pricingError}</p>}
+            {pricing && (
+              <div className="mt-3 space-y-1.5">
+                <div className="text-lg font-bold tracking-tight text-ai">
+                  SAR {formatSAR(pricing.suggested_nightly_min)} – {formatSAR(pricing.suggested_nightly_max)}
+                  <span className="ms-1 text-xs font-normal text-muted-foreground">
+                    {t("partnerDashboard.listingForm.pricingSuggestion.perNight")}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">{pricing.reasoning}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {t(
+                    pricing.generated_by === "ai"
+                      ? "partnerDashboard.listingForm.pricingSuggestion.aiGenerated"
+                      : "partnerDashboard.listingForm.pricingSuggestion.estimateGenerated",
+                  )}
+                </p>
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-3 gap-3">
             <FormField label={t("partnerDashboard.listingForm.bedrooms")}>

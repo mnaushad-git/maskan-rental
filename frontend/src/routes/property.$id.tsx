@@ -2,6 +2,10 @@
 import { TopNav } from "@/components/maskan/TopNav";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useState } from "react";
+import { differenceInCalendarDays, format, startOfDay } from "date-fns";
+import type { DateRange } from "react-day-picker";
+import { Calendar as DateRangeCalendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   ArrowLeft,
   Bath,
@@ -48,7 +52,11 @@ import {
   deleteSavedProperty,
   updateSavedProperty,
   mapApiProperty,
+  fetchAvailability,
+  fetchBookingInsights,
+  createBooking,
   type ApiAreaIntelligence,
+  type ApiAvailabilityInsight,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
@@ -206,6 +214,7 @@ function PropertyDetail() {
           ) : (
             <RentCalculator property={property} />
           )}
+          {!isSale && <ShortTermBooking property={property} />}
           <AreaSummary property={property} />
           <NearbyPlaces areaIntel={areaIntel} district={property.district} />
           <ComparableListings currentId={property.id} properties={properties} />
@@ -1553,6 +1562,186 @@ function PurchaseCostBreakdown({ property }: { property: Property }) {
         )}
       </div>
     </div>
+  );
+}
+
+// ── Short-Term Stay Booking ─────────────────────────────────────────────────
+// No per-listing nightly rate exists in the data model yet (Maskan only
+// tracks long-term monthly_rent) — the nightly rate shown here is an
+// indicative estimate derived from it, using the same short-term premium
+// heuristic as the AI pricing suggestion shown to landlords (see
+// backend/app/api/routes/ai.py's pricing-suggestion endpoint).
+function ShortTermBooking({ property }: { property: Property }) {
+  const tProp = usePropT();
+  const { user } = useAuth();
+  const [range, setRange] = useState<DateRange | undefined>();
+  const [availability, setAvailability] = useState<boolean | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [booking, setBooking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [insight, setInsight] = useState<ApiAvailabilityInsight | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchBookingInsights(Number(property.id))
+      .then((data) => {
+        if (!cancelled) setInsight(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [property.id]);
+
+  // A stale availability/error result from a previous range must not survive
+  // into a newly selected range.
+  useEffect(() => {
+    setAvailability(null);
+    setError(null);
+  }, [range?.from, range?.to]);
+
+  const nightlyRate = Math.max(50, Math.round(((property.price / 12 / 30) * 1.6)));
+  const nights = range?.from && range?.to ? differenceInCalendarDays(range.to, range.from) : 0;
+  const totalPrice = nights > 0 ? nights * nightlyRate : 0;
+  const today = startOfDay(new Date());
+
+  async function handleCheck() {
+    if (!range?.from || !range?.to) return;
+    setChecking(true);
+    setError(null);
+    try {
+      const res = await fetchAvailability(
+        Number(property.id),
+        format(range.from, "yyyy-MM-dd"),
+        format(range.to, "yyyy-MM-dd"),
+      );
+      setAvailability(res.available);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : tProp("booking.checkFailed"));
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function handleBook() {
+    if (!range?.from || !range?.to) return;
+    setBooking(true);
+    setError(null);
+    try {
+      await createBooking({
+        property_id: Number(property.id),
+        check_in: format(range.from, "yyyy-MM-dd"),
+        check_out: format(range.to, "yyyy-MM-dd"),
+        total_price: totalPrice,
+      });
+      setSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : tProp("booking.bookFailed"));
+      setAvailability(false);
+    } finally {
+      setBooking(false);
+    }
+  }
+
+  if (success && range?.from && range?.to) {
+    return (
+      <section className="rounded-2xl border border-success/30 bg-success/8 p-6 shadow-card md:p-8">
+        <div className="flex items-start gap-3">
+          <CheckCircle2 className="size-6 shrink-0 text-success" />
+          <div>
+            <h2 className="font-display text-xl font-bold tracking-tight">
+              {tProp("booking.confirmedTitle")}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {tProp("booking.confirmedDesc", {
+                checkIn: format(range.from, "MMM d, yyyy"),
+                checkOut: format(range.to, "MMM d, yyyy"),
+              })}
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="font-display text-2xl font-bold tracking-tight">{tProp("booking.title")}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{tProp("booking.subtitle")}</p>
+        </div>
+        <Badge tone="neutral">
+          <Calendar className="size-3.5" /> SAR {formatSAR(nightlyRate)} {tProp("booking.perNight")}
+        </Badge>
+      </div>
+
+      {insight && (
+        <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Sparkles className="size-3.5 text-ai" /> {insight.note}
+        </p>
+      )}
+
+      <div className="mt-5 flex flex-wrap items-end gap-3">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="justify-start">
+              <Calendar className="size-4" />
+              {range?.from && range?.to
+                ? `${format(range.from, "MMM d")} – ${format(range.to, "MMM d, yyyy")}`
+                : tProp("booking.pickDates")}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <DateRangeCalendar
+              mode="range"
+              selected={range}
+              onSelect={setRange}
+              disabled={{ before: today }}
+              numberOfMonths={2}
+            />
+          </PopoverContent>
+        </Popover>
+
+        <Button
+          variant="outline"
+          disabled={!range?.from || !range?.to || checking}
+          onClick={() => void handleCheck()}
+        >
+          {checking ? tProp("booking.checking") : tProp("booking.checkAvailability")}
+        </Button>
+      </div>
+
+      {nights > 0 && (
+        <div className="mt-4 flex items-center justify-between rounded-xl bg-surface p-4 text-sm">
+          <span className="text-muted-foreground">{tProp("booking.nightsTotal", { nights })}</span>
+          <span className="font-bold tabular-nums">SAR {formatSAR(totalPrice)}</span>
+        </div>
+      )}
+
+      {availability === true && (
+        <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-success">
+          <CheckCircle2 className="size-4" /> {tProp("booking.available")}
+        </p>
+      )}
+      {availability === false && !error && (
+        <p className="mt-3 text-sm font-semibold text-destructive">{tProp("booking.unavailable")}</p>
+      )}
+      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+
+      <div className="mt-5">
+        {!user ? (
+          <Button variant="hero" asChild>
+            <Link to="/auth">{tProp("booking.signInToBook")}</Link>
+          </Button>
+        ) : (
+          <Button variant="hero" disabled={availability !== true || booking} onClick={() => void handleBook()}>
+            {booking ? tProp("booking.booking") : tProp("booking.bookNow")}
+          </Button>
+        )}
+      </div>
+    </section>
   );
 }
 

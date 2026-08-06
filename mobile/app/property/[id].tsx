@@ -17,6 +17,7 @@ import { PropertyImageGallery } from "@/components/PropertyImageGallery";
 import { PropertyAreaInsights } from "@/components/PropertyAreaInsights";
 import { PropertySimilarListings } from "@/components/PropertySimilarListings";
 import { PropertyLocationMap } from "@/components/PropertyLocationMap";
+import { BookingCalendar } from "@/components/BookingCalendar";
 import { ScoreRing } from "@/components/ScoreIndicator";
 import { whatsappLink } from "@/lib/whatsapp";
 import { colors } from "@/lib/colors";
@@ -166,6 +167,10 @@ export default function PropertyDetailScreen() {
             </View>
             {property.mediatorId ? <ChevronRight size={18} color={colors.neutral400} /> : null}
           </Pressable>
+
+          {!isSale && (
+            <BookingCalendar propertyId={Number(property.id)} monthlyRent={Math.round(property.price / 12)} />
+          )}
 
           <PropertyAreaInsights district={property.district} city={property.city} />
 

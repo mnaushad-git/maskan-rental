@@ -2182,3 +2182,87 @@ export function adminModeratePropertyRequestResponse(
     { method: "POST" },
   );
 }
+
+// ── Short-term stay bookings ────────────────────────────────────────────────
+
+export type ApiBooking = {
+  id: number;
+  property_id: number;
+  renter_user_id: number;
+  check_in: string;
+  check_out: string;
+  total_price: number;
+  status: "confirmed" | "cancelled";
+  created_at: string;
+  updated_at: string;
+  property_title: string | null;
+  renter_name: string | null;
+};
+
+export type ApiAvailability = {
+  property_id: number;
+  check_in: string;
+  check_out: string;
+  available: boolean;
+};
+
+export type ApiAvailabilityInsight = {
+  property_id: number;
+  average_lead_time_days: number | null;
+  sample_size: number;
+  note: string;
+};
+
+export function fetchAvailability(propertyId: number, checkIn: string, checkOut: string) {
+  const params = new URLSearchParams({
+    property_id: String(propertyId),
+    check_in: checkIn,
+    check_out: checkOut,
+  });
+  return requestJson<ApiAvailability>(`/bookings/availability?${params.toString()}`);
+}
+
+export function fetchBookingInsights(propertyId: number) {
+  return requestJson<ApiAvailabilityInsight>(`/bookings/property/${propertyId}/insights`);
+}
+
+export function createBooking(payload: {
+  property_id: number;
+  check_in: string;
+  check_out: string;
+  total_price: number;
+}) {
+  return requestJson<ApiBooking>("/bookings/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchMyBookings() {
+  return requestJson<ApiBooking[]>("/bookings/my");
+}
+
+export function cancelBooking(id: number) {
+  return requestJson<ApiBooking>(`/bookings/${id}/cancel`, { method: "POST" });
+}
+
+// ── AI dynamic pricing suggestion (short-term nightly rate) ────────────────
+
+export type ApiPricingSuggestion = {
+  suggested_nightly_min: number;
+  suggested_nightly_max: number;
+  reasoning: string;
+  season: string;
+  generated_by: "ai" | "fallback";
+};
+
+export function fetchPricingSuggestion(payload: {
+  area: string;
+  city: string;
+  monthly_rent?: number;
+}) {
+  return requestJson<ApiPricingSuggestion>("/ai/pricing-suggestion", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

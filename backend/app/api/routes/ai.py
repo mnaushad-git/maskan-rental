@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_admin_user, get_current_user, get_db, get_optional_current_user
 from app.api.routes.contracts import _check_contract_access
 from app.core.ai import gateway
-from app.core.ai.prompts import ADMIN_ADVISOR, CONTRACT_ASSISTANT, CUSTOMER_ADVISOR, PromptDefinition
+from app.core.ai.prompts import ADMIN_ADVISOR, CONTRACT_ASSISTANT, CUSTOMER_ADVISOR, PRICING_ASSISTANT, PromptDefinition
 from app.core.config import settings
 from app.core.rate_limit import _client_identifier, check_rate_limit, rate_limit_dependency
 from app.models.contract import Contract
@@ -664,6 +665,146 @@ def contract_flags(
             feature="contract_flags",
             model=gateway.DEFAULT_MODEL,
             prompt=CONTRACT_ASSISTANT,
+            latency_ms=result.latency_ms if result else 0.0,
+            status=status,
+            user_id=current_user.id,
+            input_tokens=result.input_tokens if result else None,
+            output_tokens=result.output_tokens if result else None,
+        )
+
+
+# ── AI Dynamic Pricing Suggestion (short-term booking nightly rate) ────────
+
+class PricingSuggestionRequest(BaseModel):
+    area: str
+    city: str
+    monthly_rent: float | None = None
+
+
+class PricingSuggestionResponse(BaseModel):
+    suggested_nightly_min: float
+    suggested_nightly_max: float
+    reasoning: str
+    season: str
+    generated_by: str  # "ai" | "fallback"
+
+
+# Winter (Riyadh Season / cooler weather, Nov-Feb) and the Jun-Jul school
+# summer break are the two Gregorian-month windows where short-term Saudi
+# rental demand reliably rises regardless of the (lunar, non-fixed) Islamic
+# calendar — Ramadan/Eid dates aren't predictable from the month alone, so
+# this heuristic deliberately doesn't try to model them.
+_WINTER_MONTHS = {11, 12, 1, 2}
+_SUMMER_BREAK_MONTHS = {6, 7}
+
+
+def _season_label_and_multiplier(month: int) -> tuple[str, float]:
+    if month in _WINTER_MONTHS:
+        return "winter high season (Riyadh Season / cooler weather)", 1.35
+    if month in _SUMMER_BREAK_MONTHS:
+        return "summer school-holiday season", 1.15
+    return "regular season", 1.0
+
+
+def _area_quality_multiplier(area_score: float | None) -> float:
+    if area_score is None:
+        return 1.0
+    if area_score >= 80:
+        return 1.2
+    if area_score >= 65:
+        return 1.1
+    return 1.0
+
+
+def _deterministic_pricing(
+    baseline_nightly: float, area_score: float | None, month: int
+) -> tuple[float, float, str]:
+    season_label, season_mult = _season_label_and_multiplier(month)
+    area_mult = _area_quality_multiplier(area_score)
+    mid = baseline_nightly * 1.6 * season_mult * area_mult
+    low = round(mid * 0.85, 2)
+    high = round(mid * 1.15, 2)
+    reasoning = (
+        f"Based on a long-term baseline of SAR {baseline_nightly:,.0f}/night, adjusted for {season_label} "
+        f"and this district's area quality, a short-term nightly rate of SAR {low:,.0f}-{high:,.0f} is typical."
+    )
+    return low, high, reasoning
+
+
+@router.post(
+    "/pricing-suggestion",
+    response_model=PricingSuggestionResponse,
+    dependencies=[Depends(rate_limit_dependency("ai_pricing_suggestion", limit=20, window_seconds=600, by_user=True))],
+)
+def pricing_suggestion(
+    req: PricingSuggestionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    area_row = db.scalars(
+        select(AreaIntelligence).where(
+            AreaIntelligence.area_name.ilike(f"%{req.area}%"), AreaIntelligence.city.ilike(f"%{req.city}%")
+        )
+    ).first()
+    area_score = area_row.area_score if area_row else None
+
+    baseline_monthly = req.monthly_rent
+    if not baseline_monthly:
+        baseline_monthly = _district_avg_monthly_rent(db, req.area, req.city)
+    baseline_nightly = round((baseline_monthly or 3000) / 30, 2)
+
+    today = date.today()
+    season_label, _ = _season_label_and_multiplier(today.month)
+
+    if not settings.ANTHROPIC_API_KEY:
+        low, high, reasoning = _deterministic_pricing(baseline_nightly, area_score, today.month)
+        return PricingSuggestionResponse(
+            suggested_nightly_min=low, suggested_nightly_max=high, reasoning=reasoning,
+            season=season_label, generated_by="fallback",
+        )
+
+    facts = "\n".join([
+        f"District: {req.area}, {req.city}",
+        f"Area quality score (0-100): {round(area_score) if area_score is not None else 'no data available'}",
+        f"Long-term monthly rent baseline: SAR {baseline_monthly:,.0f}" if baseline_monthly else "Long-term monthly rent baseline: no data available",
+        f"Baseline nightly rate (monthly/30): SAR {baseline_nightly:,.0f}",
+        f"Current month: {today.strftime('%B')} ({season_label})",
+    ])
+
+    status = "error"
+    result = None
+    try:
+        result = gateway.run_chat(
+            model=gateway.DEFAULT_MODEL,
+            system=PRICING_ASSISTANT.template,
+            tools=[],
+            messages=[{"role": "user", "content": f"Suggest a nightly rate for this listing:\n{facts}\n\nRespond with the JSON object only."}],
+            max_tokens=400,
+        )
+        status = "ok"
+        data = json.loads(re.search(r"\{.*\}", result.reply.strip(), re.DOTALL).group(0))
+        low = round(float(data["suggested_nightly_min"]), 2)
+        high = round(float(data["suggested_nightly_max"]), 2)
+        reasoning = str(data.get("reasoning", "")).strip()[:600]
+        if low <= 0 or high <= low or not reasoning:
+            raise ValueError("AI pricing response failed sanity checks")
+        return PricingSuggestionResponse(
+            suggested_nightly_min=low, suggested_nightly_max=high, reasoning=reasoning,
+            season=season_label, generated_by="ai",
+        )
+    except Exception as exc:  # noqa: BLE001 — a flaky/malformed AI response must degrade to the deterministic estimate
+        logger.warning("pricing_suggestion: AI call failed, using deterministic fallback: %s", exc)
+        status = "error"
+        low, high, reasoning = _deterministic_pricing(baseline_nightly, area_score, today.month)
+        return PricingSuggestionResponse(
+            suggested_nightly_min=low, suggested_nightly_max=high, reasoning=reasoning,
+            season=season_label, generated_by="fallback",
+        )
+    finally:
+        gateway.log_ai_call(
+            feature="pricing_suggestion",
+            model=gateway.DEFAULT_MODEL,
+            prompt=PRICING_ASSISTANT,
             latency_ms=result.latency_ms if result else 0.0,
             status=status,
             user_id=current_user.id,
