@@ -7,6 +7,7 @@ from app.models.mediator import Mediator, MediatorArea
 from app.models.area_intelligence import AreaIntelligence
 from app.models.lead import Lead, LeadAssignment, LeadMessage, LeadSuggestion
 from app.models.contract import Contract
+from app.models.booking import Booking
 from app.models.payment import Payment
 from app.models.review import Review
 from app.models.outbox_event import OutboxEvent
