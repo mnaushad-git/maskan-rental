@@ -14,7 +14,7 @@ import app.tasks.lead_notifications  # noqa: F401 — registers outbox event han
 import app.tasks.property_requests  # noqa: F401 — registers outbox event handlers (property request matching) at import time
 from app.api.routes import properties, search, analytics, areas, auth, users, saved_searches, saved_properties, ai, health
 from app.api.routes import area_intelligence, mediators, leads, contracts, payments, reviews, notifications, devices
-from app.api.routes import property_requests, property_request_partner, property_request_admin
+from app.api.routes import property_requests, property_request_partner, property_request_admin, verification
 
 configure_logging()
 
@@ -115,6 +115,7 @@ _ROUTERS = [
     (property_requests.router, "/property-requests", ["property-requests"]),
     (property_request_partner.router, "/partner/property-requests", ["partner-property-requests"]),
     (property_request_admin.router, "/admin/property-requests", ["admin-property-requests"]),
+    (verification.router, "/verification", ["verification"]),
 ]
 
 for router, path, tags in _ROUTERS:

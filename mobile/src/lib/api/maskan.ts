@@ -69,11 +69,15 @@ export type ApiProperty = {
   longitude: number | null;
 };
 
+export type VerificationStatus = "unverified" | "pending" | "approved" | "rejected";
+
 export type AuthUser = {
   id: number;
   email: string;
   full_name: string | null;
   is_admin: boolean;
+  verification_status: VerificationStatus;
+  is_verified: boolean;
 };
 
 export type AuthResponse = {
@@ -340,6 +344,42 @@ export function login(payload: { email: string; password: string }) {
 
 export function fetchMe(token: string) {
   return requestJson<AuthUser>("/auth/me", { headers: { Authorization: `Bearer ${token}` } });
+}
+
+// ── Renter identity verification (mock — no real Nafath call) ─────────────
+
+export type ApiVerification = {
+  verification_status: VerificationStatus;
+  is_verified: boolean;
+  verification_document_ref: string | null;
+  verification_submitted_at: string | null;
+  verification_reviewed_at: string | null;
+};
+
+export function fetchMyVerification() {
+  return requestJson<ApiVerification>("/verification/me");
+}
+
+export function submitVerification(documentReference: string) {
+  return requestJson<ApiVerification>("/verification/me", {
+    method: "POST",
+    body: JSON.stringify({ document_reference: documentReference }),
+  });
+}
+
+// ── AI Trust Badge inputs — the weighted-score formula lives client-side,
+// see src/lib/trustScore.ts ───────────────────────────────────────────────
+
+export type ApiTrustMetrics = {
+  is_verified: boolean;
+  verification_status: VerificationStatus;
+  review_count: number;
+  responded_leads: number;
+  total_leads_with_contact: number;
+};
+
+export function fetchMyTrustMetrics() {
+  return requestJson<ApiTrustMetrics>("/users/me/trust-metrics");
 }
 
 export type ApiLeadSuggestion = {
@@ -637,6 +677,7 @@ export type ApiReview = {
   reviewer_name: string | null;
   status: string;
   created_at: string;
+  reviewer_is_verified: boolean;
 };
 
 export type ApiReviewSummary = {

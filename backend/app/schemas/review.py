@@ -17,6 +17,7 @@ class ReviewOut(BaseModel):
     reviewer_name: str | None
     status: str
     created_at: datetime
+    reviewer_is_verified: bool = False
 
     model_config = {"from_attributes": True}
 

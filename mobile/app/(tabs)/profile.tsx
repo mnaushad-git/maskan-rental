@@ -1,15 +1,27 @@
+import { useEffect, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { LogOut, Globe, FileText, ChevronRight, Map, BookOpen, Scale, Calculator, Bell, BellRing, Settings, SearchCheck } from "lucide-react-native";
+import { LogOut, Globe, FileText, ChevronRight, Map, BookOpen, Scale, Calculator, Bell, BellRing, Settings, SearchCheck, ShieldCheck } from "lucide-react-native";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { colors } from "@/lib/colors";
+import { fetchMyTrustMetrics, type ApiTrustMetrics } from "@/lib/api/maskan";
+import { TrustBadgeChip } from "@/components/TrustBadge";
 
 export default function ProfileScreen() {
   const { t, lang, setLang } = useLanguage();
   const { user, authLoading, clearAuth } = useAuth();
   const router = useRouter();
+  const [trustMetrics, setTrustMetrics] = useState<ApiTrustMetrics | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setTrustMetrics(null);
+      return;
+    }
+    fetchMyTrustMetrics().then(setTrustMetrics).catch(() => setTrustMetrics(null));
+  }, [user]);
 
   if (authLoading) {
     return (
@@ -22,8 +34,11 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView edges={["bottom"]} className="flex-1 gap-6 bg-background p-4">
       {user ? (
-        <View className="gap-1 rounded-2xl border border-border p-4">
-          <Text className="text-base font-bold text-foreground">{user.full_name ?? user.email}</Text>
+        <View className="gap-1.5 rounded-2xl border border-border p-4">
+          <View className="flex-row items-center gap-2">
+            <Text className="text-base font-bold text-foreground">{user.full_name ?? user.email}</Text>
+            {trustMetrics && <TrustBadgeChip metrics={trustMetrics} />}
+          </View>
           <Text className="text-sm text-muted-foreground">{user.email}</Text>
         </View>
       ) : (
@@ -79,6 +94,16 @@ export default function ProfileScreen() {
           >
             <Settings size={18} color={colors.foreground} />
             <Text className="flex-1 text-sm font-medium text-foreground">{t("notificationSettings.heading")}</Text>
+            <ChevronRight size={18} color={colors.neutral400} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/verification")}
+            className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
+          >
+            <ShieldCheck size={18} color={colors.foreground} />
+            <Text className="flex-1 text-sm font-medium text-foreground">{t("verification.profileRowLabel")}</Text>
+            <Text className="text-xs text-muted-foreground">{t(`verification.status.${user.verification_status}`)}</Text>
             <ChevronRight size={18} color={colors.neutral400} />
           </Pressable>
         </View>

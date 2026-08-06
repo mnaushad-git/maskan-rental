@@ -1663,6 +1663,46 @@ export const en = {
       unableToCreate: "Unable to create account. Please try again.",
     },
   },
+  verification: {
+    heading: "Identity verification",
+    profileRowLabel: "Identity verification",
+    signInToView: "Sign in to verify your identity.",
+    intro:
+      "Verify your identity to unlock a Trust Badge landlords and agents can see on your reviews. This is a mock flow for the demo — no real Nafath call is made.",
+    documentLabel: "ID / document reference",
+    documentPlaceholder: "e.g. National ID number",
+    documentHelp: "Enter any reference number — this is captured for demo purposes only.",
+    submit: "Submit for verification",
+    submitting: "Submitting…",
+    submitSuccess: "Verification submitted. An admin will review it shortly.",
+    submitFailed: "Couldn't submit verification. Please try again.",
+    status: {
+      unverified: "Not verified",
+      pending: "Under review",
+      approved: "Verified",
+      rejected: "Verification rejected",
+    },
+    statusDesc: {
+      unverified: "You haven't submitted identity verification yet.",
+      pending: "Submitted {{date}}. Admin review usually takes 24–48 hours.",
+      approved: "Your identity was verified on {{date}}.",
+      rejected: "Your submission was rejected. You can resubmit below.",
+    },
+    resubmit: "Resubmit",
+  },
+  trustBadge: {
+    tier: {
+      trusted: "Trusted",
+      building: "Building trust",
+      new: "New member",
+    },
+    desc: "Combines identity verification, review history and response rate.",
+    breakdown: {
+      verification: "Identity verification",
+      reviews: "Review history",
+      responseRate: "Response rate",
+    },
+  },
   propertyRequest: {
     navTitle: "My Property Requests",
     entryPoint: {

@@ -19,6 +19,7 @@ def get_mediator_reviews(mediator_id: int, db: Session = Depends(get_db)):
     """Public — approved reviews for a mediator, newest first."""
     return db.scalars(
         select(Review)
+        .options(joinedload(Review.user))
         .where(Review.mediator_id == mediator_id, Review.status == "approved")
         .order_by(Review.created_at.desc())
     ).all()

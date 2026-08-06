@@ -43,3 +43,17 @@ class UserOut(BaseModel):
     is_admin: bool = False
     created_at: datetime
     role: str = "customer"  # "admin" | "partner" | "customer"
+    verification_status: str = "unverified"  # "unverified" | "pending" | "approved" | "rejected"
+    is_verified: bool = False
+
+
+class TrustMetricsOut(BaseModel):
+    """Raw inputs for the AI Trust Badge — the weighted-score formula itself
+    lives client-side (see mobile/src/lib/trustScore.ts) so it stays easy to
+    tune without a backend deploy."""
+
+    is_verified: bool
+    verification_status: str
+    review_count: int
+    responded_leads: int
+    total_leads_with_contact: int

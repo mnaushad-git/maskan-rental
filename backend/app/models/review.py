@@ -26,3 +26,7 @@ class Review(Base):
     @property
     def mediator_agency_name(self) -> str | None:
         return self.mediator.agency_name if self.mediator else None
+
+    @property
+    def reviewer_is_verified(self) -> bool:
+        return bool(self.user and self.user.is_verified)

@@ -55,6 +55,8 @@ class UserResponse(BaseModel):
     email: str
     full_name: str | None = None
     is_admin: bool = False
+    verification_status: str = "unverified"  # "unverified" | "pending" | "approved" | "rejected"
+    is_verified: bool = False
 
     class Config:
         from_attributes = True
@@ -108,6 +110,8 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
             email=user.email,
             full_name=user.full_name,
             is_admin=user.email in settings.admin_emails,
+            verification_status=user.verification_status,
+            is_verified=user.is_verified,
         ),
     )
 
@@ -133,6 +137,8 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             email=user.email,
             full_name=user.full_name,
             is_admin=user.email in settings.admin_emails,
+            verification_status=user.verification_status,
+            is_verified=user.is_verified,
         ),
     )
 
@@ -144,6 +150,8 @@ def me(current_user: User = Depends(get_current_user)):
         email=current_user.email,
         full_name=current_user.full_name,
         is_admin=current_user.email in settings.admin_emails,
+        verification_status=current_user.verification_status,
+        is_verified=current_user.is_verified,
     )
 
 

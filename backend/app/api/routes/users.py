@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from passlib.context import CryptContext
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_admin_user, get_db
+from app.api.deps import get_admin_user, get_current_user, get_db
 from app.core.config import settings
+from app.models.lead import Lead, LeadMessage
 from app.models.mediator import Mediator
+from app.models.review import Review
 from app.models.user import User
-from app.schemas.user import AdminUserCreate, UserOut, UserUpdate
+from app.schemas.user import AdminUserCreate, TrustMetricsOut, UserOut, UserUpdate
 import uuid
 
 router = APIRouter()
@@ -33,6 +35,39 @@ def list_users(db: Session = Depends(get_db), _admin: User = Depends(get_admin_u
     users = db.scalars(select(User).order_by(User.id.desc())).all()
     partner_ids = set(db.scalars(select(Mediator.user_id)).all())
     return [_to_out(u, partner_ids) for u in users]
+
+
+@router.get("/me/trust-metrics", response_model=TrustMetricsOut)
+def get_my_trust_metrics(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Raw signals for the renter's AI Trust Badge: verification status,
+    approved review history, and lead response rate (did the renter reply
+    when a mediator reached out on one of their leads)."""
+    review_count = db.scalar(
+        select(func.count(Review.id)).where(Review.user_id == current_user.id, Review.status == "approved")
+    ) or 0
+
+    mediator_contacted = set(
+        db.scalars(
+            select(LeadMessage.lead_id)
+            .join(Lead, Lead.id == LeadMessage.lead_id)
+            .where(Lead.customer_user_id == current_user.id, LeadMessage.sender_role == "mediator")
+        ).all()
+    )
+    customer_replied = set(
+        db.scalars(
+            select(LeadMessage.lead_id)
+            .join(Lead, Lead.id == LeadMessage.lead_id)
+            .where(Lead.customer_user_id == current_user.id, LeadMessage.sender_role == "customer")
+        ).all()
+    )
+
+    return TrustMetricsOut(
+        is_verified=current_user.is_verified,
+        verification_status=current_user.verification_status,
+        review_count=review_count,
+        responded_leads=len(mediator_contacted & customer_replied),
+        total_leads_with_contact=len(mediator_contacted),
+    )
 
 
 @router.get("/{user_id}", response_model=UserOut)

@@ -46,6 +46,10 @@ Confirmed by codebase audit (2026-08-05): Maskan already has map search, saved-s
 - **AI flavor:** AI-assisted trust score combining verification status + review history + response rate into a single "Trust Badge," shown next to the existing rental score.
 - **Why it fits one session:** can start with a mock/manual verification flow (mirroring the existing mediator pattern) rather than a real Nafath integration, which is a separate infra project.
 - **Acceptance criteria:** renter can submit ID for verification, admin can approve (reuse mediator approval UI pattern), verified badge shows on profile/reviews.
+- **Done (backend + frontend, one combined session since the earlier "backend done" session prompt was never actually run):**
+  - Backend: `User.verification_status`/`is_verified`/`verification_document_ref`/`verification_submitted_at`/`verification_reviewed_at` fields (migration `a1b2c3d4e5f7`), routes in `backend/app/api/routes/verification.py` mounted at `/api/verification` — `POST/GET /me` (renter submit/status), `GET /admin/pending`, `POST /admin/{user_id}/approve`, `POST /admin/{user_id}/reject` (mirrors `mediators.py`'s approve/reject pattern). Exposed on `GET /auth/me` and `UserOut`. `GET /api/users/me/trust-metrics` returns the raw signals (verification, approved review count, lead response rate from `LeadMessage`) for the badge. `Review.reviewer_is_verified` (joined) exposed on `ReviewOut` for the mediator review list.
+  - Frontend (mobile only — no renter-facing "profile" screen exists on the web app, only `mobile/app/(tabs)/profile.tsx`): `mobile/src/lib/trustScore.ts` (deterministic weighted formula: 50% verification / 25% review history / 25% response rate → `trusted`/`building`/`new` tier), `mobile/src/components/TrustBadge.tsx` (compact chip + full breakdown card), `mobile/app/verification.tsx` (submit/status screen), wired into the profile screen (badge chip + status row) and the mediator review list (`agent/[id].tsx`, "Verified" chip per reviewer).
+  - **Not done:** no admin UI for verification review (API-only, admin can call it directly — same scope call as other admin approval flows in this codebase); no equivalent on the web frontend (renters don't have a profile page there yet).
 
 ### 3. Renter-Facing Premium Tier
 - **Aqar has:** "Aqar Plus" — paid tier with extra search/filtering/marketing tools.
@@ -79,7 +83,7 @@ The current **AI Rental Score / Fair Rent Analysis is a client-side heuristic** 
 | # | Feature | Status | Session(s) used | Next step |
 |---|---|---|---|---|
 | 1 | Digital rental contracts + AI assistant | Done | 2 | — |
-| 2 | Renter identity verification + AI trust badge | Not started | — | Mirror mediator verification pattern |
+| 2 | Renter identity verification + AI trust badge | Done | 1 | — |
 | 3 | Renter premium tier + AI Alert Plus | Not started | — | Fix mocked Moyasar payment first (decide: fix now or accept mock) |
 | 4a | Short-term booking — backend | Not started | — | Design booking/availability model |
 | 4b | Short-term booking — frontend | Not started | — | Depends on 4a |

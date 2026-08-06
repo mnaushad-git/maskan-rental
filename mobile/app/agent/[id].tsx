@@ -205,9 +205,17 @@ export default function AgentProfileScreen() {
               reviews.map((r) => (
                 <View key={r.id} className="gap-1 rounded-xl border border-border bg-card p-3">
                   <View className="flex-row items-center justify-between">
-                    <Text className="text-sm font-medium text-foreground">
-                      {r.reviewer_name ?? t("agent.reviews.anonymous")}
-                    </Text>
+                    <View className="flex-1 flex-row items-center gap-1.5">
+                      <Text className="text-sm font-medium text-foreground">
+                        {r.reviewer_name ?? t("agent.reviews.anonymous")}
+                      </Text>
+                      {r.reviewer_is_verified && (
+                        <View className="flex-row items-center gap-0.5 rounded-full bg-success/10 px-1.5 py-0.5">
+                          <BadgeCheck size={11} color={colors.success} />
+                          <Text className="text-[10px] font-semibold text-success">{t("agent.verified")}</Text>
+                        </View>
+                      )}
+                    </View>
                     <View className="flex-row">
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Star key={i} size={13} color="#F59E0B" fill={i < r.rating ? "#F59E0B" : "none"} />

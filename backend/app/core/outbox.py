@@ -34,6 +34,8 @@ class EventType:
     PROPERTY_AVAILABILITY_CHANGED = "property.availability_changed"
     PROPERTY_VERIFIED = "property.verified"
     MEDIATOR_VERIFIED = "mediator.verified"
+    USER_VERIFICATION_SUBMITTED = "user.verification_submitted"
+    USER_VERIFIED = "user.verified"
     # ── Generic lead notifications (Phase 3) ────────────────────────────────
     # LEAD_CREATED, LEAD_STATUS_CHANGED, LEAD_MESSAGE_ADDED already existed
     # above (used previously for audit logging only — see app/tasks/outbox.py);

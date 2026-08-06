@@ -1660,6 +1660,46 @@ export const ar: TranslationDict = {
       unableToCreate: "تعذّر إنشاء الحساب. يرجى المحاولة مرة أخرى.",
     },
   },
+  verification: {
+    heading: "توثيق الهوية",
+    profileRowLabel: "توثيق الهوية",
+    signInToView: "سجّل الدخول لتوثيق هويتك.",
+    intro:
+      "وثّق هويتك للحصول على شارة ثقة يراها الملاك والوسطاء على تقييماتك. هذا مسار تجريبي للعرض التوضيحي فقط — لا يتم إجراء اتصال حقيقي بنفاذ.",
+    documentLabel: "رقم الهوية / المستند",
+    documentPlaceholder: "مثال: رقم الهوية الوطنية",
+    documentHelp: "أدخل أي رقم مرجعي — يُلتقط هذا لأغراض العرض التوضيحي فقط.",
+    submit: "إرسال للتوثيق",
+    submitting: "جارٍ الإرسال…",
+    submitSuccess: "تم إرسال طلب التوثيق. سيراجعه المشرف قريبًا.",
+    submitFailed: "تعذّر إرسال طلب التوثيق. يرجى المحاولة مرة أخرى.",
+    status: {
+      unverified: "غير موثّق",
+      pending: "قيد المراجعة",
+      approved: "موثّق",
+      rejected: "تم رفض التوثيق",
+    },
+    statusDesc: {
+      unverified: "لم تُرسل طلب توثيق الهوية بعد.",
+      pending: "أُرسل بتاريخ {{date}}. تستغرق المراجعة عادةً 24–48 ساعة.",
+      approved: "تم توثيق هويتك بتاريخ {{date}}.",
+      rejected: "تم رفض طلبك. يمكنك إعادة الإرسال أدناه.",
+    },
+    resubmit: "إعادة الإرسال",
+  },
+  trustBadge: {
+    tier: {
+      trusted: "موثوق",
+      building: "في طور بناء الثقة",
+      new: "عضو جديد",
+    },
+    desc: "يجمع بين توثيق الهوية وسجل التقييمات ومعدل الاستجابة.",
+    breakdown: {
+      verification: "توثيق الهوية",
+      reviews: "سجل التقييمات",
+      responseRate: "معدل الاستجابة",
+    },
+  },
   propertyRequest: {
     navTitle: "طلبات العقار الخاصة بي",
     entryPoint: {
