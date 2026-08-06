@@ -524,6 +524,8 @@ export const ar: TranslationDict = {
       verdictFair: "قيمة مقبولة",
       verdictBelow: "أقل من المتوسط",
       lastRefreshed: "تقييمات منصة مسكن · آخر تحديث {{date}}",
+      aiGenerated: "تقييم مُولّد بالذكاء الاصطناعي",
+      estimateGenerated: "تقييم تقديري (الذكاء الاصطناعي غير متاح حاليًا)",
     },
     fairRent: {
       title: "تحليل عدالة الإيجار",

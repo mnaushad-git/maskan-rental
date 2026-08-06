@@ -56,6 +56,7 @@ import {
   fetchBookingInsights,
   createBooking,
   submitFinancingInterest,
+  fetchRentalScore,
   type ApiAreaIntelligence,
   type ApiAvailabilityInsight,
   type ApiFinancingInterest,
@@ -470,9 +471,43 @@ function RentalIntelligence({
   const amenities = Math.round(areaIntel?.lifestyle_score ?? 75);
   const commute = Math.round(areaIntel?.traffic_score ?? 75);
   const family = Math.round(areaIntel?.family_score ?? 75);
-  const overall = Math.round(
+  // Deterministic composite — used for instant paint and as the offline
+  // fallback if the AI rental-score call below fails or is unreachable.
+  const fallbackScore = Math.round(
     0.25 * priceFairness + 0.25 * areaQuality + 0.2 * amenities + 0.15 * commute + 0.15 * family,
   );
+
+  const [aiScore, setAiScore] = useState<{
+    score: number;
+    reasoning: string;
+    generatedBy: "ai" | "fallback";
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRentalScore({
+      listing_type: isSale ? "sale" : "rent",
+      monthly_rent: isSale ? null : monthlyRent,
+      sale_price: isSale ? property.price : null,
+      bedrooms: property.bedrooms,
+      area: property.district,
+      city: property.city,
+    })
+      .then((res) => {
+        if (!cancelled) {
+          setAiScore({ score: res.score, reasoning: res.reasoning, generatedBy: res.generated_by });
+        }
+      })
+      .catch(() => {
+        // Network/API unreachable — the deterministic fallbackScore above stays displayed.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [property.id]);
+
+  const overall = aiScore?.score ?? fallbackScore;
 
   const breakdown = [
     { label: tProp("rentalIntelligence.priceFairness"), value: priceFairness },
@@ -514,9 +549,24 @@ function RentalIntelligence({
               <span className="text-base text-muted-foreground">/100</span>
             </div>
             <div className="text-xs font-semibold text-primary">{verdict}</div>
+            {aiScore && (
+              <div className="mt-0.5 text-[10px] text-muted-foreground">
+                {tProp(
+                  aiScore.generatedBy === "ai"
+                    ? "rentalIntelligence.aiGenerated"
+                    : "rentalIntelligence.estimateGenerated",
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
+      {aiScore?.generatedBy === "ai" && (
+        <p className="mt-4 flex items-start gap-2 rounded-xl bg-ai-soft/40 p-3 text-xs text-muted-foreground">
+          <Sparkles className="mt-0.5 size-3.5 shrink-0 text-ai" />
+          <span>{aiScore.reasoning}</span>
+        </p>
+      )}
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
         {breakdown.map((b) => (
           <ScoreBar key={b.label} label={b.label} value={b.value} />

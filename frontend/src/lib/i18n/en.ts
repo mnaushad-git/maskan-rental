@@ -528,6 +528,8 @@ export const en = {
       verdictFair: "Fair value",
       verdictBelow: "Below average",
       lastRefreshed: "Maskan platform scores · Last refreshed {{date}}",
+      aiGenerated: "AI-generated score",
+      estimateGenerated: "Estimated score (AI unavailable right now)",
     },
     fairRent: {
       title: "Fair Rent Analysis",

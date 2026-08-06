@@ -19,6 +19,7 @@ from app.core.ai.prompts import (
     CONTRACT_ASSISTANT,
     CUSTOMER_ADVISOR,
     PRICING_ASSISTANT,
+    RENTAL_SCORE_ASSISTANT,
     PromptDefinition,
 )
 from app.core.config import settings
@@ -815,6 +816,149 @@ def pricing_suggestion(
             latency_ms=result.latency_ms if result else 0.0,
             status=status,
             user_id=current_user.id,
+            input_tokens=result.input_tokens if result else None,
+            output_tokens=result.output_tokens if result else None,
+        )
+
+
+# ── AI Rental Score (property detail page "Rental Score" badge) ────────────
+# Server-side replacement for the old client-side heuristic
+# (frontend/src/lib/api/maskan.ts's estimateRentalScore) — same reuse pattern
+# as pricing_suggestion/contract_flags: one AI call per property view, with a
+# deterministic fallback the frontend never has to know is happening unless
+# the request itself fails outright (network/API unreachable).
+
+class RentalScoreRequest(BaseModel):
+    listing_type: str  # "rent" | "sale"
+    monthly_rent: float | None = None
+    sale_price: float | None = None
+    bedrooms: int | None = None
+    area: str
+    city: str
+
+
+class RentalScoreResponse(BaseModel):
+    score: int
+    reasoning: str
+    generated_by: str  # "ai" | "fallback"
+    district_avg_monthly_rent: float | None = None
+    district_area_score: float | None = None
+
+
+def _deterministic_rental_score(req: RentalScoreRequest, avg_monthly: float | None) -> int:
+    bedrooms = req.bedrooms or 0
+    if req.listing_type == "sale" or not req.monthly_rent:
+        return max(72, min(95, 82 + bedrooms * 2))
+    if avg_monthly and avg_monthly > 0:
+        ratio = req.monthly_rent / avg_monthly
+        score = 97 if ratio < 0.85 else 88 if ratio < 0.95 else 82 if ratio < 1.05 else 68 if ratio < 1.15 else 52
+    else:
+        score = 90 - int(req.monthly_rent // 50000) + bedrooms * 2
+    return max(52, min(97, score))
+
+
+_FALLBACK_REASONING = "Estimated using district rent averages and listing details (AI unavailable right now)."
+
+
+@router.post(
+    "/rental-score",
+    response_model=RentalScoreResponse,
+    dependencies=[Depends(rate_limit_dependency("ai_rental_score", limit=30, window_seconds=600))],
+)
+def rental_score(
+    req: RentalScoreRequest,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    avg_rent = _district_avg_monthly_rent(db, req.area, req.city) if req.listing_type != "sale" else None
+    area_row = db.scalars(
+        select(AreaIntelligence).where(
+            AreaIntelligence.area_name.ilike(f"%{req.area}%"), AreaIntelligence.city.ilike(f"%{req.city}%")
+        )
+    ).first()
+    area_score = area_row.area_score if area_row else None
+
+    if not settings.ANTHROPIC_API_KEY:
+        return RentalScoreResponse(
+            score=_deterministic_rental_score(req, avg_rent),
+            reasoning=_FALLBACK_REASONING,
+            generated_by="fallback",
+            district_avg_monthly_rent=avg_rent,
+            district_area_score=area_score,
+        )
+
+    facts_lines = [
+        f"Listing type: {req.listing_type}",
+        f"Bedrooms: {req.bedrooms if req.bedrooms is not None else 'unknown'}",
+    ]
+    if req.listing_type == "sale":
+        facts_lines.append(
+            f"Sale price: SAR {req.sale_price:,.0f}" if req.sale_price else "Sale price: not provided"
+        )
+    else:
+        facts_lines.append(
+            f"Monthly rent: SAR {req.monthly_rent:,.0f}" if req.monthly_rent else "Monthly rent: not provided"
+        )
+        facts_lines.append(
+            f"District average monthly rent: SAR {avg_rent:,.0f}"
+            if avg_rent
+            else "District average monthly rent: no data available"
+        )
+    facts_lines.append(f"District: {req.area}, {req.city}")
+    facts_lines.append(
+        f"District area quality score (0-100): {round(area_score) if area_score is not None else 'no data available'}"
+    )
+    if area_row:
+        facts_lines.append(
+            f"School score: {round(area_row.school_score) if area_row.school_score is not None else 'n/a'}, "
+            f"Healthcare score: {round(area_row.healthcare_score) if area_row.healthcare_score is not None else 'n/a'}, "
+            f"Lifestyle/amenities score: {round(area_row.lifestyle_score) if area_row.lifestyle_score is not None else 'n/a'}, "
+            f"Traffic/commute score: {round(area_row.traffic_score) if area_row.traffic_score is not None else 'n/a'}, "
+            f"Family suitability score: {round(area_row.family_score) if area_row.family_score is not None else 'n/a'}"
+        )
+    facts = "\n".join(facts_lines)
+
+    status = "error"
+    result = None
+    try:
+        result = gateway.run_chat(
+            model=gateway.DEFAULT_MODEL,
+            system=RENTAL_SCORE_ASSISTANT.template,
+            tools=[],
+            messages=[{"role": "user", "content": f"Score this listing:\n{facts}\n\nRespond with the JSON object only."}],
+            max_tokens=350,
+        )
+        status = "ok"
+        data = json.loads(re.search(r"\{.*\}", result.reply.strip(), re.DOTALL).group(0))
+        score = int(data["score"])
+        reasoning = str(data.get("reasoning", "")).strip()[:500]
+        if not (0 <= score <= 100) or not reasoning:
+            raise ValueError("AI rental score response failed sanity checks")
+        return RentalScoreResponse(
+            score=score,
+            reasoning=reasoning,
+            generated_by="ai",
+            district_avg_monthly_rent=avg_rent,
+            district_area_score=area_score,
+        )
+    except Exception as exc:  # noqa: BLE001 — a flaky/malformed AI response must degrade to the deterministic estimate
+        logger.warning("rental_score: AI call failed, using deterministic fallback: %s", exc)
+        status = "error"
+        return RentalScoreResponse(
+            score=_deterministic_rental_score(req, avg_rent),
+            reasoning=_FALLBACK_REASONING,
+            generated_by="fallback",
+            district_avg_monthly_rent=avg_rent,
+            district_area_score=area_score,
+        )
+    finally:
+        gateway.log_ai_call(
+            feature="rental_score",
+            model=gateway.DEFAULT_MODEL,
+            prompt=RENTAL_SCORE_ASSISTANT,
+            latency_ms=result.latency_ms if result else 0.0,
+            status=status,
+            user_id=current_user.id if current_user else None,
             input_tokens=result.input_tokens if result else None,
             output_tokens=result.output_tokens if result else None,
         )

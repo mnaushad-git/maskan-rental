@@ -1071,6 +1071,32 @@ export function fetchContractFlags(contract_id: number) {
   });
 }
 
+// ── AI Rental Score ──────────────────────────────────────────────────────────
+
+export type ApiRentalScoreRequest = {
+  listing_type: "rent" | "sale";
+  monthly_rent?: number | null;
+  sale_price?: number | null;
+  bedrooms?: number | null;
+  area: string;
+  city: string;
+};
+
+export type ApiRentalScoreResponse = {
+  score: number;
+  reasoning: string;
+  generated_by: "ai" | "fallback";
+  district_avg_monthly_rent: number | null;
+  district_area_score: number | null;
+};
+
+export function fetchRentalScore(payload: ApiRentalScoreRequest) {
+  return requestJson<ApiRentalScoreResponse>("/ai/rental-score", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function fetchAdminMediators() {
   return requestJson<ApiPartner[]>("/mediators/");
 }

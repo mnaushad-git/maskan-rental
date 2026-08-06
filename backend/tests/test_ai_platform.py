@@ -258,3 +258,87 @@ def test_pricing_suggestion_falls_back_on_malformed_ai_response(client, unique_e
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["generated_by"] == "fallback"
+
+
+# ── AI rental score (property detail page "Rental Score" badge) ─────────
+
+def test_rental_score_no_auth_required(client, monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.ANTHROPIC_API_KEY", "")
+    resp = client.post(
+        "/api/ai/rental-score",
+        json={"listing_type": "rent", "monthly_rent": 6000, "bedrooms": 2, "area": "Al Yasmin", "city": "Riyadh"},
+    )
+    assert resp.status_code == 200, resp.text
+
+
+def test_rental_score_fallback_without_api_key(client, monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.ANTHROPIC_API_KEY", "")
+    resp = client.post(
+        "/api/ai/rental-score",
+        json={"listing_type": "rent", "monthly_rent": 6000, "bedrooms": 2, "area": "Al Yasmin", "city": "Riyadh"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["generated_by"] == "fallback"
+    assert 0 <= body["score"] <= 100
+    assert body["reasoning"]
+
+
+def test_rental_score_sale_listing_fallback_ignores_rent_average(client, monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.ANTHROPIC_API_KEY", "")
+    resp = client.post(
+        "/api/ai/rental-score",
+        json={"listing_type": "sale", "sale_price": 900000, "bedrooms": 4, "area": "Al Yasmin", "city": "Riyadh"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["generated_by"] == "fallback"
+    assert body["district_avg_monthly_rent"] is None
+    assert body["score"] == 90  # 82 + 4*2, clamped
+
+
+def test_rental_score_uses_ai_when_available(client, monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.ANTHROPIC_API_KEY", "sk-ant-fake-for-test")
+    fake_result = gateway.ChatResult(
+        reply='{"score": 88, "reasoning": "Rent is below the district average and area quality is strong."}',
+        input_tokens=30, output_tokens=20, latency_ms=90.0,
+    )
+    monkeypatch.setattr(gateway, "run_chat", lambda **kwargs: fake_result)
+
+    resp = client.post(
+        "/api/ai/rental-score",
+        json={"listing_type": "rent", "monthly_rent": 6000, "bedrooms": 2, "area": "Al Yasmin", "city": "Riyadh"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["generated_by"] == "ai"
+    assert body["score"] == 88
+    assert body["reasoning"]
+
+
+def test_rental_score_falls_back_on_malformed_ai_response(client, monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.ANTHROPIC_API_KEY", "sk-ant-fake-for-test")
+    fake_result = gateway.ChatResult(reply="not json at all", input_tokens=10, output_tokens=5, latency_ms=50.0)
+    monkeypatch.setattr(gateway, "run_chat", lambda **kwargs: fake_result)
+
+    resp = client.post(
+        "/api/ai/rental-score",
+        json={"listing_type": "rent", "monthly_rent": 6000, "bedrooms": 2, "area": "Al Yasmin", "city": "Riyadh"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["generated_by"] == "fallback"
+
+
+def test_rental_score_falls_back_on_out_of_range_ai_score(client, monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.ANTHROPIC_API_KEY", "sk-ant-fake-for-test")
+    fake_result = gateway.ChatResult(
+        reply='{"score": 140, "reasoning": "Implausibly high."}', input_tokens=10, output_tokens=5, latency_ms=50.0,
+    )
+    monkeypatch.setattr(gateway, "run_chat", lambda **kwargs: fake_result)
+
+    resp = client.post(
+        "/api/ai/rental-score",
+        json={"listing_type": "rent", "monthly_rent": 6000, "bedrooms": 2, "area": "Al Yasmin", "city": "Riyadh"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["generated_by"] == "fallback"
