@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     # Same Moyasar flow as the mediator subscription above (app.core.moyasar),
     # gated by the same USE_REAL_PAYMENTS/MOYASAR_SECRET_KEY pair.
     RENTER_PREMIUM_FEE_SAR: float = 19.0
+    # Free-tier daily cap on AI Advisor chat messages ("AI Alert Plus" perk:
+    # premium is unlimited). A simple per-day counter, not a new AI feature —
+    # see app.api.routes.ai._enforce_free_chat_cap.
+    AI_CHAT_FREE_DAILY_LIMIT: int = 15
 
     # ── Email notifications ───────────────────────────────────────────────────
     SENDGRID_API_KEY: str | None = None         # TODO: add real key when available

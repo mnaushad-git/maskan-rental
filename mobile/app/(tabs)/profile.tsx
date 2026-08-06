@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { LogOut, Globe, FileText, ChevronRight, Map, BookOpen, Scale, Calculator, Bell, BellRing, Settings, SearchCheck, ShieldCheck } from "lucide-react-native";
+import { LogOut, Globe, FileText, ChevronRight, Map, BookOpen, Scale, Calculator, Bell, BellRing, Settings, SearchCheck, ShieldCheck, Sparkles } from "lucide-react-native";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { colors } from "@/lib/colors";
@@ -61,6 +61,18 @@ export default function ProfileScreen() {
 
       {user && (
         <View className="gap-2">
+          <Pressable
+            onPress={() => router.push("/premium")}
+            className="flex-row items-center gap-3 rounded-xl border border-ai/30 bg-ai-soft px-4 py-3"
+          >
+            <Sparkles size={18} color={colors.ai} />
+            <Text className="flex-1 text-sm font-medium text-foreground">{t("premium.profileRowLabel")}</Text>
+            <Text className="text-xs font-semibold" style={{ color: colors.ai }}>
+              {user.subscription_status === "active" ? t("premium.tier.premium") : t("premium.tier.free")}
+            </Text>
+            <ChevronRight size={18} color={colors.ai} />
+          </Pressable>
+
           <Pressable
             onPress={() => router.push("/notifications")}
             className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"

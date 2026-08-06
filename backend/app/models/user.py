@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -38,3 +38,13 @@ class User(Base):
 
     saved_searches = relationship("SavedSearch", back_populates="user", cascade="all, delete-orphan")
     saved_properties = relationship("SavedProperty", back_populates="user", cascade="all, delete-orphan")
+
+    @property
+    def is_premium_active(self) -> bool:
+        """Point-in-time premium check ("AI Alert Plus" gate) — true if the
+        subscription is active and not past expiry. Unlike
+        deps._sync_subscription_expiry, this never mutates/commits, so it's
+        safe to call from background tasks and other read-only contexts."""
+        if self.subscription_status != "active":
+            return False
+        return self.subscription_expires_at is None or self.subscription_expires_at > datetime.now(timezone.utc)

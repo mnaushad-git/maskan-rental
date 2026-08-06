@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { AuthUser } from "./api/maskan";
-import { onUnauthorized } from "./api/maskan";
+import { fetchMe, onUnauthorized } from "./api/maskan";
 import { readStoredToken, readStoredUser, writeStoredAuth, clearStoredAuth } from "./auth-storage";
 import { reregisterIfPermittedAsync, unregisterCurrentDeviceAsync } from "./push";
 import { useLanguage } from "./i18n/context";
@@ -11,6 +11,7 @@ type AuthState = {
   authLoading: boolean;
   setAuth: (user: AuthUser, token: string) => Promise<void>;
   clearAuth: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -58,8 +59,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
   }
 
+  // Re-fetches /auth/me so screens that change server-side user state (e.g.
+  // subscribing to premium) can reflect it immediately without a re-login.
+  async function refreshUser() {
+    if (!token) return;
+    const nextUser = await fetchMe(token);
+    await writeStoredAuth(nextUser, token);
+    setUser(nextUser);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, authLoading, setAuth, clearAuth }}>
+    <AuthContext.Provider value={{ user, token, authLoading, setAuth, clearAuth, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

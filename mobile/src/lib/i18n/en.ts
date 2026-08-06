@@ -785,6 +785,8 @@ export const en = {
     footerDisclaimer:
       "myHome AI answers based on live platform data. You can also ask it to create a lead request.",
     errorReachingAI: "Sorry, I couldn't reach the AI service. Please try again.",
+    chatCapReached: "You've reached today's free chat limit. Upgrade to myHome Premium for unlimited AI Advisor chats.",
+    upgradeCta: "Upgrade to Premium",
     emptyState: {
       askAboutProperty: "Ask about this property",
       title: "myHome AI Advisor",
@@ -1662,6 +1664,37 @@ export const en = {
       emailAlreadyRegistered: "This email is already registered. Try signing in instead.",
       unableToCreate: "Unable to create account. Please try again.",
     },
+  },
+  premium: {
+    heading: "myHome Premium",
+    profileRowLabel: "myHome Premium",
+    signInToView: "Sign in to manage your myHome Premium subscription.",
+    title: "AI Alert Plus",
+    subtitle: "Instant, AI-summarized saved search alerts and unlimited AI Advisor chat.",
+    currentPlan: "Current plan",
+    tier: {
+      free: "Free",
+      premium: "Premium",
+    },
+    statusDesc: {
+      free: "You're on the free plan. Upgrade for instant AI-summarized alerts and unlimited AI Advisor chat.",
+      activeUntil: "Active until {{date}}.",
+      cancelled: "Your subscription was cancelled. Subscribe again anytime.",
+      expired: "Your subscription has expired. Renew to keep AI Alert Plus.",
+    },
+    benefitsHeading: "What's included",
+    benefit: {
+      instantAlerts: "Instant saved search alerts with a one-line AI summary of why each match fits.",
+      unlimitedChat: "Unlimited AI Advisor chat — no daily message limit.",
+      badge: "A visible Premium badge on your profile.",
+    },
+    subscribeCta: "Subscribe to Premium",
+    renew: "Renew subscription",
+    cancel: "Cancel subscription",
+    subscribeSuccess: "Premium activated. Enjoy AI Alert Plus!",
+    renewSuccess: "Subscription renewed.",
+    cancelSuccess: "Subscription cancelled.",
+    actionFailed: "Something went wrong. Please try again.",
   },
   verification: {
     heading: "Identity verification",

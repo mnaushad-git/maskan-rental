@@ -279,7 +279,10 @@ def _create_and_deliver_notification(db: Session, match: SavedSearchMatch, cand:
     notifications_created_total.labels(type=notification_type).inc()
     _deliver(db, notification, saved_search.channels or ["in_app"])
 
-    if should_enrich(cand.change_type):
+    # AI Alert Plus (Aqar gap #3): the one-line AI explanation is a premium
+    # perk — free-tier users still get the instant alert + deterministic
+    # rule_based_explanation above, just not the enriched AI summary.
+    if should_enrich(cand.change_type) and saved_search.user is not None and saved_search.user.is_premium_active:
         from app.core.jobs import enqueue
 
         enqueue(enrich_notification_task, notification.id)

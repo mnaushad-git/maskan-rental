@@ -2,19 +2,19 @@ import json
 import logging
 import re
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from anthropic import beta_tool
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_admin_user, get_current_user, get_db
+from app.api.deps import get_admin_user, get_current_user, get_db, get_optional_current_user
 from app.api.routes.contracts import _check_contract_access
 from app.core.ai import gateway
 from app.core.ai.prompts import ADMIN_ADVISOR, CONTRACT_ASSISTANT, CUSTOMER_ADVISOR, PromptDefinition
 from app.core.config import settings
-from app.core.rate_limit import rate_limit_dependency
+from app.core.rate_limit import _client_identifier, check_rate_limit, rate_limit_dependency
 from app.models.contract import Contract
 from app.models.lead import Lead
 from app.models.property import Property
@@ -345,6 +345,26 @@ def _admin_tools(db: Session) -> list:
     return [query_properties, query_leads, query_partners, platform_counts, rent_summary]
 
 
+# ── AI Alert Plus: free-tier daily chat cap, premium unlimited ─────────────
+# A simple per-day Redis counter (reuses the same fixed-window limiter as
+# every other rate limit in this app), not a new AI feature. Separate from
+# the abuse-prevention `rate_limit_dependency("ai_chat", ...)` below — that
+# one guards against bursts for everyone; this one is the product-tier gate.
+
+def _enforce_free_chat_cap(request: Request, user: User | None) -> None:
+    if user is not None and user.is_premium_active:
+        return
+    identifier = f"user:{user.id}" if user is not None else _client_identifier(request)
+    result = check_rate_limit(
+        "ai_chat_free_daily", identifier, limit=settings.AI_CHAT_FREE_DAILY_LIMIT, window_seconds=24 * 60 * 60
+    )
+    if not result.allowed:
+        raise HTTPException(
+            status_code=403,
+            detail="You've reached today's free AI Advisor chat limit. Upgrade to myHome Premium for unlimited chats.",
+        )
+
+
 def _run_chat(feature: str, prompt: PromptDefinition, tools: list, req: ChatRequest, user_id: int | None = None) -> ChatResponse:
     messages = [{"role": m.role, "content": m.content} for m in req.history]
     messages.append({"role": "user", "content": req.message})
@@ -442,11 +462,17 @@ def admin_ai_chat(
     response_model=ChatResponse,
     dependencies=[Depends(rate_limit_dependency("ai_chat", limit=20, window_seconds=600))],
 )
-def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
+def ai_chat(
+    req: ChatRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured — set ANTHROPIC_API_KEY")
+    _enforce_free_chat_cap(request, current_user)
     try:
-        return _run_chat("customer_chat", CUSTOMER_ADVISOR, _customer_tools(db), req)
+        return _run_chat("customer_chat", CUSTOMER_ADVISOR, _customer_tools(db), req, user_id=current_user.id if current_user else None)
     except HTTPException:
         raise
     except Exception as exc:
@@ -457,10 +483,16 @@ def ai_chat(req: ChatRequest, db: Session = Depends(get_db)):
     "/chat/stream",
     dependencies=[Depends(rate_limit_dependency("ai_chat", limit=20, window_seconds=600))],
 )
-def ai_chat_stream(req: ChatRequest, db: Session = Depends(get_db)):
+def ai_chat_stream(
+    req: ChatRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured — set ANTHROPIC_API_KEY")
-    return _stream_chat("customer_chat_stream", CUSTOMER_ADVISOR, _customer_tools(db), req)
+    _enforce_free_chat_cap(request, current_user)
+    return _stream_chat("customer_chat_stream", CUSTOMER_ADVISOR, _customer_tools(db), req, user_id=current_user.id if current_user else None)
 
 
 # ── AI Contract Assistant ───────────────────────────────────────────────────

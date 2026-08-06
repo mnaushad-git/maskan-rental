@@ -71,6 +71,9 @@ export type ApiProperty = {
 
 export type VerificationStatus = "unverified" | "pending" | "approved" | "rejected";
 
+export type SubscriptionStatus = "inactive" | "pending_payment" | "active" | "cancelled" | "expired";
+export type SubscriptionTier = "free" | "premium";
+
 export type AuthUser = {
   id: number;
   email: string;
@@ -78,6 +81,8 @@ export type AuthUser = {
   is_admin: boolean;
   verification_status: VerificationStatus;
   is_verified: boolean;
+  subscription_status: SubscriptionStatus;
+  subscription_tier: SubscriptionTier;
 };
 
 export type AuthResponse = {
@@ -367,6 +372,41 @@ export function submitVerification(documentReference: string) {
   });
 }
 
+// ── Renter premium tier ("AI Alert Plus") ───────────────────────────────────
+
+export type ApiSubscription = {
+  subscription_status: SubscriptionStatus;
+  subscription_tier: SubscriptionTier;
+  subscription_started_at: string | null;
+  subscription_expires_at: string | null;
+};
+
+export function fetchMySubscription() {
+  return requestJson<ApiSubscription>("/subscriptions/me");
+}
+
+export type ApiSubscribeResult = {
+  status: string;
+  message?: string;
+  payment_url?: string;
+  payment_id?: number;
+  subscription_expires_at?: string | null;
+};
+
+export function subscribeToPremium() {
+  return requestJson<ApiSubscribeResult>("/subscriptions/me/subscribe", { method: "POST" });
+}
+
+export function renewPremium() {
+  return requestJson<{ status: string; subscription_expires_at: string | null }>("/subscriptions/me/renew", {
+    method: "POST",
+  });
+}
+
+export function unsubscribeFromPremium() {
+  return requestJson<{ status: string }>("/subscriptions/me/unsubscribe", { method: "POST" });
+}
+
 // ── AI Trust Badge inputs — the weighted-score formula lives client-side,
 // see src/lib/trustScore.ts ───────────────────────────────────────────────
 
@@ -616,6 +656,14 @@ export function streamAdvisorChat(
     // Process only complete events (all but the trailing, possibly-partial chunk).
     xhr.onprogress = () => consume(xhr.responseText.split("\n\n").length - 1);
     xhr.onload = () => {
+      // A 403 means _enforce_free_chat_cap rejected the request before the
+      // SSE stream ever started — the body is a plain JSON error, not
+      // `data: {...}` events, so it must be special-cased here rather than
+      // fed into consume().
+      if (xhr.status === 403) {
+        finish(() => handlers.onError("premium_required"));
+        return;
+      }
       consume(xhr.responseText.split("\n\n").length);
       finish(handlers.onDone);
     };

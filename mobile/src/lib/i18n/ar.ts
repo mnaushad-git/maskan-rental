@@ -784,6 +784,8 @@ export const ar: TranslationDict = {
     footerDisclaimer:
       "يجيب ذكاء ماي هوم الاصطناعي بناءً على بيانات المنصة الحية. يمكنك أيضًا أن تطلب منه إنشاء طلب.",
     errorReachingAI: "عذرًا، تعذّر الوصول إلى خدمة الذكاء الاصطناعي. يرجى المحاولة مرة أخرى.",
+    chatCapReached: "لقد وصلت إلى الحد المجاني للمحادثات اليوم. اشترك في myHome Premium للحصول على محادثات غير محدودة مع المستشار الذكي.",
+    upgradeCta: "الترقية إلى Premium",
     emptyState: {
       askAboutProperty: "اسأل عن هذا العقار",
       title: "مستشار ماي هوم الذكي",
@@ -1659,6 +1661,37 @@ export const ar: TranslationDict = {
       emailAlreadyRegistered: "هذا البريد الإلكتروني مسجّل بالفعل. جرّب تسجيل الدخول بدلاً من ذلك.",
       unableToCreate: "تعذّر إنشاء الحساب. يرجى المحاولة مرة أخرى.",
     },
+  },
+  premium: {
+    heading: "myHome Premium",
+    profileRowLabel: "myHome Premium",
+    signInToView: "سجّل الدخول لإدارة اشتراك myHome Premium الخاص بك.",
+    title: "AI Alert Plus",
+    subtitle: "تنبيهات فورية لعمليات البحث المحفوظة مع ملخص ذكاء اصطناعي، ومحادثات غير محدودة مع المستشار الذكي.",
+    currentPlan: "الخطة الحالية",
+    tier: {
+      free: "مجاني",
+      premium: "Premium",
+    },
+    statusDesc: {
+      free: "أنت على الخطة المجانية. اشترك للحصول على تنبيهات فورية بملخص ذكاء اصطناعي ومحادثات غير محدودة مع المستشار الذكي.",
+      activeUntil: "نشط حتى {{date}}.",
+      cancelled: "تم إلغاء اشتراكك. يمكنك الاشتراك مجددًا في أي وقت.",
+      expired: "انتهت صلاحية اشتراكك. جدّده للاحتفاظ بميزة AI Alert Plus.",
+    },
+    benefitsHeading: "ما الذي يشمله الاشتراك",
+    benefit: {
+      instantAlerts: "تنبيهات فورية لعمليات البحث المحفوظة مع ملخص ذكاء اصطناعي من سطر واحد يوضح سبب مطابقة كل عقار.",
+      unlimitedChat: "محادثات غير محدودة مع المستشار الذكي — بلا حد يومي للرسائل.",
+      badge: "شارة Premium ظاهرة على ملفك الشخصي.",
+    },
+    subscribeCta: "اشترك في Premium",
+    renew: "تجديد الاشتراك",
+    cancel: "إلغاء الاشتراك",
+    subscribeSuccess: "تم تفعيل Premium. استمتع بميزة AI Alert Plus!",
+    renewSuccess: "تم تجديد الاشتراك.",
+    cancelSuccess: "تم إلغاء الاشتراك.",
+    actionFailed: "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
   },
   verification: {
     heading: "توثيق الهوية",

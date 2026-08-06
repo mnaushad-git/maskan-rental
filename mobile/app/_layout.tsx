@@ -80,6 +80,7 @@ export default function RootLayout() {
               <Stack.Screen name="notifications" options={{ headerShown: true }} />
               <Stack.Screen name="saved-searches" options={{ headerShown: true }} />
               <Stack.Screen name="notification-settings" options={{ headerShown: true }} />
+              <Stack.Screen name="premium" options={{ headerShown: true }} />
               <Stack.Screen name="property-requests/index" options={{ headerShown: true }} />
               <Stack.Screen name="property-requests/new" options={{ headerShown: true }} />
               <Stack.Screen name="property-requests/[id]" options={{ headerShown: true }} />

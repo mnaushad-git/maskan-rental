@@ -51,6 +51,7 @@ export default function AdvisorScreen() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
+  const [capReached, setCapReached] = useState(false);
   // The cancel fn streamAdvisorChat returns — captured so Stop and unmount
   // cleanup can abort an in-flight request instead of leaking it.
   const abortRef = useRef<(() => void) | null>(null);
@@ -76,6 +77,7 @@ export default function AdvisorScreen() {
     setDraft("");
     setBusy(true);
     setLastFailedMessage(null);
+    setCapReached(false);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
 
     let errored = false;
@@ -101,10 +103,23 @@ export default function AdvisorScreen() {
           return copy;
         });
       },
-      onError: () => {
+      onError: (message) => {
         errored = true;
         setBusy(false);
         abortRef.current = null;
+        // "premium_required" means the backend's free-tier daily chat cap
+        // was hit (see _enforce_free_chat_cap in ai.py) — a distinct,
+        // non-retryable case that should point at the upgrade flow instead
+        // of the generic "couldn't reach AI" retry affordance.
+        if (message === "premium_required") {
+          setCapReached(true);
+          setMessages((prev) => {
+            const copy = [...prev];
+            if (copy[assistantIndex]) copy[assistantIndex] = { role: "assistant", content: t("advisor.chatCapReached") };
+            return copy;
+          });
+          return;
+        }
         setLastFailedMessage(content);
         setMessages((prev) => {
           const copy = [...prev];
@@ -136,7 +151,14 @@ export default function AdvisorScreen() {
           title: t("nav.aiAdvisor"),
           headerRight: () =>
             messages.length > 0 ? (
-              <Pressable onPress={() => setMessages([])} className="flex-row items-center gap-1 pr-1">
+              <Pressable
+                onPress={() => {
+                  setMessages([]);
+                  setCapReached(false);
+                  setLastFailedMessage(null);
+                }}
+                className="flex-row items-center gap-1 pr-1"
+              >
                 <Plus size={16} color={colors.primary} />
                 <Text className="text-sm font-medium text-primary">{t("advisor.newChat")}</Text>
               </Pressable>
@@ -220,6 +242,17 @@ export default function AdvisorScreen() {
             >
               <RotateCcw size={14} color={colors.primary} />
               <Text className="text-sm font-medium text-primary">{t("advisor.retry")}</Text>
+            </Pressable>
+          )}
+          {!busy && capReached && (
+            <Pressable
+              onPress={() => router.push("/premium")}
+              accessibilityRole="button"
+              accessibilityLabel={t("advisor.upgradeCta")}
+              className="mt-1 flex-row items-center gap-1.5 self-start rounded-full bg-ai px-3.5 py-2"
+            >
+              <Sparkles size={14} color="#FFFFFF" />
+              <Text className="text-sm font-medium text-white">{t("advisor.upgradeCta")}</Text>
             </Pressable>
           )}
         </ScrollView>
