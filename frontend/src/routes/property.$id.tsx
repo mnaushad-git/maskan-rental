@@ -55,8 +55,10 @@ import {
   fetchAvailability,
   fetchBookingInsights,
   createBooking,
+  submitFinancingInterest,
   type ApiAreaIntelligence,
   type ApiAvailabilityInsight,
+  type ApiFinancingInterest,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
@@ -1139,6 +1141,121 @@ function ContactModal({
   );
 }
 
+// ── Rent Financing Interest (stub — no real payment integration) ───────────
+
+function FinancingModal({ property, onClose }: { property: Property; onClose: () => void }) {
+  const tProp = usePropT();
+  const { user } = useAuth();
+  const [budget, setBudget] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [result, setResult] = useState<ApiFinancingInterest | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const statedBudget = Number(budget);
+    if (!statedBudget || statedBudget <= 0) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const record = await submitFinancingInterest({
+        property_id: Number(property.id),
+        stated_budget: statedBudget,
+      });
+      setResult(record);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : tProp("financing.submitFailed"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm px-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {result ? (
+          <div className="py-2 text-center space-y-4">
+            <div className="grid size-14 place-items-center rounded-full bg-success/15 mx-auto">
+              <CheckCircle2 className="size-8 text-success" />
+            </div>
+            <h2 className="text-lg font-bold">{tProp("financing.submittedTitle")}</h2>
+            <p className="text-sm text-muted-foreground">{tProp("financing.submittedDesc")}</p>
+            {result.ai_note && (
+              <div className="rounded-xl border border-ai/20 bg-ai/8 p-4 text-left">
+                <p className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-ai">
+                  <Sparkles className="size-3.5" /> {tProp("financing.aiNoteTitle")}
+                </p>
+                <p className="text-sm text-foreground">{result.ai_note}</p>
+              </div>
+            )}
+            <Button className="w-full" onClick={onClose}>
+              {tProp("financing.done")}
+            </Button>
+          </div>
+        ) : !user ? (
+          <div className="py-4 text-center space-y-4">
+            <h2 className="text-lg font-bold">{tProp("financing.signInTitle")}</h2>
+            <p className="text-sm text-muted-foreground">{tProp("financing.signInDesc")}</p>
+            <Button className="w-full" asChild>
+              <Link to="/auth">{tProp("financing.signIn")}</Link>
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold">{tProp("financing.title")}</h2>
+                <p className="mt-1 text-xs text-muted-foreground">{tProp("financing.subtitle")}</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={onClose}>
+                <X className="size-4" />
+              </Button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium">{tProp("financing.budgetLabel")}</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  placeholder="8000"
+                  required
+                  className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {tProp("financing.rentContext", { amount: formatSAR(Math.round(property.price / 12)) })}
+                </p>
+              </div>
+              {submitError && (
+                <p className="rounded-xl border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs text-destructive">
+                  {submitError}
+                </p>
+              )}
+              <Button
+                type="submit"
+                variant="hero"
+                size="lg"
+                className="w-full"
+                disabled={!budget || Number(budget) <= 0 || submitting}
+              >
+                <Landmark className="size-4" />{" "}
+                {submitting ? tProp("financing.submitting") : tProp("financing.submit")}
+              </Button>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function storeAdvisorCtx(property: Property) {
   try {
     sessionStorage.setItem("maskan_advisor_ctx", JSON.stringify(property));
@@ -1753,6 +1870,7 @@ function ActionsCard({ property }: { property: Property }) {
   const { user } = useAuth();
   const [savedRecordId, setSavedRecordId] = useState<number | null>(null);
   const [showContact, setShowContact] = useState(false);
+  const [showFinancing, setShowFinancing] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -1828,6 +1946,11 @@ function ActionsCard({ property }: { property: Property }) {
               </Link>
             </Button>
           </div>
+          {!isSale && (
+            <Button variant="outline" className="w-full" onClick={() => setShowFinancing(true)}>
+              <Landmark className="size-4" /> {tProp("actions.requestFinancing")}
+            </Button>
+          )}
           <Link
             to="/property-requests/new"
             className="flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium text-ai transition-colors hover:underline"
@@ -1883,6 +2006,10 @@ function ActionsCard({ property }: { property: Property }) {
           onSaved={(newId) => setSavedRecordId(newId)}
           onClose={() => setShowContact(false)}
         />
+      )}
+
+      {showFinancing && (
+        <FinancingModal property={property} onClose={() => setShowFinancing(false)} />
       )}
     </>
   );

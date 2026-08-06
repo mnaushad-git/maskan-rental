@@ -2266,3 +2266,24 @@ export function fetchPricingSuggestion(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+// ── Rent financing interest waitlist (stub — no real payment integration) ──
+
+export type ApiFinancingInterest = {
+  id: number;
+  renter_user_id: number;
+  property_id: number;
+  stated_budget: number;
+  ai_note: string | null;
+  ai_generated_by: "ai" | "fallback" | null;
+  created_at: string;
+  property_title: string | null;
+  renter_name: string | null;
+};
+
+export function submitFinancingInterest(payload: { property_id: number; stated_budget: number }) {
+  return requestJson<ApiFinancingInterest>("/financing/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

@@ -700,6 +700,7 @@ export const en = {
       submitLeadDesc:
         "Submit a lead and a licensed partner covering {{district}} will reach out within 24 hours.",
       submitLeadRequest: "Submit a lead request",
+      requestFinancing: "Request financing",
     },
     landlord: {
       listedBy: "Listed by",
@@ -727,6 +728,23 @@ export const en = {
       bookFailed: "Booking failed. Please try again.",
       confirmedTitle: "Booking confirmed",
       confirmedDesc: "Your stay from {{checkIn}} to {{checkOut}} is confirmed.",
+    },
+    financing: {
+      title: "Request rent financing",
+      subtitle:
+        "Interest-only waitlist — no financing partner is confirmed yet, so this doesn't move any money.",
+      budgetLabel: "Your monthly budget (SAR)",
+      rentContext: "This property's rent is about SAR {{amount}}/month.",
+      submit: "Submit interest",
+      submitting: "Submitting…",
+      submitFailed: "Failed to submit. Please try again.",
+      submittedTitle: "Interest submitted",
+      submittedDesc: "We've recorded your interest — we'll be in touch once financing partners are confirmed.",
+      aiNoteTitle: "AI Affordability Advisor",
+      done: "Done",
+      signInTitle: "Sign in to request financing",
+      signInDesc: "Create a free account or sign in to submit a financing interest request.",
+      signIn: "Sign in",
     },
   },
   lifestyleTags: {

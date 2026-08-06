@@ -13,7 +13,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_admin_user, get_current_user, get_db, get_optional_current_user
 from app.api.routes.contracts import _check_contract_access
 from app.core.ai import gateway
-from app.core.ai.prompts import ADMIN_ADVISOR, CONTRACT_ASSISTANT, CUSTOMER_ADVISOR, PRICING_ASSISTANT, PromptDefinition
+from app.core.ai.prompts import (
+    ADMIN_ADVISOR,
+    AFFORDABILITY_ADVISOR,
+    CONTRACT_ASSISTANT,
+    CUSTOMER_ADVISOR,
+    PRICING_ASSISTANT,
+    PromptDefinition,
+)
 from app.core.config import settings
 from app.core.rate_limit import _client_identifier, check_rate_limit, rate_limit_dependency
 from app.models.contract import Contract
@@ -808,6 +815,81 @@ def pricing_suggestion(
             latency_ms=result.latency_ms if result else 0.0,
             status=status,
             user_id=current_user.id,
+            input_tokens=result.input_tokens if result else None,
+            output_tokens=result.output_tokens if result else None,
+        )
+
+
+# ── AI Affordability Advisor (rent financing interest waitlist) ────────────
+# Called directly by app/api/routes/financing.py at submission time (not its
+# own HTTP endpoint) — same reuse pattern as ai.py importing
+# `_check_contract_access` from contracts.py, just in the other direction.
+
+def _deterministic_affordability_note(stated_budget: float, monthly_rent: float) -> str:
+    ratio = monthly_rent / stated_budget if stated_budget > 0 else None
+    disclaimer = "This is general guidance only, not a financing offer."
+    if ratio is None:
+        return f"We couldn't assess affordability without a valid stated budget. {disclaimer}"
+    if ratio <= 0.5:
+        return (
+            f"This rent (SAR {monthly_rent:,.0f}/mo) looks comfortable against your stated budget "
+            f"(SAR {stated_budget:,.0f}/mo) — well within typical affordability guidelines. A quarterly or "
+            f"semi-annual installment plan should work fine. {disclaimer}"
+        )
+    if ratio <= 0.8:
+        return (
+            f"This rent (SAR {monthly_rent:,.0f}/mo) takes up a meaningful share of your stated budget "
+            f"(SAR {stated_budget:,.0f}/mo) — manageable, but worth planning around. A monthly or quarterly "
+            f"installment plan would spread the cost more comfortably. {disclaimer}"
+        )
+    return (
+        f"This rent (SAR {monthly_rent:,.0f}/mo) is a real stretch against your stated budget "
+        f"(SAR {stated_budget:,.0f}/mo). Monthly installments would help keep individual payments manageable, "
+        f"but it's worth reconsidering the budget or property before committing. {disclaimer}"
+    )
+
+
+def generate_affordability_note(*, stated_budget: float, monthly_rent: float, user_id: int | None) -> tuple[str, str]:
+    """Returns (note, generated_by). Never raises — degrades to a
+    deterministic note on any AI failure, same as contract_flags/
+    pricing_suggestion, since a flaky AI call must not block the interest
+    submission it's attached to."""
+    if not settings.ANTHROPIC_API_KEY:
+        return _deterministic_affordability_note(stated_budget, monthly_rent), "fallback"
+
+    facts = "\n".join([
+        f"Renter's stated monthly budget: SAR {stated_budget:,.0f}",
+        f"Property's monthly rent: SAR {monthly_rent:,.0f}",
+        f"Rent as % of stated budget: {round(monthly_rent / stated_budget * 100) if stated_budget else 'n/a'}%",
+    ])
+
+    status = "error"
+    result = None
+    try:
+        result = gateway.run_chat(
+            model=gateway.DEFAULT_MODEL,
+            system=AFFORDABILITY_ADVISOR.template,
+            tools=[],
+            messages=[{"role": "user", "content": f"Assess this rent financing interest:\n{facts}"}],
+            max_tokens=300,
+        )
+        status = "ok"
+        note = result.reply.strip()[:800]
+        if not note:
+            raise ValueError("AI returned an empty affordability note")
+        return note, "ai"
+    except Exception as exc:  # noqa: BLE001 — a flaky AI call must degrade to a deterministic note, never block submission
+        logger.warning("generate_affordability_note: AI call failed, using deterministic fallback: %s", exc)
+        status = "error"
+        return _deterministic_affordability_note(stated_budget, monthly_rent), "fallback"
+    finally:
+        gateway.log_ai_call(
+            feature="affordability_advisor",
+            model=gateway.DEFAULT_MODEL,
+            prompt=AFFORDABILITY_ADVISOR,
+            latency_ms=result.latency_ms if result else 0.0,
+            status=status,
+            user_id=user_id,
             input_tokens=result.input_tokens if result else None,
             output_tokens=result.output_tokens if result else None,
         )
