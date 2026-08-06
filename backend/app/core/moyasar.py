@@ -1,4 +1,4 @@
-"""Moyasar payment gateway integration (mediator subscriptions).
+"""Moyasar payment gateway integration (mediator + renter subscriptions).
 
 Real vs mock is chosen once by `get_payment_gateway_provider()`, gated by
 `settings.USE_REAL_PAYMENTS` *and* `settings.MOYASAR_SECRET_KEY` being set —
@@ -12,6 +12,10 @@ asynchronously via the already-real `/api/payments/webhook/moyasar` handler
 (`app.api.routes.payments._handle_payment_paid`) once Moyasar confirms the
 charge, exactly like a real gateway integration must work (the charge can
 fail, require 3-D Secure, or simply take a moment to settle).
+
+Callers pass their own `metadata` (used by the webhook to route the paid
+event back to a mediator or a renter `User`) and, for invoices, their own
+`success_url`/`back_url` — this file has no opinion on who the subscriber is.
 """
 import logging
 from abc import ABC, abstractmethod
@@ -37,20 +41,20 @@ class GatewayResult:
 
 class PaymentGatewayProvider(ABC):
     @abstractmethod
-    def create_subscription_invoice(self, *, mediator_id: int, amount_sar: float, description: str) -> GatewayResult: ...
+    def create_subscription_invoice(self, *, amount_sar: float, description: str, metadata: dict, success_url: str, back_url: str) -> GatewayResult: ...
 
     @abstractmethod
-    def charge_saved_card(self, *, mediator_id: int, token: str, amount_sar: float, description: str) -> GatewayResult: ...
+    def charge_saved_card(self, *, token: str, amount_sar: float, description: str, metadata: dict) -> GatewayResult: ...
 
 
 class MockPaymentGatewayProvider(PaymentGatewayProvider):
     """No network call, no invoice — callers fall back to the original
     instant-activation mock rather than using this provider's result."""
 
-    def create_subscription_invoice(self, *, mediator_id: int, amount_sar: float, description: str) -> GatewayResult:
+    def create_subscription_invoice(self, *, amount_sar: float, description: str, metadata: dict, success_url: str, back_url: str) -> GatewayResult:
         return GatewayResult(success=False, error="mock provider does not create real invoices")
 
-    def charge_saved_card(self, *, mediator_id: int, token: str, amount_sar: float, description: str) -> GatewayResult:
+    def charge_saved_card(self, *, token: str, amount_sar: float, description: str, metadata: dict) -> GatewayResult:
         return GatewayResult(success=False, error="mock provider does not charge real cards")
 
 
@@ -63,25 +67,25 @@ class MoyasarPaymentGatewayProvider(PaymentGatewayProvider):
             timeout=15.0,
         )
 
-    def create_subscription_invoice(self, *, mediator_id: int, amount_sar: float, description: str) -> GatewayResult:
+    def create_subscription_invoice(self, *, amount_sar: float, description: str, metadata: dict, success_url: str, back_url: str) -> GatewayResult:
         """Creates a Moyasar hosted-checkout Invoice — the frontend redirects
-        the mediator to `payment_url` to enter card details; Moyasar redirects
+        the subscriber to `payment_url` to enter card details; Moyasar redirects
         back to success_url/back_url afterward, but actual activation is
         driven by the server-to-server webhook, not that redirect."""
         payload = {
             "amount": _to_halalas(amount_sar),
             "currency": "SAR",
             "description": description,
-            "success_url": f"{settings.FRONTEND_ORIGIN}/mediator/subscription?status=success",
-            "back_url": f"{settings.FRONTEND_ORIGIN}/mediator/subscription?status=cancelled",
-            "metadata": {"payment_type": "subscription", "mediator_id": str(mediator_id)},
+            "success_url": success_url,
+            "back_url": back_url,
+            "metadata": metadata,
         }
         result = self._post("/invoices", payload, context="invoice creation")
         if not result.success:
             return result
         return GatewayResult(success=True, gateway_payment_id=result.raw.get("id"), payment_url=result.raw.get("url"), raw=result.raw)
 
-    def charge_saved_card(self, *, mediator_id: int, token: str, amount_sar: float, description: str) -> GatewayResult:
+    def charge_saved_card(self, *, token: str, amount_sar: float, description: str, metadata: dict) -> GatewayResult:
         """Charges a previously-saved card token directly (renewals) — no
         redirect involved. Requires a token saved from a prior successful
         invoice payment (see `_handle_payment_paid` in payments.py)."""
@@ -90,7 +94,7 @@ class MoyasarPaymentGatewayProvider(PaymentGatewayProvider):
             "currency": "SAR",
             "description": description,
             "source": {"type": "token", "token": token},
-            "metadata": {"payment_type": "subscription", "mediator_id": str(mediator_id)},
+            "metadata": metadata,
         }
         result = self._post("/payments", payload, context="renewal charge")
         if not result.success:

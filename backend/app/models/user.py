@@ -27,5 +27,14 @@ class User(Base):
     verification_submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     verification_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Renter premium subscription ("AI Alert Plus") — mirrors Mediator's
+    # subscription_status/tier pattern. "inactive" | "active" | "pending_payment"
+    # | "cancelled" | "expired".
+    subscription_status: Mapped[str] = mapped_column(String(30), nullable=False, default="inactive", server_default="inactive")
+    subscription_tier: Mapped[str] = mapped_column(String(30), nullable=False, default="free", server_default="free")
+    subscription_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    subscription_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    moyasar_card_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     saved_searches = relationship("SavedSearch", back_populates="user", cascade="all, delete-orphan")
     saved_properties = relationship("SavedProperty", back_populates="user", cascade="all, delete-orphan")

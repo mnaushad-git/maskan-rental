@@ -65,6 +65,11 @@ class Settings(BaseSettings):
     LEAD_PICKUP_FEE_SAR: float = 25.0
     SUBSCRIPTION_FEE_SAR: float = 99.0
 
+    # ── Renter premium tier ("AI Alert Plus") ─────────────────────────────────
+    # Same Moyasar flow as the mediator subscription above (app.core.moyasar),
+    # gated by the same USE_REAL_PAYMENTS/MOYASAR_SECRET_KEY pair.
+    RENTER_PREMIUM_FEE_SAR: float = 19.0
+
     # ── Email notifications ───────────────────────────────────────────────────
     SENDGRID_API_KEY: str | None = None         # TODO: add real key when available
     FROM_EMAIL: str = "no-reply@maskan.sa"

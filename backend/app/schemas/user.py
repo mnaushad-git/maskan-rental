@@ -45,6 +45,8 @@ class UserOut(BaseModel):
     role: str = "customer"  # "admin" | "partner" | "customer"
     verification_status: str = "unverified"  # "unverified" | "pending" | "approved" | "rejected"
     is_verified: bool = False
+    subscription_status: str = "inactive"  # "inactive" | "pending_payment" | "active" | "cancelled" | "expired"
+    subscription_tier: str = "free"  # "free" | "premium"
 
 
 class TrustMetricsOut(BaseModel):

@@ -126,9 +126,11 @@ def subscribe_mediator(
 
     if _real_payments_enabled():
         result = get_payment_gateway_provider().create_subscription_invoice(
-            mediator_id=mediator.id,
             amount_sar=settings.SUBSCRIPTION_FEE_SAR,
             description=f"Maskan mediator subscription (SAR {settings.SUBSCRIPTION_FEE_SAR}/month)",
+            metadata={"payment_type": "subscription", "mediator_id": str(mediator.id)},
+            success_url=f"{settings.FRONTEND_ORIGIN}/mediator/subscription?status=success",
+            back_url=f"{settings.FRONTEND_ORIGIN}/mediator/subscription?status=cancelled",
         )
         if not result.success:
             raise HTTPException(status_code=502, detail=f"Could not start payment with Moyasar: {result.error}")
@@ -187,10 +189,10 @@ def renew_subscription(
                 detail="No saved card on file. Complete a subscription payment via POST /me/subscribe first.",
             )
         result = get_payment_gateway_provider().charge_saved_card(
-            mediator_id=mediator.id,
             token=mediator.moyasar_card_token,
             amount_sar=settings.SUBSCRIPTION_FEE_SAR,
             description=f"Maskan mediator subscription renewal (SAR {settings.SUBSCRIPTION_FEE_SAR}/month)",
+            metadata={"payment_type": "subscription", "mediator_id": str(mediator.id)},
         )
         if not result.success:
             raise HTTPException(status_code=502, detail=f"Renewal charge failed: {result.error}")

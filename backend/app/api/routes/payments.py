@@ -86,6 +86,7 @@ def _handle_payment_paid(data: dict, db: Session) -> None:
     metadata = data.get("metadata", {})
     payment_type = metadata.get("payment_type")
     mediator_id = metadata.get("mediator_id")
+    user_id = metadata.get("user_id")
 
     payment = db.query(Payment).filter(Payment.gateway_payment_id == gateway_id).first()
     if payment:
@@ -110,6 +111,23 @@ def _handle_payment_paid(data: dict, db: Session) -> None:
                 payload={"mediator_id": mediator.id, "subscription_status": mediator.subscription_status},
             )
             CacheService().delete("mediator-public", str(mediator.id))
+    elif payment_type == "subscription" and user_id:
+        user = db.get(User, int(user_id))
+        if user:
+            card_token = data.get("source", {}).get("token")
+            user.subscription_status = "active"
+            user.subscription_tier = "premium"
+            user.subscription_started_at = datetime.now(timezone.utc)
+            user.subscription_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+            if card_token:
+                user.moyasar_card_token = card_token
+            record_event(
+                db,
+                event_type=EventType.USER_SUBSCRIPTION_CHANGED,
+                aggregate_type="user",
+                aggregate_id=user.id,
+                payload={"user_id": user.id, "subscription_status": user.subscription_status},
+            )
 
     if payment:
         record_event(
@@ -136,7 +154,9 @@ def _handle_payment_failed(data: dict, db: Session) -> None:
 
 
 def _handle_subscription_renewed(data: dict, db: Session) -> None:
-    mediator_id = data.get("metadata", {}).get("mediator_id")
+    metadata = data.get("metadata", {})
+    mediator_id = metadata.get("mediator_id")
+    user_id = metadata.get("user_id")
     if mediator_id:
         mediator = db.get(Mediator, int(mediator_id))
         if mediator:
@@ -144,17 +164,31 @@ def _handle_subscription_renewed(data: dict, db: Session) -> None:
             mediator.subscription_expires_at = base + timedelta(days=30)
             mediator.subscription_status = "active"
             db.commit()
-    logger.info(f"Subscription renewed for mediator {mediator_id}")
+    elif user_id:
+        user = db.get(User, int(user_id))
+        if user:
+            base = user.subscription_expires_at or datetime.now(timezone.utc)
+            user.subscription_expires_at = base + timedelta(days=30)
+            user.subscription_status = "active"
+            db.commit()
+    logger.info(f"Subscription renewed for mediator={mediator_id} user={user_id}")
 
 
 def _handle_subscription_cancelled(data: dict, db: Session) -> None:
-    mediator_id = data.get("metadata", {}).get("mediator_id")
+    metadata = data.get("metadata", {})
+    mediator_id = metadata.get("mediator_id")
+    user_id = metadata.get("user_id")
     if mediator_id:
         mediator = db.get(Mediator, int(mediator_id))
         if mediator:
             mediator.subscription_status = "cancelled"
             db.commit()
-    logger.info(f"Subscription cancelled for mediator {mediator_id}")
+    elif user_id:
+        user = db.get(User, int(user_id))
+        if user:
+            user.subscription_status = "cancelled"
+            db.commit()
+    logger.info(f"Subscription cancelled for mediator={mediator_id} user={user_id}")
 
 
 # ── Admin: view payments ──────────────────────────────────────────────────────

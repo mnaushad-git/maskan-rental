@@ -57,6 +57,8 @@ class UserResponse(BaseModel):
     is_admin: bool = False
     verification_status: str = "unverified"  # "unverified" | "pending" | "approved" | "rejected"
     is_verified: bool = False
+    subscription_status: str = "inactive"  # "inactive" | "pending_payment" | "active" | "cancelled" | "expired"
+    subscription_tier: str = "free"  # "free" | "premium"
 
     class Config:
         from_attributes = True

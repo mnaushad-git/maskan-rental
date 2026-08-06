@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from datetime import datetime, timezone
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -82,6 +83,30 @@ def get_optional_admin_user(
     user = _decode_user(token, db)
     if user is None or (user.email not in settings.admin_emails and not user.is_admin):
         return None
+    return user
+
+
+def _sync_subscription_expiry(user: User) -> None:
+    """Lazily flip an active renter premium subscription past its expiry to
+    'expired' on read — mirrors Contract's lazy status flip in contracts.py.
+    Caller is responsible for committing."""
+    if user.subscription_status == "active" and user.subscription_expires_at and user.subscription_expires_at < datetime.now(timezone.utc):
+        user.subscription_status = "expired"
+
+
+def get_premium_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    """Returns the logged-in user if they have an active (non-expired) renter
+    premium subscription. Mirrors get_mediator_user's gate pattern."""
+    user = _decode_user(token, db)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
+    _sync_subscription_expiry(user)
+    db.commit()
+    if user.subscription_status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Premium subscription is '{user.subscription_status}'. An active subscription is required.")
     return user
 
 
