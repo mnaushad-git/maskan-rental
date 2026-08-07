@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,6 +23,27 @@ class PropertyBase(BaseModel):
     furnished: str | None = None
     latitude: float | None = None
     longitude: float | None = None
+    living_rooms: int | None = None
+    property_age_years: int | None = None
+    commission_percent: float | None = None
+    has_kitchen: bool = False
+    has_water: bool = False
+    has_electricity: bool = False
+    has_private_roof: bool = False
+    in_villa: bool = False
+    has_two_entrances: bool = False
+    has_separate_electrical_meter: bool = False
+    license_number: str | None = None
+    license_expiration_date: date | None = None
+    deed_area: int | None = None
+    is_bookable: bool = False
+    nightly_rate: float | None = None
+    has_elevator: bool = False
+    has_airconditioners: bool = False
+    arrival_time: str | None = None
+    departure_time: str | None = None
+    latest_booking_time: str | None = None
+    insurance_amount: float = 0
 
 
 class PropertyCreate(PropertyBase):
@@ -44,6 +65,18 @@ class PartnerPropertyCreate(BaseModel):
     description: str | None = None
     property_type: str | None = None
     furnished: str | None = None
+    living_rooms: int | None = None
+    property_age_years: int | None = None
+    commission_percent: float | None = None
+    has_kitchen: bool = False
+    has_water: bool = False
+    has_electricity: bool = False
+    has_private_roof: bool = False
+    in_villa: bool = False
+    has_two_entrances: bool = False
+    has_separate_electrical_meter: bool = False
+    license_number: str | None = None
+    deed_area: int | None = None
 
 
 class PropertyUpdate(BaseModel):
@@ -66,6 +99,27 @@ class PropertyUpdate(BaseModel):
     furnished: str | None = None
     latitude: float | None = None
     longitude: float | None = None
+    living_rooms: int | None = None
+    property_age_years: int | None = None
+    commission_percent: float | None = None
+    has_kitchen: bool | None = None
+    has_water: bool | None = None
+    has_electricity: bool | None = None
+    has_private_roof: bool | None = None
+    in_villa: bool | None = None
+    has_two_entrances: bool | None = None
+    has_separate_electrical_meter: bool | None = None
+    license_number: str | None = None
+    license_expiration_date: date | None = None
+    deed_area: int | None = None
+    is_bookable: bool | None = None
+    nightly_rate: float | None = None
+    has_elevator: bool | None = None
+    has_airconditioners: bool | None = None
+    arrival_time: str | None = None
+    departure_time: str | None = None
+    latest_booking_time: str | None = None
+    insurance_amount: float | None = None
 
 
 class PartnerPropertyUpdate(BaseModel):
@@ -83,6 +137,18 @@ class PartnerPropertyUpdate(BaseModel):
     description: str | None = None
     property_type: str | None = None
     furnished: str | None = None
+    living_rooms: int | None = None
+    property_age_years: int | None = None
+    commission_percent: float | None = None
+    has_kitchen: bool | None = None
+    has_water: bool | None = None
+    has_electricity: bool | None = None
+    has_private_roof: bool | None = None
+    in_villa: bool | None = None
+    has_two_entrances: bool | None = None
+    has_separate_electrical_meter: bool | None = None
+    license_number: str | None = None
+    deed_area: int | None = None
 
 
 class ListingImageOut(BaseModel):
@@ -98,6 +164,8 @@ class PropertyOut(PropertyBase):
 
     id: int
     created_at: datetime
+    updated_at: datetime
+    views_count: int = 0
     # ORM relationship is named `listing_images`, not `images` — without this
     # alias, from_attributes silently falls back to the [] default instead
     # of raising, so every response's images list was empty regardless of
@@ -107,3 +175,9 @@ class PropertyOut(PropertyBase):
     mediator_profile_image_url: str | None = None
     mediator_agent_name: str | None = None
     mediator_is_verified: bool = False
+    # Schema-only — not ORM columns. Populated manually by the route handler
+    # (GET /{property_id}) via a single reviews-summary lookup, so the list
+    # endpoint (which also returns PropertyOut) never pays that extra query
+    # cost per row.
+    mediator_rating: float | None = None
+    mediator_review_count: int = 0

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { LogOut, Globe, FileText, ChevronRight, Map, BookOpen, Scale, Calculator, Bell, BellRing, Settings, SearchCheck, ShieldCheck, Sparkles } from "lucide-react-native";
+import { LogOut, Globe, FileText, ChevronRight, Map, BookOpen, Scale, Calculator, Bell, BellRing, Settings, SearchCheck, ShieldCheck, Sparkles, Search, Heart, ClipboardList } from "lucide-react-native";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { colors } from "@/lib/colors";
@@ -51,6 +51,15 @@ export default function ProfileScreen() {
       )}
 
       <Pressable
+        onPress={() => router.push("/search")}
+        className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
+      >
+        <Search size={18} color={colors.foreground} />
+        <Text className="flex-1 text-sm font-medium text-foreground">{t("nav.search")}</Text>
+        <ChevronRight size={18} color={colors.neutral400} />
+      </Pressable>
+
+      <Pressable
         onPress={() => setLang(lang === "en" ? "ar" : "en")}
         className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
       >
@@ -61,6 +70,24 @@ export default function ProfileScreen() {
 
       {user && (
         <View className="gap-2">
+          <Pressable
+            onPress={() => router.push("/saved")}
+            className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
+          >
+            <Heart size={18} color={colors.foreground} />
+            <Text className="flex-1 text-sm font-medium text-foreground">{t("nav.saved")}</Text>
+            <ChevronRight size={18} color={colors.neutral400} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/leads")}
+            className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
+          >
+            <ClipboardList size={18} color={colors.foreground} />
+            <Text className="flex-1 text-sm font-medium text-foreground">{t("nav.myLeads")}</Text>
+            <ChevronRight size={18} color={colors.neutral400} />
+          </Pressable>
+
           <Pressable
             onPress={() => router.push("/premium")}
             className="flex-row items-center gap-3 rounded-xl border border-ai/30 bg-ai-soft px-4 py-3"

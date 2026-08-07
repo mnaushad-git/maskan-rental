@@ -60,12 +60,36 @@ export default function AdvisorScreen() {
     return () => abortRef.current?.();
   }, []);
 
-  const suggestions = [
-    t("advisor.suggested.q1"),
-    t("advisor.suggested.q2"),
-    t("advisor.suggested.q3"),
-    t("advisor.suggested.q4"),
+  type Category = "all" | "rent" | "sale" | "projects";
+  const [category, setCategory] = useState<Category>("all");
+
+  const suggestionsByCategory: Record<Category, string[]> = {
+    all: [
+      t("advisor.suggested.q1"),
+      t("advisor.suggested.buy1"),
+      t("advisor.suggested.projects1"),
+      t("advisor.suggested.q3"),
+    ],
+    rent: [
+      t("advisor.suggested.q1"),
+      t("advisor.suggested.q2"),
+      t("advisor.suggested.q3"),
+      t("advisor.suggested.q4"),
+    ],
+    sale: [t("advisor.suggested.buy1"), t("advisor.suggested.buy2"), t("advisor.suggested.buy3")],
+    projects: [
+      t("advisor.suggested.projects1"),
+      t("advisor.suggested.projects2"),
+      t("advisor.suggested.projects3"),
+    ],
+  };
+  const categories: { id: Category; label: string }[] = [
+    { id: "all", label: t("listingCategories.all") },
+    { id: "rent", label: t("listingCategories.rent") },
+    { id: "sale", label: t("listingCategories.sale") },
+    { id: "projects", label: t("nav.projects") },
   ];
+  const suggestions = suggestionsByCategory[category];
 
   function send(text: string) {
     const content = text.trim();
@@ -180,6 +204,27 @@ export default function AdvisorScreen() {
                 <Text className="text-center text-lg font-bold text-foreground">{t("advisor.emptyState.title")}</Text>
                 <Text className="text-center text-sm text-muted-foreground">{t("advisor.emptyState.desc")}</Text>
               </View>
+
+              <View className="flex-row flex-wrap justify-center gap-2">
+                {categories.map((c) => (
+                  <Pressable
+                    key={c.id}
+                    onPress={() => setCategory(c.id)}
+                    className={`rounded-full border px-3.5 py-1.5 ${
+                      category === c.id ? "border-primary bg-primary" : "border-border bg-card"
+                    }`}
+                  >
+                    <Text
+                      className={`text-xs font-semibold ${
+                        category === c.id ? "text-primary-foreground" : "text-foreground"
+                      }`}
+                    >
+                      {c.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
               <View className="gap-2">
                 {suggestions.map((q) => (
                   <Pressable

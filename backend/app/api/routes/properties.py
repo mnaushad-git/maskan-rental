@@ -1,14 +1,18 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.orm import Session
 
 from pydantic import BaseModel
 
 from app.api.deps import get_admin_user, get_db, get_mediator_user, get_optional_admin_user
+from app.api.routes.reviews import get_mediator_summary
 from app.core.config import settings
 from app.core.geo import coords_for
 from app.core.metrics import properties_published_total
 from app.core.outbox import EventType, record_event
+from app.models.booking import Booking
 from app.models.listing_image import ListingImage
 from app.models.mediator import Mediator
 from app.models.property import Property
@@ -39,6 +43,9 @@ def list_properties(
     max_lat: float | None = Query(default=None),
     min_lng: float | None = Query(default=None),
     max_lng: float | None = Query(default=None),
+    is_bookable: bool | None = Query(default=None),
+    check_in: date | None = Query(default=None),
+    check_out: date | None = Query(default=None),
     include_all: bool = Query(default=False),
     admin: User | None = Depends(get_optional_admin_user),
     db: Session = Depends(get_db),
@@ -74,6 +81,25 @@ def list_properties(
     if min_lat is not None and max_lat is not None and min_lng is not None and max_lng is not None:
         filters.append(Property.latitude.between(min_lat, max_lat))
         filters.append(Property.longitude.between(min_lng, max_lng))
+    if is_bookable is not None:
+        filters.append(Property.is_bookable == is_bookable)
+    if check_in is not None and check_out is not None:
+        # Half-open range overlap ([) — mirrors bookings.py's _overlap_filter
+        # so a date-filtered browse list agrees with the actual availability
+        # check a renter would run on the property's own detail page.
+        conflicting_booking = (
+            select(Booking.id)
+            .where(
+                and_(
+                    Booking.property_id == Property.id,
+                    Booking.status != "cancelled",
+                    Booking.check_in < check_out,
+                    Booking.check_out > check_in,
+                )
+            )
+            .exists()
+        )
+        filters.append(~conflicting_booking)
 
     total = db.scalar(select(func.count()).select_from(Property).where(*filters)) or 0
     response.headers["X-Total-Count"] = str(total)
@@ -134,8 +160,11 @@ def create_partner_property(
     db: Session = Depends(get_db),
 ):
     _, mediator = mediator_user
+    data = payload.model_dump()
+    if not data.get("license_number"):
+        data["license_number"] = mediator.license_number
     prop = Property(
-        **payload.model_dump(),
+        **data,
         status="Pending Approval",
         mediator_id=mediator.id,
     )
@@ -200,7 +229,46 @@ def get_property(property_id: int, db: Session = Depends(get_db)):
     property_obj = db.get(Property, property_id)
     if not property_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
-    return property_obj
+
+    property_obj.views_count = (property_obj.views_count or 0) + 1
+    db.commit()
+    db.refresh(property_obj)
+
+    result = PropertyOut.model_validate(property_obj)
+    if property_obj.mediator_id:
+        summary = get_mediator_summary(property_obj.mediator_id, db)
+        result.mediator_rating = summary.avg_rating
+        result.mediator_review_count = summary.review_count
+    return result
+
+
+@router.get("/{property_id}/similar", response_model=list[PropertyOut])
+def get_similar_properties(
+    property_id: int,
+    limit: int = Query(default=6, ge=1, le=20),
+    db: Session = Depends(get_db),
+):
+    base = db.get(Property, property_id)
+    if not base:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
+
+    base_price = base.monthly_rent if base.listing_type != "sale" else base.sale_price
+    price_col = Property.sale_price if base.listing_type == "sale" else Property.monthly_rent
+
+    stmt = (
+        select(Property)
+        .where(
+            Property.id != base.id,
+            Property.status == "Published",
+            Property.city == base.city,
+        )
+        .order_by(
+            case((Property.area == base.area, 0), else_=1),
+            func.abs(func.coalesce(price_col, 0) - (base_price or 0)),
+        )
+        .limit(limit)
+    )
+    return db.scalars(stmt).all()
 
 
 @router.post("/", response_model=PropertyOut, status_code=status.HTTP_201_CREATED)

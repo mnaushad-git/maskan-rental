@@ -13,7 +13,20 @@ const MAX_Y = SHEET_HEIGHT - PEEK; // translateY when collapsed
  * lives in the header (grip + peek content); the body below scrolls on its own,
  * so dragging the sheet and scrolling its content don't fight each other.
  */
-export function HomeSheet({ header, children }: { header: ReactNode; children: ReactNode }) {
+export function HomeSheet({
+  header,
+  children,
+  pointerEvents = "auto",
+}: {
+  header: ReactNode;
+  children: ReactNode;
+  // On Android, the map wrapper's zIndex only reorders painting, not touch
+  // dispatch — a later-mounted sibling like this sheet still receives taps
+  // even when a higher-zIndex view is drawn on top of it. Pass "none" while
+  // the map's marker preview card is open so its buttons (e.g. "View full
+  // details") actually receive the touch instead of the sheet underneath it.
+  pointerEvents?: "auto" | "none";
+}) {
   const translateY = useSharedValue(MAX_Y); // start collapsed
   const startY = useSharedValue(MAX_Y);
 
@@ -33,6 +46,7 @@ export function HomeSheet({ header, children }: { header: ReactNode; children: R
 
   return (
     <Animated.View
+      pointerEvents={pointerEvents}
       style={[
         {
           position: "absolute",

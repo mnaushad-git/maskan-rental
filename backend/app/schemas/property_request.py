@@ -211,7 +211,9 @@ class PropertyRequestSummaryOut(BaseModel):
     title: str
     status: str
     transaction_type: str | None
+    property_category: str | None
     city: str | None
+    preferred_districts: list[str] = Field(default_factory=list)
     min_price: float | None
     max_price: float | None
     bedrooms_min: int | None

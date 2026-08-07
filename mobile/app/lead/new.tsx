@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View, Text, TextInput, Pressable, ActivityIndicator, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { MapPin } from "lucide-react-native";
 import { createLead } from "@/lib/api/maskan";
 import { districtsByCity } from "@/lib/maskan-search-data";
@@ -18,12 +18,20 @@ export default function LeadNewScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const pushPrompt = usePushPermissionPrompt();
+  // Optional prefill — e.g. a project's "Contact" CTA (see app/project/[id].tsx)
+  // deep-links here with the project's location and a note mentioning it,
+  // rather than adding a project-specific inquiry flow.
+  const { city: prefillCity, district: prefillDistrict, note: prefillNote } = useLocalSearchParams<{
+    city?: string;
+    district?: string;
+    note?: string;
+  }>();
 
-  const [city, setCity] = useState<string>("Riyadh");
-  const [district, setDistrict] = useState<string>("Any");
+  const [city, setCity] = useState<string>(prefillCity || "Riyadh");
+  const [district, setDistrict] = useState<string>(prefillDistrict || "Any");
   const [bedrooms, setBedrooms] = useState("Any");
   const [maxBudget, setMaxBudget] = useState("");
-  const [requirements, setRequirements] = useState("");
+  const [requirements, setRequirements] = useState(prefillNote || "");
   const [name, setName] = useState(user?.full_name ?? "");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState(user?.email ?? "");

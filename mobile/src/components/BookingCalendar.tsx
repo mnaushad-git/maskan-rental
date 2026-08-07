@@ -34,13 +34,21 @@ function monthGrid(viewDate: Date): (Date | null)[] {
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
-// No per-listing nightly rate exists in the data model yet (myHome only
-// tracks long-term monthly_rent) — the nightly rate shown here is an
-// indicative estimate derived from it, using the same short-term premium
-// heuristic as the AI pricing suggestion shown to landlords on the web
-// partner dashboard (see backend/app/api/routes/ai.py's pricing-suggestion
-// endpoint).
-export function BookingCalendar({ propertyId, monthlyRent }: { propertyId: number; monthlyRent: number | null }) {
+// Bookable listings (Property.is_bookable) carry a real nightly_rate — use
+// it when present. Older/regular rent listings have no nightly rate in the
+// data model, so the nightly rate shown for them is an indicative estimate
+// derived from monthly_rent, using the same short-term premium heuristic as
+// the AI pricing suggestion shown to landlords on the web partner dashboard
+// (see backend/app/api/routes/ai.py's pricing-suggestion endpoint).
+export function BookingCalendar({
+  propertyId,
+  monthlyRent,
+  nightlyRate: fixedNightlyRate,
+}: {
+  propertyId: number;
+  monthlyRent: number | null;
+  nightlyRate?: number | null;
+}) {
   const { t } = useLanguage();
   const { user } = useAuth();
   const router = useRouter();
@@ -73,7 +81,7 @@ export function BookingCalendar({ propertyId, monthlyRent }: { propertyId: numbe
     setError(null);
   }, [checkIn, checkOut]);
 
-  const nightlyRate = Math.max(50, Math.round(((monthlyRent ?? 9000) / 30) * 1.6));
+  const nightlyRate = fixedNightlyRate ?? Math.max(50, Math.round(((monthlyRent ?? 9000) / 30) * 1.6));
   const nights = checkIn && checkOut ? Math.round((checkOut.getTime() - checkIn.getTime()) / 86400000) : 0;
   const totalPrice = nights > 0 ? nights * nightlyRate : 0;
 

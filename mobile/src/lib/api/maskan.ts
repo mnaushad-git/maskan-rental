@@ -1,5 +1,5 @@
 import { Image, type ImageSourcePropType } from "react-native";
-import type { Property as UiProperty } from "@/lib/maskan-data";
+import type { Property as UiProperty, Project as UiProject } from "@/lib/maskan-data";
 import type { SearchProperty as UiSearchProperty } from "@/lib/maskan-search-data";
 import { readStoredToken, clearStoredAuth } from "@/lib/auth-storage";
 
@@ -57,6 +57,7 @@ export type ApiProperty = {
   description: string | null;
   image_url: string | null;
   created_at: string;
+  updated_at: string;
   mediator_id: number | null;
   images: ApiListingImage[];
   mediator_phone: string | null;
@@ -67,6 +68,30 @@ export type ApiProperty = {
   furnished: string | null;
   latitude: number | null;
   longitude: number | null;
+  living_rooms: number | null;
+  property_age_years: number | null;
+  commission_percent: number | null;
+  has_kitchen: boolean;
+  has_water: boolean;
+  has_electricity: boolean;
+  has_private_roof: boolean;
+  in_villa: boolean;
+  has_two_entrances: boolean;
+  has_separate_electrical_meter: boolean;
+  license_number: string | null;
+  license_expiration_date: string | null;
+  deed_area: number | null;
+  views_count: number;
+  mediator_rating: number | null;
+  mediator_review_count: number;
+  is_bookable: boolean;
+  nightly_rate: number | null;
+  has_elevator: boolean;
+  has_airconditioners: boolean;
+  arrival_time: string | null;
+  departure_time: string | null;
+  latest_booking_time: string | null;
+  insurance_amount: number;
 };
 
 export type VerificationStatus = "unverified" | "pending" | "approved" | "rejected";
@@ -192,6 +217,36 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     mediatorId: property.mediator_id ?? null,
     latitude: property.latitude,
     longitude: property.longitude,
+    description: property.description ?? null,
+    furnished: property.furnished ?? null,
+    livingRooms: property.living_rooms ?? null,
+    propertyAgeYears: property.property_age_years ?? null,
+    commissionPercent: property.commission_percent ?? null,
+    features: {
+      kitchen: property.has_kitchen,
+      water: property.has_water,
+      electricity: property.has_electricity,
+      privateRoof: property.has_private_roof,
+      inVilla: property.in_villa,
+      twoEntrances: property.has_two_entrances,
+      separateElectricalMeter: property.has_separate_electrical_meter,
+      elevator: property.has_elevator,
+      airconditioners: property.has_airconditioners,
+    },
+    licenseNumber: property.license_number ?? null,
+    licenseExpirationDate: property.license_expiration_date ?? null,
+    deedArea: property.deed_area ?? null,
+    viewsCount: property.views_count ?? 0,
+    createdAt: property.created_at,
+    updatedAt: property.updated_at,
+    mediatorRating: property.mediator_rating ?? null,
+    mediatorReviewCount: property.mediator_review_count ?? 0,
+    isBookable: property.is_bookable,
+    nightlyRate: property.nightly_rate ?? null,
+    arrivalTime: property.arrival_time ?? null,
+    departureTime: property.departure_time ?? null,
+    latestBookingTime: property.latest_booking_time ?? null,
+    insuranceAmount: property.insurance_amount ?? 0,
   };
 }
 
@@ -263,6 +318,25 @@ export function fetchProperties() {
   return requestJson<ApiProperty[]>("/properties/?limit=500");
 }
 
+export type BookableSearchParams = {
+  checkIn?: string;
+  checkOut?: string;
+  city?: string;
+  limit?: number;
+};
+
+// Browse/search for short-term bookable stays — reuses the general
+// GET /properties/ endpoint (is_bookable + optional check_in/check_out
+// filters) rather than a separate endpoint, since bookable stays are just
+// Property rows with is_bookable=true, not a distinct model.
+export function fetchBookableProperties(params: BookableSearchParams = {}) {
+  const q = new URLSearchParams({ is_bookable: "true", limit: String(params.limit ?? 50) });
+  if (params.checkIn) q.set("check_in", params.checkIn);
+  if (params.checkOut) q.set("check_out", params.checkOut);
+  if (params.city && params.city !== "Any") q.set("city", params.city);
+  return requestJsonWithCount<ApiProperty[]>(`/properties/?${q.toString()}`);
+}
+
 export type PropertySearchParams = {
   q?: string;
   area?: string;
@@ -312,6 +386,10 @@ export function fetchPropertiesInBounds(bounds: MapBounds) {
 
 export function fetchProperty(id: number) {
   return requestJson<ApiProperty>(`/properties/${id}`);
+}
+
+export function fetchSimilarProperties(id: number, limit = 6) {
+  return requestJson<ApiProperty[]>(`/properties/${id}/similar?limit=${limit}`);
 }
 
 export function saveProperty(userId: number, propertyId: number) {
@@ -740,6 +818,27 @@ export function fetchMediatorReviews(mediatorId: number) {
 
 export function fetchMediatorReviewSummary(mediatorId: number) {
   return requestJson<ApiReviewSummary>(`/reviews/mediator/${mediatorId}/summary`);
+}
+
+// ── Rent financing interest waitlist (stub — no real payment integration) ──
+
+export type ApiFinancingInterest = {
+  id: number;
+  renter_user_id: number;
+  property_id: number;
+  stated_budget: number;
+  ai_note: string | null;
+  ai_generated_by: "ai" | "fallback" | null;
+  created_at: string;
+  property_title: string | null;
+  renter_name: string | null;
+};
+
+export function submitFinancingInterest(payload: { property_id: number; stated_budget: number }) {
+  return requestJson<ApiFinancingInterest>("/financing/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 // ── Saved search alerts ────────────────────────────────────────────────────
@@ -1476,4 +1575,112 @@ export function createBooking(payload: {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function fetchMyBookings() {
+  return requestJson<ApiBooking[]>("/bookings/my");
+}
+
+export function cancelBooking(id: number) {
+  return requestJson<ApiBooking>(`/bookings/${id}/cancel`, { method: "POST" });
+}
+
+// ── Projects (off-plan developments) ────────────────────────────────────────
+
+export type ApiProjectImage = {
+  id: number;
+  url: string;
+  display_order: number;
+};
+
+export type ApiProjectUnit = {
+  id: number;
+  unit_type: string;
+  price: number;
+  area_sq_m: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  living_rooms: number | null;
+  status: string;
+};
+
+export type ApiProject = {
+  id: number;
+  external_id: string | null;
+  title: string;
+  city: string;
+  area: string;
+  description: string | null;
+  image_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  status: string;
+  completion_status: string | null;
+  property_category: string | null;
+  price_min: number | null;
+  price_max: number | null;
+  area_min: number | null;
+  area_max: number | null;
+  unit_count: number | null;
+  intro_document_url: string | null;
+  is_featured: boolean;
+  developer_name: string | null;
+  developer_logo_url: string | null;
+  views_count: number;
+  created_at: string;
+  updated_at: string;
+  units: ApiProjectUnit[];
+  images: ApiProjectImage[];
+};
+
+export function mapApiProject(project: ApiProject): UiProject {
+  const imageUrls = (project.images ?? []).map((i) => i.url);
+  const primaryImage = imageUrls[0] ?? project.image_url ?? "";
+
+  return {
+    id: String(project.id),
+    title: project.title,
+    district: project.area,
+    city: project.city,
+    image: primaryImage,
+    images: imageUrls.length > 0 ? imageUrls : [primaryImage],
+    priceMin: project.price_min,
+    priceMax: project.price_max,
+    areaMin: project.area_min,
+    areaMax: project.area_max,
+    unitCount: project.unit_count,
+    status: project.status,
+    completionStatus: project.completion_status,
+    category: project.property_category,
+    developerName: project.developer_name,
+    developerLogo: project.developer_logo_url,
+    description: project.description,
+    latitude: project.latitude,
+    longitude: project.longitude,
+    introDocumentUrl: project.intro_document_url,
+    isFeatured: project.is_featured,
+    units: (project.units ?? []).map((u) => ({
+      id: String(u.id),
+      unitType: u.unit_type,
+      price: u.price,
+      areaSqm: u.area_sq_m,
+      bedrooms: u.bedrooms,
+      bathrooms: u.bathrooms,
+      livingRooms: u.living_rooms,
+      status: u.status,
+    })),
+    createdAt: project.created_at,
+  };
+}
+
+export function fetchProjects() {
+  return requestJson<ApiProject[]>("/projects/?limit=100");
+}
+
+export function fetchProject(id: number) {
+  return requestJson<ApiProject>(`/projects/${id}`);
+}
+
+export function fetchSimilarProjects(id: number, limit = 6) {
+  return requestJson<ApiProject[]>(`/projects/${id}/similar?limit=${limit}`);
 }

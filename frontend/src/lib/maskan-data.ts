@@ -1,7 +1,12 @@
-import prop1 from "@/assets/prop-1.jpg";
-import prop2 from "@/assets/prop-2.jpg";
-import prop3 from "@/assets/prop-3.jpg";
-import prop4 from "@/assets/prop-4.jpg";
+export type PropertyFeatures = {
+  kitchen: boolean;
+  water: boolean;
+  electricity: boolean;
+  privateRoof: boolean;
+  inVilla: boolean;
+  twoEntrances: boolean;
+  separateElectricalMeter: boolean;
+};
 
 export type Property = {
   id: string;
@@ -25,142 +30,21 @@ export type Property = {
   agentPhone: string | null;
   agentProfileImage: string | null;
   mediatorId: number | null;
+  description: string | null;
+  furnished: string | null;
+  livingRooms: number | null;
+  propertyAgeYears: number | null;
+  commissionPercent: number | null;
+  features: PropertyFeatures;
+  licenseNumber: string | null;
+  licenseExpirationDate: string | null;
+  deedArea: number | null;
+  viewsCount: number;
+  createdAt: string;
+  updatedAt: string;
+  mediatorRating: number | null;
+  mediatorReviewCount: number;
 };
-
-export const properties: Property[] = [
-  {
-    id: "MSK-1042",
-    title: "Skyline Residence — Al Olaya",
-    district: "Al Olaya",
-    city: "Riyadh",
-    price: 145000,
-    listingType: "rent" as const,
-    bedrooms: 3,
-    bathrooms: 3,
-    area: 210,
-    type: "Apartment",
-    image: prop1,
-    images: [prop1],
-    matchScore: 96,
-    badges: ["Best Match", "Verified"],
-    status: "Available",
-    pricePerSqm: 690,
-    agent: "Faisal Al-Harbi",
-    agentPhone: null,
-    agentProfileImage: null,
-    mediatorId: null,
-  },
-  {
-    id: "MSK-2210",
-    title: "Najdi Modern Villa — Al Yasmin",
-    district: "Al Yasmin",
-    city: "Riyadh",
-    price: 235000,
-    listingType: "rent" as const,
-    bedrooms: 5,
-    bathrooms: 6,
-    area: 480,
-    type: "Villa",
-    image: prop2,
-    images: [prop2],
-    matchScore: 91,
-    badges: ["Verified", "New"],
-    status: "Available",
-    pricePerSqm: 489,
-    agent: "Noura Al-Qahtani",
-    agentPhone: null,
-    agentProfileImage: null,
-    mediatorId: null,
-  },
-  {
-    id: "MSK-3398",
-    title: "KAFD Penthouse with City View",
-    district: "King Abdullah Financial District",
-    city: "Riyadh",
-    price: 420000,
-    listingType: "rent" as const,
-    bedrooms: 4,
-    bathrooms: 5,
-    area: 360,
-    type: "Penthouse",
-    image: prop3,
-    images: [prop3],
-    matchScore: 88,
-    badges: ["Hot", "Verified"],
-    status: "Reserved",
-    pricePerSqm: 1166,
-    agent: "Omar Bin Saleh",
-    agentPhone: null,
-    agentProfileImage: null,
-    mediatorId: null,
-  },
-  {
-    id: "MSK-4521",
-    title: "Coastal Townhouse — Al Shati",
-    district: "Al Shati",
-    city: "Jeddah",
-    price: 168000,
-    listingType: "rent" as const,
-    bedrooms: 4,
-    bathrooms: 4,
-    area: 260,
-    type: "Townhouse",
-    image: prop4,
-    images: [prop4],
-    matchScore: 84,
-    badges: ["Price Drop", "Verified"],
-    status: "Available",
-    pricePerSqm: 646,
-    agent: "Layla Al-Subaie",
-    agentPhone: null,
-    agentProfileImage: null,
-    mediatorId: null,
-  },
-  {
-    id: "MSK-5630",
-    title: "Family Apartment — Al Narjis",
-    district: "Al Narjis",
-    city: "Riyadh",
-    price: 98000,
-    listingType: "rent" as const,
-    bedrooms: 3,
-    bathrooms: 3,
-    area: 195,
-    type: "Apartment",
-    image: prop1,
-    images: [prop1],
-    matchScore: 89,
-    badges: ["Verified", "New"],
-    status: "Available",
-    pricePerSqm: 502,
-    agent: "Saad Al-Dosari",
-    agentPhone: null,
-    agentProfileImage: null,
-    mediatorId: null,
-  },
-  {
-    id: "MSK-6712",
-    title: "Garden Villa — Al Malqa",
-    district: "Al Malqa",
-    city: "Riyadh",
-    price: 205000,
-    listingType: "rent" as const,
-    bedrooms: 4,
-    bathrooms: 5,
-    area: 380,
-    type: "Villa",
-    image: prop2,
-    images: [prop2],
-    matchScore: 92,
-    badges: ["Best Match", "Verified"],
-    status: "Available",
-    pricePerSqm: 539,
-    agent: "Hanan Al-Rashid",
-    agentPhone: null,
-    agentProfileImage: null,
-    mediatorId: null,
-  },
-];
 
 export const marketStats = [
   { label: "Avg. Rent Riyadh", value: "SAR 92K", delta: "+4.2%", trend: "up" as const },

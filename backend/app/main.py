@@ -12,7 +12,7 @@ import app.models  # noqa: F401 — registers all SQLAlchemy models before any m
 import app.tasks.notifications  # noqa: F401 — registers outbox event handlers (saved-search matching) at import time
 import app.tasks.lead_notifications  # noqa: F401 — registers outbox event handlers (generic lead notifications) at import time
 import app.tasks.property_requests  # noqa: F401 — registers outbox event handlers (property request matching) at import time
-from app.api.routes import properties, search, analytics, areas, auth, users, saved_searches, saved_properties, ai, health
+from app.api.routes import properties, search, analytics, areas, auth, users, saved_searches, saved_properties, ai, health, projects
 from app.api.routes import area_intelligence, mediators, leads, contracts, payments, reviews, notifications, devices, bookings
 from app.api.routes import property_requests, property_request_partner, property_request_admin, verification, subscriptions
 from app.api.routes import financing
@@ -98,6 +98,7 @@ _ROUTERS = [
     (auth.router, "/auth", ["auth"]),
     (users.router, "/users", ["users"]),
     (properties.router, "/properties", ["properties"]),
+    (projects.router, "/projects", ["projects"]),
     (saved_properties.router, "/saved-properties", ["saved-properties"]),
     (saved_searches.router, "/saved-searches", ["saved-searches"]),
     (search.router, "/search", ["search"]),

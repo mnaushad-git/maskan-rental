@@ -13,8 +13,9 @@ import {
   Building2,
   Calculator,
   Calendar,
-  Car,
   CheckCircle2,
+  Eye,
+  FileText,
   GitCompare,
   GraduationCap,
   Heart,
@@ -31,6 +32,7 @@ import {
   ShoppingBag,
   Sofa,
   Sparkles,
+  Star,
   Trees,
   TrendingUp,
   Wallet,
@@ -43,8 +45,8 @@ import { ScoreRing, ScoreBar } from "@/components/maskan/ScoreIndicator";
 import { PropertyCard } from "@/components/maskan/PropertyCard";
 import { WhatsAppIcon, whatsappLink } from "@/components/maskan/ContactButtons";
 import {
-  fetchProperties,
   fetchProperty,
+  fetchSimilarProperties,
   fetchAreas,
   fetchAreaIntelligence,
   fetchSavedProperties,
@@ -96,7 +98,6 @@ function PropertyDetail() {
   const { t } = useLanguage();
   const tProp = usePropT();
   const [property, setProperty] = useState<Property | null>(null);
-  const [properties, setProperties] = useState<Property[]>([]);
   const [areaIntel, setAreaIntel] = useState<ApiAreaIntelligence | null>(null);
   const [areaAvgMonthly, setAreaAvgMonthly] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,14 +121,10 @@ function PropertyDetail() {
       try {
         setLoading(true);
         setError(null);
-        const [propertyData, propertiesData] = await Promise.all([
-          fetchProperty(propertyId),
-          fetchProperties(),
-        ]);
+        const propertyData = await fetchProperty(propertyId);
         if (cancelled) return;
         const mapped = mapApiProperty(propertyData);
         setProperty(mapped);
-        setProperties(propertiesData.map(mapApiProperty));
 
         // Now load area-specific data in parallel (non-blocking)
         Promise.all([
@@ -202,6 +199,9 @@ function PropertyDetail() {
       <div className="container-page grid grid-cols-1 gap-10 pb-32 lg:pb-16 lg:grid-cols-[1.7fr_1fr]">
         <main className="space-y-10">
           <Summary property={property} />
+          {!isSale && <RentNowPayLaterBanner property={property} />}
+          <PropertyFeatures property={property} />
+          <DescriptionSection property={property} />
           <RentalIntelligence
             property={property}
             areaIntel={areaIntel}
@@ -218,9 +218,11 @@ function PropertyDetail() {
             <RentCalculator property={property} />
           )}
           {!isSale && <ShortTermBooking property={property} />}
+          <RentPayments property={property} />
           <AreaSummary property={property} />
           <NearbyPlaces areaIntel={areaIntel} district={property.district} />
-          <ComparableListings currentId={property.id} properties={properties} />
+          <ListingDetailsPanel property={property} />
+          <ComparableListings currentId={property.id} />
           <AiSummary
             property={property}
             areaIntel={areaIntel}
@@ -235,7 +237,10 @@ function PropertyDetail() {
             agentPhone={property.agentPhone}
             agentProfileImage={property.agentProfileImage}
             mediatorId={property.mediatorId}
+            mediatorRating={property.mediatorRating}
+            mediatorReviewCount={property.mediatorReviewCount}
           />
+          <RegisterLeaseBanner property={property} />
         </aside>
       </div>
 
@@ -377,25 +382,36 @@ function Summary({ property }: { property: Property }) {
       label: tProp("summary.bathrooms"),
       value: property.bathrooms,
     },
+    ...(property.livingRooms != null
+      ? [
+          {
+            icon: <Sofa className="size-4" />,
+            label: tProp("summary.livingRooms"),
+            value: property.livingRooms,
+          },
+        ]
+      : []),
     {
       icon: <Maximize className="size-4" />,
       label: tProp("summary.area"),
       value: `${property.area} m²`,
     },
-    {
-      icon: <Sofa className="size-4" />,
-      label: tProp("summary.furnishing"),
-      value: tProp("summary.semiFurnished"),
-    },
+    ...(property.furnished
+      ? [
+          {
+            icon: <Sofa className="size-4" />,
+            label: tProp("summary.furnishing"),
+            value: property.furnished,
+          },
+        ]
+      : []),
     {
       icon: <Calendar className="size-4" />,
       label: tProp("summary.buildingAge"),
-      value: tProp("summary.years", { count: 3 }),
-    },
-    {
-      icon: <Car className="size-4" />,
-      label: tProp("summary.parking"),
-      value: tProp("summary.covered", { count: 2 }),
+      value:
+        !property.propertyAgeYears
+          ? tProp("summary.new")
+          : tProp("summary.years", { count: property.propertyAgeYears }),
     },
   ];
   return (
@@ -422,6 +438,11 @@ function Summary({ property }: { property: Property }) {
           </div>
           <div className="font-display text-3xl font-bold tracking-tight md:text-4xl">
             SAR {formatSAR(property.price)}
+            {property.commissionPercent != null && (
+              <span className="ms-2 text-sm font-normal text-muted-foreground">
+                {tProp("summary.plusCommission", { percent: property.commissionPercent })}
+              </span>
+            )}
           </div>
           <div className="mt-1 text-sm text-muted-foreground">
             SAR {formatSAR(property.pricePerSqm)} / m²
@@ -442,6 +463,202 @@ function Summary({ property }: { property: Property }) {
   );
 }
 
+/* ------------------------ Rent now, pay later ----------------------------- */
+function RentNowPayLaterBanner({ property }: { property: Property }) {
+  const tProp = usePropT();
+  const [showFinancing, setShowFinancing] = useState(false);
+  const monthly = Math.round(property.price / 12);
+
+  return (
+    <>
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-primary/30 bg-primary/5 p-5">
+        <div>
+          <div className="text-sm font-semibold">{tProp("rentNowPayLater.title")}</div>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {tProp("rentNowPayLater.subtitle", { amount: formatSAR(monthly) })}
+          </p>
+        </div>
+        <Button onClick={() => setShowFinancing(true)}>{tProp("rentNowPayLater.cta")}</Button>
+      </section>
+      {showFinancing && (
+        <FinancingModal property={property} onClose={() => setShowFinancing(false)} />
+      )}
+    </>
+  );
+}
+
+/* --------------------------- Property Features ---------------------------- */
+function PropertyFeatures({ property }: { property: Property }) {
+  const tProp = usePropT();
+  const items: { key: keyof Property["features"]; label: string }[] = [
+    { key: "kitchen", label: tProp("features.kitchen") },
+    { key: "water", label: tProp("features.water") },
+    { key: "electricity", label: tProp("features.electricity") },
+    { key: "privateRoof", label: tProp("features.privateRoof") },
+    { key: "inVilla", label: tProp("features.inVilla") },
+    { key: "twoEntrances", label: tProp("features.twoEntrances") },
+    { key: "separateElectricalMeter", label: tProp("features.separateElectricalMeter") },
+  ];
+  const active = items.filter((i) => property.features[i.key]);
+  if (active.length === 0) return null;
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <h2 className="font-display text-xl font-bold tracking-tight">{tProp("features.title")}</h2>
+      <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+        {active.map((i) => (
+          <div key={i.key} className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="size-4 shrink-0 text-success" /> {i.label}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------ Description -------------------------------- */
+const DESCRIPTION_PREVIEW_LENGTH = 320;
+
+function DescriptionSection({ property }: { property: Property }) {
+  const tProp = usePropT();
+  const [expanded, setExpanded] = useState(false);
+  const description = property.description ?? "";
+  if (!description) return null;
+  const isLong = description.length > DESCRIPTION_PREVIEW_LENGTH;
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <h2 className="font-display text-xl font-bold tracking-tight">{tProp("description.title")}</h2>
+      <p className="mt-3 whitespace-pre-line text-sm leading-6 text-muted-foreground">
+        {expanded || !isLong ? description : `${description.slice(0, DESCRIPTION_PREVIEW_LENGTH)}…`}
+      </p>
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 text-sm font-semibold text-primary hover:underline"
+        >
+          {expanded ? tProp("readLess") : tProp("readMore")}
+        </button>
+      )}
+    </section>
+  );
+}
+
+/* ----------------------------- Rent Payments ------------------------------ */
+function RentPayments({ property }: { property: Property }) {
+  const tProp = usePropT();
+  if (property.listingType === "sale") return null;
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <h2 className="font-display text-xl font-bold tracking-tight">{tProp("rentPayments.title")}</h2>
+      <div className="mt-4 flex items-center justify-between rounded-xl border border-border p-4">
+        <span className="text-lg font-bold">SAR {formatSAR(property.price)}</span>
+        <span className="text-sm text-muted-foreground">{tProp("rentPayments.yearly")}</span>
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------- Register lease contract ------------------------ */
+function RegisterLeaseBanner({ property }: { property: Property }) {
+  const tProp = usePropT();
+  return (
+    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+      <div className="flex items-start gap-3">
+        <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+          <FileText className="size-4" />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-sm font-semibold">{tProp("registerLease.title")}</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">{tProp("registerLease.desc")}</p>
+          <Button size="sm" variant="outline" className="mt-3 w-full" asChild>
+            <Link to="/lead/new" search={{ area: property.district, city: property.city }}>
+              {tProp("registerLease.cta")}
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------- Listing details ------------------------------ */
+function ListingDetailsPanel({ property }: { property: Property }) {
+  const tProp = usePropT();
+  const [tab, setTab] = useState<"main" | "additional">("main");
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <h2 className="font-display text-xl font-bold tracking-tight">{tProp("listingDetails.title")}</h2>
+      <div className="mt-4 flex gap-2 border-b border-border">
+        <button
+          type="button"
+          onClick={() => setTab("main")}
+          className={cn(
+            "border-b-2 px-1 pb-2 text-sm font-medium",
+            tab === "main" ? "border-primary text-foreground" : "border-transparent text-muted-foreground",
+          )}
+        >
+          {tProp("listingDetails.mainTab")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("additional")}
+          className={cn(
+            "border-b-2 px-1 pb-2 text-sm font-medium",
+            tab === "additional" ? "border-primary text-foreground" : "border-transparent text-muted-foreground",
+          )}
+        >
+          {tProp("listingDetails.additionalTab")}
+        </button>
+      </div>
+      <div className="mt-4 space-y-2 text-sm">
+        {tab === "main" ? (
+          <>
+            <Row icon={<Eye className="size-4" />} label={tProp("listingDetails.listingId")} value={`#${property.id}`} />
+            <Row
+              icon={<Calendar className="size-4" />}
+              label={tProp("listingDetails.createdAt")}
+              value={format(new Date(property.createdAt), "d MMM yyyy")}
+            />
+            <Row icon={<Eye className="size-4" />} label={tProp("listingDetails.views")} value={String(property.viewsCount)} />
+            <Row
+              icon={<Maximize className="size-4" />}
+              label={tProp("listingDetails.deedArea")}
+              value={property.deedArea != null ? `${property.deedArea} m²` : "—"}
+            />
+          </>
+        ) : (
+          <>
+            <Row
+              icon={<FileText className="size-4" />}
+              label={tProp("listingDetails.licenseNumber")}
+              value={property.licenseNumber ?? "—"}
+            />
+            <Row
+              icon={<Calendar className="size-4" />}
+              label={tProp("listingDetails.licenseExpiration")}
+              value={
+                property.licenseExpirationDate
+                  ? format(new Date(property.licenseExpirationDate), "d MMM yyyy")
+                  : "—"
+              }
+            />
+            <Row
+              icon={<Calendar className="size-4" />}
+              label={tProp("listingDetails.lastUpdated")}
+              value={format(new Date(property.updatedAt), "d MMM yyyy")}
+            />
+            <Row icon={<Building2 className="size-4" />} label={tProp("listingDetails.source")} value={tProp("listingDetails.sourceValue")} />
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------------- */
 /* ------------------------- Rental Intelligence --------------------------- */
 function computePriceFairness(monthlyRent: number, areaAvg: number | null): number {
   if (!areaAvg) return 75;
@@ -877,15 +1094,24 @@ function NearbyPlaces({
 }
 
 /* -------------------------- Comparable Listings -------------------------- */
-function ComparableListings({
-  currentId,
-  properties,
-}: {
-  currentId: string;
-  properties: Property[];
-}) {
+function ComparableListings({ currentId }: { currentId: string }) {
   const tProp = usePropT();
-  const comps = properties.filter((p) => p.id !== currentId).slice(0, 5);
+  const [comps, setComps] = useState<Property[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSimilarProperties(Number(currentId))
+      .then((results) => {
+        if (!cancelled) setComps(results.map(mapApiProperty));
+      })
+      .catch(() => !cancelled && setComps([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [currentId]);
+
+  if (comps.length === 0) return null;
+
   return (
     <section>
       <div className="mb-6 flex items-end justify-between">
@@ -2092,11 +2318,15 @@ function LandlordCard({
   agentPhone,
   agentProfileImage,
   mediatorId,
+  mediatorRating,
+  mediatorReviewCount,
 }: {
   agentName: string;
   agentPhone: string | null;
   agentProfileImage: string | null;
   mediatorId: number | null;
+  mediatorRating: number | null;
+  mediatorReviewCount: number;
 }) {
   const { t } = useLanguage();
   const tProp = usePropT();
@@ -2125,7 +2355,18 @@ function LandlordCard({
           )}
           <div className="min-w-0 flex-1">
             <div className="truncate font-semibold">{agentName}</div>
-            <div className="text-xs text-muted-foreground">{tProp("landlord.verifiedAgent")}</div>
+            {mediatorRating != null ? (
+              <Link
+                to="/agent/$id"
+                params={{ id: String(mediatorId) }}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+              >
+                <Star className="size-3.5 fill-warning text-warning" /> {mediatorRating.toFixed(2)}{" "}
+                <span className="underline">{tProp("landlord.reviews", { count: mediatorReviewCount })}</span>
+              </Link>
+            ) : (
+              <div className="text-xs text-muted-foreground">{tProp("landlord.verifiedAgent")}</div>
+            )}
           </div>
           {mediatorId && (
             <Link

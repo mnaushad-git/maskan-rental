@@ -9,6 +9,7 @@ Run from backend/ directory:
 Safe to re-run: existing records are UPDATED in-place (upsert on external_id).
 """
 
+import re
 import sys
 import os
 
@@ -1747,13 +1748,47 @@ PROPERTIES = [
 ]
 
 
+def _seed_index(data: dict) -> int:
+    """Stable per-listing number derived from external_id (e.g. MSK-001 -> 1),
+    used to vary the Aqar-style detail fields deterministically across the
+    demo dataset instead of a fixed value on every row."""
+    match = re.search(r"(\d+)$", data.get("external_id") or "")
+    return int(match.group(1)) if match else 0
+
+
+def _derive_detail_fields(data: dict) -> dict:
+    """Backfill for the Property Information / Features / Listing-details
+    sections of the Aqar-style property page — none of these exist in the
+    hand-written PROPERTIES entries above, so derive plausible, stable values
+    per listing rather than leaving them blank for the whole demo dataset."""
+    idx = _seed_index(data)
+    bedrooms = data.get("bedrooms") or 2
+    size = data.get("size_sq_m") or 150
+    is_villa = "villa" in data["title"].lower()
+    return {
+        "living_rooms": 2 if bedrooms >= 4 else 1,
+        "property_age_years": (idx * 3) % 16,  # 0 renders as "New" in the UI
+        "commission_percent": 2.5,
+        "has_kitchen": True,
+        "has_water": True,
+        "has_electricity": True,
+        "has_private_roof": is_villa,
+        "in_villa": is_villa,
+        "has_two_entrances": idx % 2 == 0,
+        "has_separate_electrical_meter": idx % 3 != 0,
+        "license_number": f"71{300000 + idx * 37}",
+        "deed_area": size + (idx % 5) * 5,
+    }
+
+
 def seed():
     db = SessionLocal()
     inserted = 0
     updated = 0
 
     try:
-        for data in PROPERTIES:
+        for raw in PROPERTIES:
+            data = {**raw, **_derive_detail_fields(raw)}
             existing = db.scalars(
                 select(Property).where(Property.external_id == data["external_id"])
             ).first()

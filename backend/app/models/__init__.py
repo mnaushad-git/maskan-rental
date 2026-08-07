@@ -33,6 +33,7 @@ from app.models.property_request_mediator_response import (
     PropertyRequestMediatorResponseProperty,
 )
 from app.models.property_request_scoring_config import PropertyRequestScoringConfig
+from app.models.project import Project, ProjectUnit, ProjectImage
 
 __all__ = [
     "User",
@@ -61,4 +62,7 @@ __all__ = [
     "DigestRun",
     "NotificationDelivery",
     "AnalyticsEvent",
+    "Project",
+    "ProjectUnit",
+    "ProjectImage",
 ]

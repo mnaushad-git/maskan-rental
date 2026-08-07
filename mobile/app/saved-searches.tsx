@@ -156,7 +156,7 @@ function SavedSearchCard({
       <Text className="text-[11px] text-muted-foreground">{t("savedSearches.card.lastAlert", { date: relativeTime(search.last_notified_at, t) })}</Text>
 
       <View className="flex-row flex-wrap gap-2 pt-1">
-        <Button size="sm" variant="outline" icon={<Search size={13} color={colors.foreground} />} onPress={() => router.push("/(tabs)/search")}>
+        <Button size="sm" variant="outline" icon={<Search size={13} color={colors.foreground} />} onPress={() => router.push("/search")}>
           {t("savedSearches.card.runSearch")}
         </Button>
         <Button size="sm" variant="outline" loading={previewing} onPress={handlePreview}>
@@ -262,7 +262,7 @@ export default function SavedSearchesScreen() {
             title={t("savedSearches.empty.heading")}
             description={t("savedSearches.empty.desc")}
             actionLabel={t("savedSearches.empty.browseProperties")}
-            onAction={() => router.push("/(tabs)/search")}
+            onAction={() => router.push("/search")}
           />
         }
       />

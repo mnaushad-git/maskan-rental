@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { View, Text, FlatList, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { Heart } from "lucide-react-native";
 import { fetchSavedProperties, mapApiSearchProperty, type ApiSavedProperty } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
@@ -56,6 +56,7 @@ export default function SavedScreen() {
   if (authLoading || loading) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 gap-4 bg-background p-4">
+        <Stack.Screen options={{ title: t("saved.heading") }} />
         {Array.from({ length: 3 }).map((_, i) => (
           <PropertyCardSkeleton key={i} />
         ))}
@@ -66,6 +67,7 @@ export default function SavedScreen() {
   if (!user) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center gap-4 bg-background p-6">
+        <Stack.Screen options={{ title: t("saved.heading") }} />
         <Text className="text-center text-base font-semibold text-foreground">{t("myLeads.signInToView")}</Text>
         <Button onPress={() => router.push("/auth/login")}>{t("myLeads.signIn")}</Button>
       </SafeAreaView>
@@ -75,6 +77,7 @@ export default function SavedScreen() {
   if (error && saved.length === 0) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
+        <Stack.Screen options={{ title: t("saved.heading") }} />
         <ErrorState onRetry={() => load(false)} />
       </SafeAreaView>
     );
@@ -82,6 +85,7 @@ export default function SavedScreen() {
 
   return (
     <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
+      <Stack.Screen options={{ title: t("saved.heading") }} />
       <FlatList
         data={saved}
         keyExtractor={(s) => String(s.id)}
@@ -100,7 +104,7 @@ export default function SavedScreen() {
             title={t("saved.empty.heading")}
             description={t("saved.empty.desc")}
             actionLabel={t("saved.empty.browseProperties")}
-            onAction={() => router.push("/(tabs)/search")}
+            onAction={() => router.push("/search")}
           />
         }
       />

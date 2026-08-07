@@ -1,41 +1,29 @@
 import { useEffect, useState } from "react";
 import { View, Text, ScrollView } from "react-native";
-import { fetchProperties, mapApiSearchProperty } from "@/lib/api/maskan";
+import { fetchSimilarProperties, mapApiSearchProperty } from "@/lib/api/maskan";
 import { useLanguage } from "@/lib/i18n/context";
 import { PropertyCard } from "./PropertyCard";
 import { toCardProperty, type Property } from "@/lib/maskan-data";
 
-/** Horizontal rail of other listings in the same district — a condensed
- * mobile take on the web app's "Comparable Listings" section. */
-export function PropertySimilarListings({
-  excludeId,
-  district,
-  city,
-}: {
-  excludeId: string;
-  district: string;
-  city: string;
-}) {
+/** Horizontal rail of other listings near this one — backed by the
+ * server-side /properties/{id}/similar endpoint (same district first, then
+ * closest price), mirroring the web app's "Comparable Listings" section. */
+export function PropertySimilarListings({ excludeId }: { excludeId: string }) {
   const { t } = useLanguage();
   const [items, setItems] = useState<Property[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchProperties()
-      .then((all) => {
+    fetchSimilarProperties(Number(excludeId))
+      .then((results) => {
         if (cancelled) return;
-        const similar = all
-          .map(mapApiSearchProperty)
-          .filter((p) => p.id !== excludeId && p.district === district && p.city === city)
-          .slice(0, 6)
-          .map(toCardProperty);
-        setItems(similar);
+        setItems(results.map(mapApiSearchProperty).map(toCardProperty));
       })
       .catch(() => !cancelled && setItems([]));
     return () => {
       cancelled = true;
     };
-  }, [excludeId, district, city]);
+  }, [excludeId]);
 
   if (!items || items.length === 0) return null;
 

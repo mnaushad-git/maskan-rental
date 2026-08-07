@@ -152,7 +152,7 @@ export default function EstimateScreen() {
             <Text className="text-[11px] leading-4 text-muted-foreground">{t("estimate.disclaimer")}</Text>
             <View className="flex-row gap-2">
               <Pressable
-                onPress={() => router.push("/(tabs)/search")}
+                onPress={() => router.push("/search")}
                 className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl border border-border py-3"
               >
                 <Text className="text-sm font-medium text-foreground">{t("estimate.viewSimilarListings")}</Text>

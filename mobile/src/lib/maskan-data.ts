@@ -1,3 +1,15 @@
+export type PropertyFeatures = {
+  kitchen: boolean;
+  water: boolean;
+  electricity: boolean;
+  privateRoof: boolean;
+  inVilla: boolean;
+  twoEntrances: boolean;
+  separateElectricalMeter: boolean;
+  elevator: boolean;
+  airconditioners: boolean;
+};
+
 export type Property = {
   id: string;
   title: string;
@@ -22,6 +34,26 @@ export type Property = {
   mediatorId: number | null;
   latitude: number | null;
   longitude: number | null;
+  description: string | null;
+  furnished: string | null;
+  livingRooms: number | null;
+  propertyAgeYears: number | null;
+  commissionPercent: number | null;
+  features: PropertyFeatures;
+  licenseNumber: string | null;
+  licenseExpirationDate: string | null;
+  deedArea: number | null;
+  viewsCount: number;
+  createdAt: string;
+  updatedAt: string;
+  mediatorRating: number | null;
+  mediatorReviewCount: number;
+  isBookable: boolean;
+  nightlyRate: number | null;
+  arrivalTime: string | null;
+  departureTime: string | null;
+  latestBookingTime: string | null;
+  insuranceAmount: number;
 };
 
 import { I18nManager } from "react-native";
@@ -57,6 +89,38 @@ export function toCardProperty(p: SearchProperty): Property {
     mediatorId: null,
     latitude: p.latitude,
     longitude: p.longitude,
+    // SearchProperty (search-result cards) doesn't carry these detail-page-only
+    // fields — placeholders here are fine since PropertyCard never renders them.
+    description: null,
+    furnished: null,
+    livingRooms: null,
+    propertyAgeYears: null,
+    commissionPercent: null,
+    features: {
+      kitchen: false,
+      water: false,
+      electricity: false,
+      privateRoof: false,
+      inVilla: false,
+      twoEntrances: false,
+      separateElectricalMeter: false,
+      elevator: false,
+      airconditioners: false,
+    },
+    licenseNumber: null,
+    licenseExpirationDate: null,
+    deedArea: null,
+    viewsCount: 0,
+    createdAt: "",
+    updatedAt: "",
+    mediatorRating: null,
+    mediatorReviewCount: 0,
+    isBookable: false,
+    nightlyRate: null,
+    arrivalTime: null,
+    departureTime: null,
+    latestBookingTime: null,
+    insuranceAmount: 0,
   };
 }
 
@@ -70,4 +134,44 @@ export function toCardProperty(p: SearchProperty): Property {
 export const formatSAR = (n: number) => {
   const locale = I18nManager.isRTL ? "ar-SA" : "en-US";
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 0, numberingSystem: "latn" }).format(n);
+};
+
+export type ProjectUnit = {
+  id: string;
+  unitType: string;
+  price: number;
+  areaSqm: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  livingRooms: number | null;
+  status: string;
+};
+
+// Off-plan/new-development "Project" — a developer-built multi-unit
+// development, distinct from a single Property listing. See ProjectCard /
+// app/project/[id].tsx.
+export type Project = {
+  id: string;
+  title: string;
+  district: string;
+  city: string;
+  image: string;
+  images: string[];
+  priceMin: number | null;
+  priceMax: number | null;
+  areaMin: number | null;
+  areaMax: number | null;
+  unitCount: number | null;
+  status: string;
+  completionStatus: string | null;
+  category: string | null;
+  developerName: string | null;
+  developerLogo: string | null;
+  description: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  introDocumentUrl: string | null;
+  isFeatured: boolean;
+  units: ProjectUnit[];
+  createdAt: string;
 };

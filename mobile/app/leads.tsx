@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { View, Text, FlatList, Pressable, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useFocusEffect } from "expo-router";
+import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { ChevronRight, FileText, MapPin } from "lucide-react-native";
 import { fetchMyLeads, type ApiLeadSummary } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
@@ -56,6 +56,7 @@ export default function MyLeadsScreen() {
   if (!user) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center gap-4 bg-background p-6">
+        <Stack.Screen options={{ title: t("nav.myLeads") }} />
         <Text className="text-center text-base text-muted-foreground">{t("myLeads.signInToView")}</Text>
         <Button onPress={() => router.push("/auth/login")}>{t("myLeads.signIn")}</Button>
       </SafeAreaView>
@@ -65,6 +66,7 @@ export default function MyLeadsScreen() {
   if (loading) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 gap-3 bg-background p-4">
+        <Stack.Screen options={{ title: t("nav.myLeads") }} />
         {Array.from({ length: 4 }).map((_, i) => (
           <View key={i} className="gap-2.5 rounded-xl border border-border bg-card p-4">
             <Skeleton width="60%" height={16} />
@@ -79,6 +81,7 @@ export default function MyLeadsScreen() {
   if (error && leads.length === 0) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
+        <Stack.Screen options={{ title: t("nav.myLeads") }} />
         <ErrorState onRetry={load} />
       </SafeAreaView>
     );
@@ -87,6 +90,7 @@ export default function MyLeadsScreen() {
   if (leads.length === 0) {
     return (
       <SafeAreaView edges={["bottom"]} className="flex-1 items-center justify-center gap-3 bg-background p-6">
+        <Stack.Screen options={{ title: t("nav.myLeads") }} />
         <FileText size={40} color={colors.neutral400} />
         <Text className="text-center text-lg font-semibold text-foreground">{t("myLeads.empty.heading")}</Text>
         <Text className="text-center text-sm text-muted-foreground">{t("myLeads.empty.desc")}</Text>
@@ -99,6 +103,7 @@ export default function MyLeadsScreen() {
 
   return (
     <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
+      <Stack.Screen options={{ title: t("nav.myLeads") }} />
       <FlatList
         data={leads}
         keyExtractor={(lead) => String(lead.id)}

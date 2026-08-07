@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -30,6 +30,35 @@ class Property(Base):
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    living_rooms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    property_age_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    commission_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+    has_kitchen: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    has_water: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    has_electricity: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    has_private_roof: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    in_villa: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    has_two_entrances: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    has_separate_electrical_meter: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    license_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    license_expiration_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    deed_area: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    views_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Short-term "bookable stay" fields — see Booking model. A property is
+    # browsable in the mobile Bookings tab only when is_bookable is set;
+    # nightly_rate is the real per-night price when set, else callers fall
+    # back to a monthly_rent-derived heuristic (see BookingCalendar.tsx).
+    is_bookable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    nightly_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    has_elevator: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    has_airconditioners: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    arrival_time: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    departure_time: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    latest_booking_time: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    insurance_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0)
 
     mediator = relationship("Mediator", foreign_keys=[mediator_id], lazy="joined")
     saved_properties = relationship("SavedProperty", back_populates="property", cascade="all, delete-orphan")

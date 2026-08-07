@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Bell, List, Map as MapIcon, Search as SearchIcon, SearchX, X, FileText } from "lucide-react-native";
 import { fetchProperties, mapApiSearchProperty, searchProperties, type ApiProperty } from "@/lib/api/maskan";
 import type { SearchProperty } from "@/lib/maskan-search-data";
@@ -164,6 +164,7 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
+      <Stack.Screen options={{ title: t("nav.search") }} />
       <View className="gap-3 p-4">
         <View className="flex-row items-center gap-2 rounded-xl border border-border bg-background px-3">
           <SearchIcon size={16} color={colors.mutedForeground} />

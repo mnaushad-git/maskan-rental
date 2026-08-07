@@ -47,13 +47,33 @@ export type ApiProperty = {
   description: string | null;
   image_url: string | null;
   created_at: string;
+  updated_at: string;
   mediator_id: number | null;
   images: ApiListingImage[];
   mediator_phone: string | null;
   mediator_profile_image_url: string | null;
   mediator_agent_name: string | null;
+  mediator_is_verified: boolean;
   property_type: string | null;
   furnished: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  living_rooms: number | null;
+  property_age_years: number | null;
+  commission_percent: number | null;
+  has_kitchen: boolean;
+  has_water: boolean;
+  has_electricity: boolean;
+  has_private_roof: boolean;
+  in_villa: boolean;
+  has_two_entrances: boolean;
+  has_separate_electrical_meter: boolean;
+  license_number: string | null;
+  license_expiration_date: string | null;
+  deed_area: number | null;
+  views_count: number;
+  mediator_rating: number | null;
+  mediator_review_count: number;
 };
 
 export type AuthUser = {
@@ -183,6 +203,13 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
   const imageUrls = (property.images ?? []).map((i) => i.url);
   const primaryImage = imageUrls[0] ?? property.image_url ?? imageForProperty(property.id);
 
+  const badges: UiProperty["badges"] = [];
+  if (property.mediator_is_verified) badges.push("Verified");
+  if (matchScore >= 90) badges.push("Best Match");
+  const createdAtMs = Date.parse(property.created_at);
+  const isRecent = !Number.isNaN(createdAtMs) && Date.now() - createdAtMs < 14 * 24 * 60 * 60 * 1000;
+  if (isRecent && !badges.includes("Best Match")) badges.push("New");
+
   return {
     id: String(property.id),
     title: property.title,
@@ -197,7 +224,7 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     image: primaryImage,
     images: imageUrls.length > 0 ? imageUrls : [primaryImage],
     matchScore,
-    badges: ["Verified", matchScore >= 90 ? "Best Match" : "New"],
+    badges,
     status:
       property.status === "Published"
         ? "Available"
@@ -209,6 +236,28 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     agentPhone: property.mediator_phone ?? null,
     agentProfileImage: property.mediator_profile_image_url ?? null,
     mediatorId: property.mediator_id ?? null,
+    description: property.description ?? null,
+    furnished: property.furnished ?? null,
+    livingRooms: property.living_rooms ?? null,
+    propertyAgeYears: property.property_age_years ?? null,
+    commissionPercent: property.commission_percent ?? null,
+    features: {
+      kitchen: property.has_kitchen,
+      water: property.has_water,
+      electricity: property.has_electricity,
+      privateRoof: property.has_private_roof,
+      inVilla: property.in_villa,
+      twoEntrances: property.has_two_entrances,
+      separateElectricalMeter: property.has_separate_electrical_meter,
+    },
+    licenseNumber: property.license_number ?? null,
+    licenseExpirationDate: property.license_expiration_date ?? null,
+    deedArea: property.deed_area ?? null,
+    viewsCount: property.views_count ?? 0,
+    createdAt: property.created_at,
+    updatedAt: property.updated_at,
+    mediatorRating: property.mediator_rating ?? null,
+    mediatorReviewCount: property.mediator_review_count ?? 0,
   };
 }
 
@@ -387,6 +436,10 @@ export async function fetchPropertiesPaged(
 
 export function fetchProperty(id: number) {
   return requestJson<ApiProperty>(`/properties/${id}`);
+}
+
+export function fetchSimilarProperties(id: number, limit = 6) {
+  return requestJson<ApiProperty[]>(`/properties/${id}/similar?limit=${limit}`);
 }
 
 export function fetchAdminProperties() {

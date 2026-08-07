@@ -128,8 +128,13 @@ export default function HomeScreen() {
         </View>
       </SafeAreaView>
 
-      {/* Pull-up bottom sheet: listing count + More ways + New listings */}
+      {/* Pull-up bottom sheet: listing count + More ways + New listings.
+          Disabled while the map's marker preview card is open — on Android,
+          zIndex alone doesn't move touch-dispatch priority, so without this
+          the sheet (mounted after the map) still swallows taps on the card's
+          "View full details" button even though the card is drawn on top. */}
       <HomeSheet
+        pointerEvents={mapCardOpen ? "none" : "auto"}
         header={
           <View className="pb-0.5">
             <Text className="text-base font-bold text-foreground">
