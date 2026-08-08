@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { View, Text, Pressable, Linking } from "react-native";
-import { Image } from "expo-image";
+import { View, Text, Pressable, Linking, Image } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { Bath, BedDouble, Heart, MapPin, Maximize, Phone, MessageCircle } from "lucide-react-native";
 import type { Property } from "@/lib/maskan-data";
@@ -69,7 +68,7 @@ export function PropertyCard({
       <Link href={{ pathname: "/property/[id]", params: { id: p.id } }} asChild>
         <Pressable>
           <View className="relative aspect-[4/3] overflow-hidden bg-surface-2">
-            <Image source={{ uri: p.image }} className="size-full" contentFit="cover" />
+            <Image source={{ uri: p.image }} className="size-full" resizeMode="cover" />
             <View className="absolute inset-x-3 top-3 flex-row items-start justify-between gap-2">
               <View className="flex-row flex-wrap gap-1.5">
                 {p.badges.slice(0, 2).map((b) => (

@@ -1,5 +1,5 @@
 import { View, Text } from "react-native";
-import { Image } from "expo-image";
+import { Image } from "react-native";
 import { Link } from "expo-router";
 import { Pressable } from "react-native";
 import { MapPin, Building2 } from "lucide-react-native";
@@ -16,7 +16,7 @@ export function ProjectCard({ p }: { p: Project }) {
     <Link href={{ pathname: "/project/[id]", params: { id: p.id } }} asChild>
       <Pressable className="overflow-hidden rounded-2xl border border-border bg-background shadow-card">
         <View className="relative aspect-[4/3] overflow-hidden bg-surface-2">
-          <Image source={{ uri: p.image }} className="size-full" contentFit="cover" />
+          <Image source={{ uri: p.image }} className="size-full" resizeMode="cover" />
           <View className="absolute inset-x-3 top-3 flex-row flex-wrap items-start gap-1.5">
             {p.isFeatured && <Badge tone="ai">{t("projects.list.featured")}</Badge>}
             {p.category && <Badge tone="neutral">{p.category}</Badge>}

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, ScrollView, Pressable, Modal, TextInput, FlatList, ActivityIndicator } from "react-native";
-import { Image } from "expo-image";
+import { View, Text, ScrollView, Pressable, Modal, TextInput, FlatList, ActivityIndicator, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
 import { Plus, X, Search, BedDouble, Bath, Maximize, Sparkles, Trophy } from "lucide-react-native";
@@ -123,7 +122,7 @@ export default function CompareScreen() {
                       <Text className="text-[9px] font-bold text-primary-foreground">{t("compare.header.aiTopPick")}</Text>
                     </View>
                   )}
-                  <Image source={{ uri: p.image }} className="h-16 w-full rounded-lg" contentFit="cover" />
+                  <Image source={{ uri: p.image }} className="h-16 w-full rounded-lg" resizeMode="cover" />
                   <Text className="text-xs font-semibold text-foreground" numberOfLines={2}>{p.title}</Text>
                   <Text className="text-[10px] text-muted-foreground" numberOfLines={1}>{p.district}</Text>
                   <Pressable
@@ -213,7 +212,7 @@ export default function CompareScreen() {
               ListEmptyComponent={<Text className="p-4 text-center text-sm text-muted-foreground">{t("compare.picker.noMatch")}</Text>}
               renderItem={({ item }) => (
                 <Pressable onPress={() => addProperty(item)} className="flex-row items-center gap-3 border-b border-border py-2.5">
-                  <Image source={{ uri: item.image }} className="size-12 rounded-lg" contentFit="cover" />
+                  <Image source={{ uri: item.image }} className="size-12 rounded-lg" resizeMode="cover" />
                   <View className="flex-1">
                     <Text className="text-sm font-medium text-foreground" numberOfLines={1}>{item.title}</Text>
                     <Text className="text-xs text-muted-foreground">{item.district}, {item.city} · SAR {formatSAR(item.price)}</Text>

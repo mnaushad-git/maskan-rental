@@ -1,6 +1,12 @@
 import { useState } from "react";
-import { View, FlatList, useWindowDimensions, type NativeSyntheticEvent, type NativeScrollEvent } from "react-native";
-import { Image } from "expo-image";
+import {
+  View,
+  FlatList,
+  Image,
+  useWindowDimensions,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
+} from "react-native";
 
 /** Edge-to-edge swipeable image gallery with a page-dot indicator. Falls
  * back to a single static image when there's only one photo, so it renders
@@ -17,13 +23,7 @@ export function PropertyImageGallery({ images, aspectRatio = 0.75 }: { images: s
 
   if (images.length <= 1) {
     return (
-      <Image
-        source={{ uri: images[0] }}
-        style={{ width, height }}
-        contentFit="cover"
-        placeholder={{ blurhash: "L6PZfSi_.AyE_3t7t7R**0o#DgR4" }}
-        transition={150}
-      />
+      <Image source={{ uri: images[0] }} style={{ width, height }} resizeMode="cover" />
     );
   }
 
@@ -38,13 +38,7 @@ export function PropertyImageGallery({ images, aspectRatio = 0.75 }: { images: s
         onScroll={onScroll}
         scrollEventThrottle={32}
         renderItem={({ item }) => (
-          <Image
-            source={{ uri: item }}
-            style={{ width, height }}
-            contentFit="cover"
-            placeholder={{ blurhash: "L6PZfSi_.AyE_3t7t7R**0o#DgR4" }}
-            transition={150}
-          />
+          <Image source={{ uri: item }} style={{ width, height }} resizeMode="cover" />
         )}
       />
       <View className="absolute inset-x-0 bottom-3 flex-row items-center justify-center gap-1.5">

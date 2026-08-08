@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, Pressable, type ViewStyle } from "react-native";
-import { Image } from "expo-image";
+import { View, Text, Pressable, Image, type ViewStyle } from "react-native";
 import RNMapView, { Marker, type Region } from "react-native-maps";
 // Drop-in MapView replacement that clusters nearby markers into a single
 // numbered pin below a zoom threshold — same react-native-maps under the
@@ -211,7 +210,7 @@ export function PropertyMapView({
       {selected && (
         <View className="absolute inset-x-3 bottom-4 overflow-hidden rounded-2xl border border-border bg-background shadow-elevated">
           <View className="relative aspect-[16/7] overflow-hidden bg-surface-2">
-            <Image source={{ uri: selected.image }} className="size-full" contentFit="cover" />
+            <Image source={{ uri: selected.image }} className="size-full" resizeMode="cover" />
             <Pressable
               onPress={() => {
                 setSelected(null);

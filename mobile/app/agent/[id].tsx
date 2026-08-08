@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text, FlatList, ActivityIndicator, Pressable, Linking } from "react-native";
-import { Image } from "expo-image";
+import { View, Text, FlatList, ActivityIndicator, Pressable, Linking, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { BadgeCheck, Phone, MessageCircle, MapPin, Star, Home } from "lucide-react-native";
@@ -175,7 +174,7 @@ export default function AgentProfileScreen() {
               className="flex-row items-center gap-3 rounded-xl border border-border bg-card p-3"
             >
               {p.image ? (
-                <Image source={{ uri: p.image }} className="size-14 rounded-lg" contentFit="cover" />
+                <Image source={{ uri: p.image }} className="size-14 rounded-lg" resizeMode="cover" />
               ) : (
                 <View className="size-14 items-center justify-center rounded-lg bg-muted">
                   <Home size={18} color={colors.mutedForeground} />

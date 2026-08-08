@@ -1,5 +1,5 @@
 import { View, Text, Pressable } from "react-native";
-import { Image } from "expo-image";
+import { Image } from "react-native";
 import { Link } from "expo-router";
 import { BedDouble, Bath, Sofa, Maximize, MapPin } from "lucide-react-native";
 import type { Property } from "@/lib/maskan-data";
@@ -17,7 +17,7 @@ export function BookableListingCard({ p }: { p: Property }) {
     <Link href={{ pathname: "/property/[id]", params: { id: p.id } }} asChild>
       <Pressable className="overflow-hidden rounded-2xl border border-border bg-background shadow-card">
         <View className="aspect-[4/3] overflow-hidden bg-surface-2">
-          <Image source={{ uri: p.image }} className="size-full" contentFit="cover" />
+          <Image source={{ uri: p.image }} className="size-full" resizeMode="cover" />
         </View>
 
         <View className="gap-3 p-5">

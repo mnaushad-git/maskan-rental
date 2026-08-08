@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { View, Text, Pressable } from "react-native";
-import { Image } from "expo-image";
+import { Image } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { Briefcase, Sparkles, Calculator, ChevronRight, SearchCheck } from "lucide-react-native";
 import { fetchPublicPartners, type ApiPartnerPublic } from "@/lib/api/maskan";
