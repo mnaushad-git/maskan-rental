@@ -312,6 +312,77 @@ Implementation notes:
   `/advisor`, `/areas`, `/saved`), and the hero heading/quick-links render
   the new copy.
 
+**Prompt 6 — Partner portal cleanup.** `frontend/src/routes/partner.tsx`'s
+sidebar/mobile nav was rebuilt from a 3-tab set (Leads, Listings, Projects +
+a separate `/partner/requests` link) into exactly the 10-item spec requested:
+Dashboard, My Properties, Rental Listings, Sale Listings, Leads, Messages,
+Profile, Reviews, Area Coverage, Subscription. Both the desktop sidebar and
+mobile top nav now render from one shared `NAV_ITEMS` array computed in the
+component body (previously two independently hand-written lists that could
+drift) — the mobile nav also switched from `flex-1` tabs to an
+overflow-x-auto pill strip (same pattern as the customer `TopNav`'s mobile
+nav from Prompt 4), since 10 items no longer fit as equal-width tabs.
+
+Mapping from old → new:
+
+| Old | New |
+|---|---|
+| Leads | **Leads** (unchanged) |
+| Listings (all types, rent-only forms) | split into **My Properties** (all, with an All/Rent/Sale filter), **Rental Listings**, **Sale Listings** — all three are the *same* `PartnerListingsView`/`listingFilter` state, not three separate pages/components |
+| Projects (off-plan) | **removed** from nav — gated behind `PHASE1_FLAGS.projects` (reusing Prompt 5's flags file) at the nav-item level, same "swap, don't delete" approach; `PartnerProjectsView`/`PartnerProjectForm` are untouched and still work if the flag is ever flipped on |
+| `/partner/requests` link (property request marketplace) | **removed** from nav |
+| — | **Dashboard** (new, default view): stat tiles reusing already-loaded state (lead counts, listings count, areas count, subscription status) — no new API calls |
+| — | **Messages** (new): an inbox-style index over the existing per-lead chat threads at `/partner/leads/$leadId` (which already had full messaging via `fetchLeadMessages`/`sendLeadMessage`) — no new messaging backend |
+| — | **Profile** (new): editable agency name/phone/bio using `updateMediatorProfile`, an existing `PATCH /mediators/me` call that nothing in the frontend used before this |
+| — | **Reviews** (new): reuses the existing public review endpoints (`fetchMediatorReviews`/`fetchMediatorReviewSummary`), scoped to the partner's own mediator id — same data already shown on the public agent profile page |
+| — | **Area Coverage** (new nav item, not new functionality): the add/remove-area UI that used to be squeezed into the Leads view's sidebar was moved out into its own tab, unchanged otherwise |
+| — | **Subscription** (new): status/tier/expiry display + a renew button wired to `subscribePartnerMock` (`POST /mediators/me/subscribe`), the same mock endpoint already used elsewhere — no new payment flow |
+
+**`/partner/requests` (Keep-Phase1 property-request marketplace) judgment
+call:** unlike Partners/Compare in Prompt 4 (which had other in-app entry
+points once dropped from top nav), this was the *only* in-app link to that
+route — grepped the frontend and found no other referrer. Removing it was
+still done because the prompt's 10-item spec is explicit and exhaustive and
+didn't include it, but this is flagged as a real functional-discoverability
+regression for a Keep-Phase1 feature, not a cosmetic one, worth reconsidering
+in a later prompt. The route itself (`partner.requests.tsx`,
+`partner.requests.$id.tsx`) is completely untouched and still reachable by
+direct URL.
+
+**Transaction-type support (listing form + table filter), the other half of
+this prompt's task:** `PartnerPropertyPayload` (`lib/api/maskan.ts`) gained
+`listing_type: "rent" | "sale"` and an optional `sale_price` — the backend
+schema (`PartnerPropertyCreate`/`PartnerPropertyUpdate`) already supported
+both, so this was a frontend-only type/payload change, no backend edits.
+`PartnerListingForm` gained a Rent/Sale segmented control at the top of the
+form; picking Sale swaps the "Monthly rent" field for "Sale price" and the
+submit validation/payload branch accordingly. `PartnerListingsView` gained
+the requested All/Rent/Sale filter pills, and its listing cards now show the
+transaction type and the correct price (previously always rendered
+`monthly_rent` regardless of type — latent since partner listings could only
+ever be rent before this prompt, now a real bug it was necessary to fix).
+
+**Bonus finding, gated on the same reasoning as Prompt 5:** the listing
+form's "AI short-stay pricing" widget (a nightly-rate suggestion for
+Airbnb-style bookings, reusing `ai.py`'s `/pricing-suggestion` endpoint) was
+neither asked about nor in scope, but is explicitly a short-stay/booking
+feature — Hide-Phase1 — so it's now gated behind `PHASE1_FLAGS.booking` and
+restricted to the Rent side of the form (a nightly rate implies a rental).
+Not required by this prompt's acceptance criteria, but left ungated would
+have been inconsistent with every other financing/booking UI already hidden
+elsewhere in this codebase this phase.
+
+Verified: `npm run typecheck` and `npm run build` both clean. Created a real
+test partner account via the backend API (signup → register → approved
+directly in Postgres), logged into the running dev server with headless
+Chrome driven over the DevTools Protocol (no Playwright/Puppeteer in this
+project — hand-rolled a ~100-line script using Node's built-in `fetch`/
+`WebSocket`), and screenshotted all 10 views plus the Rent/Sale listing form
+toggle and the mobile nav strip — confirmed the nav order/labels match the
+spec exactly, the filter and form toggle both work, and every new view
+renders real data with no console/render errors. Test account deleted from
+the database afterward.
+
 ## Feature flags
 
 Added by Prompt 2 to the existing env-var-backed registry in
@@ -334,8 +405,8 @@ Prompt 5, both of which read frontend-web files only.
 | `saved_searches` | On | `FEATURE_SAVED_SEARCHES` | n/a (`saved_searches.router` always on) |
 | `notifications` | On | `FEATURE_NOTIFICATIONS` | n/a (`notifications.router` always on) |
 | `leads` | On | `FEATURE_LEADS` | n/a (`leads.router` always on) |
-| `projects` | Off | `FEATURE_PROJECTS` | Yes — `projects.router`. Frontend: `projects.tsx`/`project.$id.tsx` gated to `PhaseGate` (Prompt 5). |
-| `booking` | Off | `FEATURE_BOOKING` | Yes — `bookings.router`. Frontend: `property.$id.tsx`'s embedded `ShortTermBooking` widget gated (Prompt 5) — no separate booking route exists on web (see "Routes changed"). |
+| `projects` | Off | `FEATURE_PROJECTS` | Yes — `projects.router`. Frontend: `projects.tsx`/`project.$id.tsx` gated to `PhaseGate` (Prompt 5); `partner.tsx`'s Projects nav item gated the same way (Prompt 6) — `PartnerProjectsView`/`PartnerProjectForm` still work if flipped on. |
+| `booking` | Off | `FEATURE_BOOKING` | Yes — `bookings.router`. Frontend: `property.$id.tsx`'s embedded `ShortTermBooking` widget gated (Prompt 5) — no separate booking route exists on web (see "Routes changed"); `partner.tsx`'s listing-form "AI short-stay pricing" widget also gated on this (Prompt 6, found while working on the listing form, not asked for). |
 | `short_stay` | Off | `FEATURE_SHORT_STAY` | No dedicated router or frontend usage — still unused on both sides, kept as a placeholder in `PHASE1_FLAGS` too |
 | `financing` | Off | `FEATURE_FINANCING` | Yes — `financing.router`. Frontend: `RentNowPayLaterBanner`/`FinancingModal`, `ActionsCard`'s "Request Financing" button, and `PurchaseCostBreakdown`'s financing-estimate/affordability sub-sections all gated (Prompt 5). |
 | `property_management` | Off | `FEATURE_PROPERTY_MANAGEMENT` | No dedicated router exists in this codebase — still open |
