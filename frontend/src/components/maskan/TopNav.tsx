@@ -10,6 +10,7 @@ function useNavLinks() {
   const { t } = useLanguage();
   const NAV_LINKS = [
     { label: t("nav.search"), to: "/search" },
+    { label: t("nav.projects"), to: "/projects" },
     { label: t("nav.exploreAreas"), to: "/areas" },
     { label: t("nav.partners"), to: "/partners" },
     { label: t("nav.aiAdvisor"), to: "/advisor" },

@@ -104,6 +104,8 @@ export default function HomeScreen() {
             style={{ flex: 1 }}
             onSelectedChange={(p) => setMapCardOpen(!!p)}
             onRegionSearch={handleRegionSearch}
+            // Clears the HomeSheet's peeked height (132px, see HomeSheet.tsx) plus a gap.
+            locateButtonBottomOffset={148}
           />
         )}
       </View>

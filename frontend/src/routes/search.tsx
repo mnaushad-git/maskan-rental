@@ -1273,6 +1273,7 @@ function ResultCard({
       {hasPhone && !isList && (
         <ContactButtons
           phone={p.agentPhone!}
+          whatsappPhone={p.agentWhatsapp ?? undefined}
           callLabel={t("propertyCard.call")}
           whatsappLabel={t("propertyCard.whatsapp")}
         />

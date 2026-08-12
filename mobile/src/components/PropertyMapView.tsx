@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, Pressable, Image, type ViewStyle } from "react-native";
+import { View, Text, Pressable, Image, ActivityIndicator, Alert, Linking, type ViewStyle } from "react-native";
 import RNMapView, { Marker, type Region } from "react-native-maps";
 // Drop-in MapView replacement that clusters nearby markers into a single
 // numbered pin below a zoom threshold — same react-native-maps under the
@@ -7,7 +7,8 @@ import RNMapView, { Marker, type Region } from "react-native-maps";
 // there'd otherwise be an unreadable pile of overlapping price tags.
 import ClusteredMapView from "react-native-map-clustering";
 import { Link } from "expo-router";
-import { BedDouble, Bath, MapPin, ExternalLink, X } from "lucide-react-native";
+import * as Location from "expo-location";
+import { BedDouble, Bath, MapPin, ExternalLink, X, LocateFixed } from "lucide-react-native";
 import type { SearchProperty } from "@/lib/maskan-search-data";
 import { formatSAR } from "@/lib/maskan-data";
 import { CITY_CENTERS, DISTRICT_COORDS } from "@/lib/geo";
@@ -60,6 +61,8 @@ function regionFor(properties: SearchProperty[]): Region {
 export type MapSearchBounds = { minLat: number; maxLat: number; minLng: number; maxLng: number };
 
 const REGION_SEARCH_DEBOUNCE_MS = 500;
+const LOCATE_TIMEOUT_MS = 8000;
+const LOCATE_DELTA = 0.05;
 
 export function PropertyMapView({
   properties,
@@ -67,6 +70,7 @@ export function PropertyMapView({
   chromeless = false,
   onSelectedChange,
   onRegionSearch,
+  locateButtonBottomOffset = 16,
 }: {
   properties: SearchProperty[];
   style?: ViewStyle;
@@ -81,10 +85,15 @@ export function PropertyMapView({
   // bounds whenever the user pans/zooms, so the host can refetch and swap in
   // only the properties within view. Omit to keep the old fixed-list behavior.
   onRegionSearch?: (bounds: MapSearchBounds) => void;
+  // Lifts the "locate me" FAB clear of overlays anchored to the bottom edge
+  // (e.g. the home screen's peeked HomeSheet).
+  locateButtonBottomOffset?: number;
 }) {
   const { t } = useLanguage();
   const mapRef = useRef<RNMapView>(null);
   const [selected, setSelected] = useState<SearchProperty | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [showsUserLocation, setShowsUserLocation] = useState(false);
   const initialRegion = useMemo(() => regionFor(properties), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Guards against PropertyMapView's own camera moves being misread as a user
@@ -132,6 +141,68 @@ export function PropertyMapView({
     }, REGION_SEARCH_DEBOUNCE_MS);
   }
 
+  async function handleLocateMe() {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Alert.alert(t("map.locationServicesOff"));
+        return;
+      }
+      const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          t("onboarding.locationDenied"),
+          undefined,
+          canAskAgain
+            ? undefined
+            : [
+                { text: t("common.cancel"), style: "cancel" },
+                { text: t("map.openSettings"), onPress: () => Linking.openSettings() },
+              ],
+        );
+        return;
+      }
+      // Emulators/indoor devices often can't get a fresh GPS fix in time —
+      // fall back to whatever position the OS last cached (e.g. from the
+      // emulator's Extended Controls location, which doesn't keep "streaming").
+      const position = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), LOCATE_TIMEOUT_MS)),
+      ]).catch(async () => {
+        const lastKnown = await Location.getLastKnownPositionAsync();
+        if (!lastKnown) throw new Error("no-location");
+        return lastKnown;
+      });
+      const region: Region = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        latitudeDelta: LOCATE_DELTA,
+        longitudeDelta: LOCATE_DELTA,
+      };
+      setShowsUserLocation(true);
+      programmaticMove.current = true;
+      mapRef.current?.animateToRegion(region, 500);
+      if (onRegionSearch) {
+        // Skip the auto-fit-to-results effect below, same as a real pan does —
+        // otherwise the fetched properties would yank the camera away from
+        // the user's own location right after we just centered on it.
+        suppressNextAutoFit.current = true;
+        onRegionSearch({
+          minLat: region.latitude - region.latitudeDelta / 2,
+          maxLat: region.latitude + region.latitudeDelta / 2,
+          minLng: region.longitude - region.longitudeDelta / 2,
+          maxLng: region.longitude + region.longitudeDelta / 2,
+        });
+      }
+    } catch {
+      Alert.alert(t("onboarding.locationDenied"));
+    } finally {
+      setLocating(false);
+    }
+  }
+
   return (
     <View
       className={chromeless ? "relative overflow-hidden" : "relative overflow-hidden rounded-2xl border border-border"}
@@ -149,11 +220,12 @@ export function PropertyMapView({
         style={{ flex: 1 }}
         initialRegion={initialRegion}
         onRegionChangeComplete={handleRegionChangeComplete}
-        radius={50}
-        minPoints={3}
-        spiralEnabled={false}
-        clusterColor={colors.primary}
-        clusterTextColor="#FFFFFF"
+        showsUserLocation={showsUserLocation}
+        showsMyLocationButton={false}
+        // Aqar-style map: always show each property as its own price pin,
+        // even when several sit close together, rather than collapsing
+        // nearby pins into a single numbered cluster circle.
+        clusteringEnabled={false}
       >
         {properties.map((p, i) => {
           const [lat, lng] = pinFor(p, i);
@@ -195,6 +267,21 @@ export function PropertyMapView({
           );
         })}
       </ClusteredMapView>
+
+      <Pressable
+        onPress={handleLocateMe}
+        disabled={locating}
+        accessibilityRole="button"
+        accessibilityLabel={t("map.locateMe")}
+        className="absolute start-3 size-11 items-center justify-center rounded-full border border-border bg-background shadow-elevated"
+        style={{ bottom: locateButtonBottomOffset, opacity: locating ? 0.7 : 1 }}
+      >
+        {locating ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <LocateFixed size={20} color={colors.primary} />
+        )}
+      </Pressable>
 
       {!chromeless && (
         <View className="absolute start-3 top-3 flex-row items-center gap-1 rounded-xl border border-border bg-background/95 px-3 py-1.5">

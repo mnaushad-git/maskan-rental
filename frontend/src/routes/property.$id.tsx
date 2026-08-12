@@ -235,6 +235,7 @@ function PropertyDetail() {
           <LandlordCard
             agentName={property.agent}
             agentPhone={property.agentPhone}
+            agentWhatsapp={property.agentWhatsapp}
             agentProfileImage={property.agentProfileImage}
             mediatorId={property.mediatorId}
             mediatorRating={property.mediatorRating}
@@ -264,7 +265,7 @@ function PropertyDetail() {
           {property.agentPhone ? (
             <>
               <a
-                href={whatsappLink(property.agentPhone)}
+                href={whatsappLink(property.agentWhatsapp ?? property.agentPhone)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-whatsapp px-4 py-2.5 text-sm font-semibold text-white"
@@ -2316,6 +2317,7 @@ function agentInitials(name: string): string {
 function LandlordCard({
   agentName,
   agentPhone,
+  agentWhatsapp,
   agentProfileImage,
   mediatorId,
   mediatorRating,
@@ -2323,6 +2325,7 @@ function LandlordCard({
 }: {
   agentName: string;
   agentPhone: string | null;
+  agentWhatsapp: string | null;
   agentProfileImage: string | null;
   mediatorId: number | null;
   mediatorRating: number | null;
@@ -2332,6 +2335,7 @@ function LandlordCard({
   const tProp = usePropT();
   const [showCall, setShowCall] = useState(false);
   const hasPhone = !!agentPhone;
+  const whatsappNumber = agentWhatsapp ?? agentPhone;
 
   return (
     <>
@@ -2391,7 +2395,7 @@ function LandlordCard({
             <Phone className="size-4" /> {t("propertyCard.call")}
           </Button>
           <a
-            href={hasPhone ? whatsappLink(agentPhone!) : undefined}
+            href={hasPhone ? whatsappLink(whatsappNumber!) : undefined}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => !hasPhone && e.preventDefault()}
@@ -2423,6 +2427,7 @@ function LandlordCard({
         <PhoneModal
           agentName={agentName}
           agentPhone={agentPhone!}
+          agentWhatsapp={whatsappNumber!}
           onClose={() => setShowCall(false)}
         />
       )}
@@ -2433,10 +2438,12 @@ function LandlordCard({
 function PhoneModal({
   agentName,
   agentPhone,
+  agentWhatsapp,
   onClose,
 }: {
   agentName: string;
   agentPhone: string;
+  agentWhatsapp: string;
   onClose: () => void;
 }) {
   const { t } = useLanguage();
@@ -2466,7 +2473,7 @@ function PhoneModal({
           {agentPhone}
         </a>
         <a
-          href={whatsappLink(agentPhone)}
+          href={whatsappLink(agentWhatsapp)}
           target="_blank"
           rel="noopener noreferrer"
           className="block rounded-xl border border-whatsapp bg-whatsapp/10 px-4 py-3 text-sm font-bold text-whatsapp-foreground hover:bg-whatsapp/20 transition-colors dark:text-whatsapp"

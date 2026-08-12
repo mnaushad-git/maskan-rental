@@ -60,6 +60,13 @@ class Property(Base):
     latest_booking_time: Mapped[str | None] = mapped_column(String(20), nullable=True)
     insurance_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0)
 
+    # Listing-specific contact numbers — partners must supply both when
+    # creating a listing (see PartnerPropertyCreate) so the call and
+    # WhatsApp buttons on a property can point at different numbers
+    # (e.g. an owner's call number vs. an agency WhatsApp Business line).
+    contact_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    whatsapp_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+
     mediator = relationship("Mediator", foreign_keys=[mediator_id], lazy="joined")
     saved_properties = relationship("SavedProperty", back_populates="property", cascade="all, delete-orphan")
     listing_images = relationship("ListingImage", back_populates="property", cascade="all, delete-orphan", order_by="ListingImage.display_order")
@@ -68,6 +75,19 @@ class Property(Base):
     def mediator_phone(self) -> str | None:
         m = self.mediator
         return m.phone if m else None
+
+    @property
+    def call_phone(self) -> str | None:
+        """Effective number for the Call button — listing's own number,
+        falling back to the mediator's account phone for rows created
+        before per-listing contact fields existed."""
+        return self.contact_phone or self.mediator_phone
+
+    @property
+    def whatsapp_number(self) -> str | None:
+        """Effective number for the WhatsApp button — same fallback chain
+        as call_phone, but prefers a listing-specific WhatsApp number."""
+        return self.whatsapp_phone or self.contact_phone or self.mediator_phone
 
     @property
     def mediator_profile_image_url(self) -> str | None:

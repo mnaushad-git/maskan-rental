@@ -22,10 +22,13 @@ export function whatsappLink(phone: string) {
  * (including the WhatsApp SVG path) in all three places. */
 export function ContactButtons({
   phone,
+  whatsappPhone,
   callLabel,
   whatsappLabel,
 }: {
   phone: string;
+  /** Defaults to `phone` when the listing has no separate WhatsApp number. */
+  whatsappPhone?: string;
   callLabel: string;
   whatsappLabel: string;
 }) {
@@ -38,7 +41,7 @@ export function ContactButtons({
         <Phone className="size-3.5" /> {callLabel}
       </a>
       <a
-        href={whatsappLink(phone)}
+        href={whatsappLink(whatsappPhone || phone)}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-whatsapp bg-whatsapp/10 py-2 text-xs font-medium text-whatsapp-foreground transition-colors hover:bg-whatsapp/20 dark:text-whatsapp"

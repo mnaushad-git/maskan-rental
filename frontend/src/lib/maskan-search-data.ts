@@ -28,6 +28,7 @@ export type SearchProperty = {
   };
   reasons: string[];
   agentPhone: string | null;
+  agentWhatsapp: string | null;
 };
 
 const IMGS = [prop1, prop2, prop3, prop4];
@@ -43,6 +44,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Within Budget", "Family Friendly", "Near Schools", "Good Rental Value"],
     agentPhone: null,
+    agentWhatsapp: null,
   },
   {
     title: "Najdi Modern Villa",
@@ -54,6 +56,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     amenities: { parking: true, balcony: true, gym: false, pool: true },
     reasons: ["Family Friendly", "Spacious Layout", "Near Schools", "Top-rated Area"],
     agentPhone: null,
+    agentWhatsapp: null,
   },
   {
     title: "KAFD Penthouse",
@@ -65,6 +68,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Prime Location", "Premium Finishings", "Concierge", "Skyline View"],
     agentPhone: null,
+    agentWhatsapp: null,
   },
   {
     title: "Coastal Townhouse",
@@ -76,6 +80,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     amenities: { parking: true, balcony: true, gym: false, pool: false },
     reasons: ["Within Budget", "Beach Access", "Family Friendly", "Good Rental Value"],
     agentPhone: null,
+    agentWhatsapp: null,
   },
   {
     title: "Family Apartment",
@@ -87,6 +92,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     amenities: { parking: true, balcony: true, gym: false, pool: false },
     reasons: ["Within Budget", "Family Friendly", "Near Schools", "Best Value"],
     agentPhone: null,
+    agentWhatsapp: null,
   },
   {
     title: "Garden Villa",
@@ -98,6 +104,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Family Friendly", "Near Schools", "Premium Compound", "Good Rental Value"],
     agentPhone: null,
+    agentWhatsapp: null,
   },
   {
     title: "Marina View Apartment",
@@ -109,6 +116,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Sea View", "Within Budget", "Modern Building", "Good Amenities"],
     agentPhone: null,
+    agentWhatsapp: null,
   },
   {
     title: "Diplomatic Quarter Villa",
@@ -120,6 +128,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Top-rated Area", "Family Friendly", "Premium Security", "Near Schools"],
     agentPhone: null,
+    agentWhatsapp: null,
   },
   {
     title: "Corniche Apartment",
@@ -131,6 +140,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     amenities: { parking: true, balcony: true, gym: false, pool: false },
     reasons: ["Within Budget", "Sea View", "Walkable", "Good Rental Value"],
     agentPhone: null,
+    agentWhatsapp: null,
   },
   {
     title: "Modern Family Townhouse",
@@ -142,6 +152,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Within Budget", "Family Friendly", "Near KAFD", "Compound Amenities"],
     agentPhone: null,
+    agentWhatsapp: null,
   },
   {
     title: "Business Bay Apartment",
@@ -153,6 +164,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     amenities: { parking: true, balcony: true, gym: true, pool: false },
     reasons: ["Within Budget", "Furnished", "Near Workplaces", "Good Value"],
     agentPhone: null,
+    agentWhatsapp: null,
   },
   {
     title: "Hittin Premium Villa",
@@ -164,6 +176,7 @@ const baseTitles: Array<Omit<SearchProperty, "id" | "image">> = [
     amenities: { parking: true, balcony: true, gym: true, pool: true },
     reasons: ["Family Friendly", "Near International Schools", "Premium Area", "Spacious"],
     agentPhone: null,
+    agentWhatsapp: null,
   },
 ];
 

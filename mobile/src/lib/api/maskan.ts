@@ -61,6 +61,10 @@ export type ApiProperty = {
   mediator_id: number | null;
   images: ApiListingImage[];
   mediator_phone: string | null;
+  contact_phone: string | null;
+  whatsapp_phone: string | null;
+  call_phone: string | null;
+  whatsapp_number: string | null;
   mediator_profile_image_url: string | null;
   mediator_agent_name: string | null;
   mediator_is_verified: boolean;
@@ -212,7 +216,8 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     status: property.status === "Published" ? "Available" : property.status === "Suspended" ? "Reserved" : "Available",
     pricePerSqm: estimatedArea > 0 ? Math.round(displayPrice / estimatedArea) : 0,
     agent: property.mediator_agent_name ?? property.owner_name ?? "myHome Agent",
-    agentPhone: property.mediator_phone ?? null,
+    agentPhone: property.call_phone ?? property.mediator_phone ?? null,
+    agentWhatsapp: property.whatsapp_number ?? property.mediator_phone ?? null,
     agentProfileImage: property.mediator_profile_image_url ?? null,
     mediatorId: property.mediator_id ?? null,
     latitude: property.latitude,
@@ -270,7 +275,8 @@ export function mapApiSearchProperty(property: ApiProperty): UiSearchProperty {
     areaScore: estimateAreaScore(property),
     matchScore: uiProperty.matchScore,
     isVerified: property.mediator_is_verified,
-    agentPhone: property.mediator_phone ?? null,
+    agentPhone: property.call_phone ?? property.mediator_phone ?? null,
+    agentWhatsapp: property.whatsapp_number ?? property.mediator_phone ?? null,
     latitude: property.latitude,
     longitude: property.longitude,
   };
@@ -1631,6 +1637,13 @@ export type ApiProject = {
   updated_at: string;
   units: ApiProjectUnit[];
   images: ApiProjectImage[];
+  mediator_id: number | null;
+  contact_phone: string | null;
+  whatsapp_phone: string | null;
+  listing_status: string;
+  mediator_phone: string | null;
+  call_phone: string | null;
+  whatsapp_number: string | null;
 };
 
 export function mapApiProject(project: ApiProject): UiProject {
@@ -1659,6 +1672,8 @@ export function mapApiProject(project: ApiProject): UiProject {
     longitude: project.longitude,
     introDocumentUrl: project.intro_document_url,
     isFeatured: project.is_featured,
+    agentPhone: project.call_phone ?? project.mediator_phone ?? null,
+    agentWhatsapp: project.whatsapp_number ?? project.mediator_phone ?? null,
     units: (project.units ?? []).map((u) => ({
       id: String(u.id),
       unitType: u.unit_type,

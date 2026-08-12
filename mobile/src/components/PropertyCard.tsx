@@ -61,7 +61,7 @@ export function PropertyCard({
   }
 
   const hasPhone = !!p.agentPhone;
-  const waLink = hasPhone ? whatsappLink(p.agentPhone!) : undefined;
+  const waLink = hasPhone ? whatsappLink(p.agentWhatsapp ?? p.agentPhone!) : undefined;
 
   return (
     <View className="overflow-hidden rounded-2xl border border-border bg-background shadow-card">

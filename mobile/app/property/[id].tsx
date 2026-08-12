@@ -150,7 +150,11 @@ export default function PropertyDetailScreen() {
   }
 
   const isSale = property.listingType === "sale";
-  const waLink = property.agentPhone ? whatsappLink(property.agentPhone) : undefined;
+  const waLink = property.agentWhatsapp
+    ? whatsappLink(property.agentWhatsapp)
+    : property.agentPhone
+      ? whatsappLink(property.agentPhone)
+      : undefined;
   const fullDescription = property.description ?? "";
 
   return (
@@ -282,7 +286,7 @@ export default function PropertyDetailScreen() {
             {property.mediatorId ? <ChevronRight size={18} color={colors.neutral400} /> : null}
           </Pressable>
 
-          {!isSale && (
+          {property.isBookable && (
             <BookingCalendar
               propertyId={Number(property.id)}
               monthlyRent={Math.round(property.price / 12)}
@@ -384,7 +388,8 @@ export default function PropertyDetailScreen() {
             <>
               <Pressable
                 onPress={() => waLink && Linking.openURL(waLink)}
-                className="flex-row items-center gap-1.5 rounded-xl bg-whatsapp px-4 py-2.5"
+                className="flex-row items-center gap-1.5 rounded-xl px-4 py-2.5"
+                style={{ backgroundColor: colors.whatsapp }}
               >
                 <MessageCircle size={16} color="#FFFFFF" />
                 <Text className="text-sm font-semibold text-white">{t("propertyCard.whatsapp")}</Text>

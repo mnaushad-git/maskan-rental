@@ -12,6 +12,7 @@ export const en = {
     loadFailed: "Something went wrong loading this. Check your connection and try again.",
     retry: "Retry",
     refresh: "Refresh",
+    cancel: "Cancel",
   },
   cities: {
     Riyadh: "Riyadh",
@@ -368,6 +369,9 @@ export const en = {
     bathroomsAbbr: "BA",
     perYear: "/yr",
     approxLocation: "Pin shows the approximate area, not the exact address",
+    locateMe: "Locate me",
+    locationServicesOff: "Turn on Location in your device settings to find homes near you.",
+    openSettings: "Open settings",
   },
   home: {
     changeCity: "Change city",
@@ -750,6 +754,7 @@ export const en = {
       perMonth: "~ SAR {{amount}}/month",
       contactLandlord: "Contact landlord",
       askAI: "Ask AI",
+      share: "Share",
       saved: "Saved",
       save: "Save",
       savedToFavorites: "Saved to favorites",

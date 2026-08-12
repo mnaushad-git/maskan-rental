@@ -140,7 +140,12 @@ export function PropertyCard({
 
       {/* Contact CTA — outside the Link to avoid nested <a> */}
       {hasPhone && (
-        <ContactButtons phone={p.agentPhone!} callLabel={t("propertyCard.call")} whatsappLabel={t("propertyCard.whatsapp")} />
+        <ContactButtons
+          phone={p.agentPhone!}
+          whatsappPhone={p.agentWhatsapp ?? undefined}
+          callLabel={t("propertyCard.call")}
+          whatsappLabel={t("propertyCard.whatsapp")}
+        />
       )}
     </div>
   );

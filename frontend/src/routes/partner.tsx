@@ -2,6 +2,7 @@ import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tan
 import { useEffect, useState } from "react";
 import {
   Briefcase,
+  Building2,
   CheckCircle,
   ClipboardList,
   Clock,
@@ -42,13 +43,18 @@ import {
   addPartnerPropertyImage,
   deletePartnerPropertyImage,
   fetchPricingSuggestion,
+  fetchPartnerProjects,
+  createPartnerProject,
+  patchPartnerProject,
   type ApiAreaSummary,
   type ApiPartner,
   type ApiLeadDetail,
   type ApiLeadAvailable,
   type ApiProperty,
+  type ApiProject,
   type ApiPricingSuggestion,
   type PartnerPropertyPayload,
+  type PartnerProjectPayload,
 } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
 import { cn } from "@/lib/utils";
@@ -59,7 +65,7 @@ export const Route = createFileRoute("/partner")({
   component: PartnerDashboard,
 });
 
-type PartnerView = "leads" | "listings";
+type PartnerView = "leads" | "listings" | "projects";
 
 function PartnerDashboard() {
   const { user, authLoading, clearAuth } = useAuth();
@@ -73,6 +79,8 @@ function PartnerDashboard() {
   const [availableLeads, setAvailableLeads] = useState<ApiLeadAvailable[]>([]);
   const [listings, setListings] = useState<ApiProperty[]>([]);
   const [loadingListings, setLoadingListings] = useState(false);
+  const [projects, setProjects] = useState<ApiProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
   const [loading, setLoading] = useState(true);
   const [noProfile, setNoProfile] = useState(false);
   const [availableAreas, setAvailableAreas] = useState<ApiAreaSummary[]>([]);
@@ -85,6 +93,10 @@ function PartnerDashboard() {
   // Listing form state
   const [listingFormOpen, setListingFormOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<ApiProperty | null>(null);
+
+  // Project form state
+  const [projectFormOpen, setProjectFormOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<ApiProject | null>(null);
 
   async function reloadLeads() {
     const [profile, l, avail] = await Promise.all([
@@ -125,6 +137,13 @@ function PartnerDashboard() {
         .then(setListings)
         .catch(() => {})
         .finally(() => setLoadingListings(false));
+    }
+    if (view === "projects" && !loadingProjects) {
+      setLoadingProjects(true);
+      fetchPartnerProjects()
+        .then(setProjects)
+        .catch(() => {})
+        .finally(() => setLoadingProjects(false));
     }
   }, [view]);
 
@@ -188,6 +207,17 @@ function PartnerDashboard() {
     // Re-fetch to get updated images
     const fresh = await fetchPartnerListings();
     setListings(fresh);
+  }
+
+  async function handleSaveProject(payload: PartnerProjectPayload, editId?: number) {
+    let saved: ApiProject;
+    if (editId) {
+      saved = await patchPartnerProject(editId, payload);
+      setProjects((ps) => ps.map((p) => (p.id === editId ? saved : p)));
+    } else {
+      saved = await createPartnerProject(payload);
+      setProjects((ps) => [saved, ...ps]);
+    }
   }
 
   if (pathname !== "/partner") return <Outlet />;
@@ -262,6 +292,11 @@ function PartnerDashboard() {
               v: "listings" as const,
               icon: Home,
               label: t("partnerDashboard.sidebar.navListings"),
+            },
+            {
+              v: "projects" as const,
+              icon: Building2,
+              label: t("partnerDashboard.sidebar.navProjects"),
             },
           ].map(({ v, icon: Icon, label }) => (
             <button
@@ -345,6 +380,11 @@ function PartnerDashboard() {
                 v: "listings" as const,
                 icon: Home,
                 label: t("partnerDashboard.sidebar.navListings"),
+              },
+              {
+                v: "projects" as const,
+                icon: Building2,
+                label: t("partnerDashboard.sidebar.navProjects"),
               },
             ].map(({ v, icon: Icon, label }) => (
               <button
@@ -751,6 +791,33 @@ function PartnerDashboard() {
               )}
             </div>
           )}
+
+          {/* ══ PROJECTS VIEW ══ */}
+          {view === "projects" && (
+            <div>
+              {projectFormOpen || editingProject ? (
+                <PartnerProjectForm
+                  editing={editingProject}
+                  onClose={() => {
+                    setProjectFormOpen(false);
+                    setEditingProject(null);
+                  }}
+                  onSave={async (payload) => {
+                    await handleSaveProject(payload, editingProject?.id);
+                    setProjectFormOpen(false);
+                    setEditingProject(null);
+                  }}
+                />
+              ) : (
+                <PartnerProjectsView
+                  projects={projects}
+                  loading={loadingProjects}
+                  onAdd={() => setProjectFormOpen(true)}
+                  onEdit={(p) => setEditingProject(p)}
+                />
+              )}
+            </div>
+          )}
         </main>
       </div>
     </div>
@@ -882,6 +949,9 @@ type ListingFormState = {
   description: string;
   property_type: string;
   furnished: string;
+  contact_phone: string;
+  whatsapp_phone: string;
+  whatsappSameAsCall: boolean;
 };
 
 function PartnerListingForm({
@@ -908,6 +978,9 @@ function PartnerListingForm({
     description: editing?.description ?? "",
     property_type: editing?.property_type ?? "",
     furnished: editing?.furnished ?? "",
+    contact_phone: editing?.contact_phone ?? "",
+    whatsapp_phone: editing?.whatsapp_phone ?? "",
+    whatsappSameAsCall: !editing || editing.whatsapp_phone === editing.contact_phone,
   });
   const [media, setMedia] = useState<string[]>(
     editing?.images?.length
@@ -965,6 +1038,15 @@ function PartnerListingForm({
       setError(t("partnerDashboard.listingForm.errors.enterTitle"));
       return;
     }
+    if (!form.contact_phone.trim()) {
+      setError(t("partnerDashboard.listingForm.errors.enterContactPhone"));
+      return;
+    }
+    const whatsappPhone = form.whatsappSameAsCall ? form.contact_phone : form.whatsapp_phone;
+    if (!whatsappPhone.trim()) {
+      setError(t("partnerDashboard.listingForm.errors.enterWhatsappPhone"));
+      return;
+    }
 
     setSaving(true);
     setError(null);
@@ -982,6 +1064,8 @@ function PartnerListingForm({
           description: form.description.trim() || undefined,
           property_type: form.property_type || undefined,
           furnished: form.furnished || undefined,
+          contact_phone: form.contact_phone.trim(),
+          whatsapp_phone: whatsappPhone.trim(),
         },
         media,
       );
@@ -1192,6 +1276,48 @@ function PartnerListingForm({
               placeholder={t("partnerDashboard.listingForm.ownerNamePlaceholder")}
             />
           </FormField>
+
+          <FormField label={t("partnerDashboard.listingForm.contactPhone")}>
+            <Input
+              type="tel"
+              value={form.contact_phone}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  contact_phone: e.target.value,
+                  whatsapp_phone: f.whatsappSameAsCall ? e.target.value : f.whatsapp_phone,
+                }))
+              }
+              placeholder={t("partnerDashboard.listingForm.contactPhonePlaceholder")}
+            />
+          </FormField>
+
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={form.whatsappSameAsCall}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  whatsappSameAsCall: e.target.checked,
+                  whatsapp_phone: e.target.checked ? f.contact_phone : f.whatsapp_phone,
+                }))
+              }
+              className="size-3.5 rounded border-border"
+            />
+            {t("partnerDashboard.listingForm.whatsappSameAsCall")}
+          </label>
+
+          {!form.whatsappSameAsCall && (
+            <FormField label={t("partnerDashboard.listingForm.whatsappPhone")}>
+              <Input
+                type="tel"
+                value={form.whatsapp_phone}
+                onChange={(e) => setForm((f) => ({ ...f, whatsapp_phone: e.target.value }))}
+                placeholder={t("partnerDashboard.listingForm.whatsappPhonePlaceholder")}
+              />
+            </FormField>
+          )}
         </div>
 
         {/* Right column */}
@@ -1275,6 +1401,476 @@ function PartnerListingForm({
             {isEdit
               ? t("partnerDashboard.listingForm.editNote")
               : t("partnerDashboard.listingForm.newNote")}
+          </div>
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" onClick={onClose} disabled={saving}>
+              {t("partnerDashboard.listingForm.cancel")}
+            </Button>
+            <Button onClick={submit} disabled={saving} className="flex-1">
+              {saving
+                ? t("partnerDashboard.listingForm.submitting")
+                : isEdit
+                  ? t("partnerDashboard.listingForm.saveResubmit")
+                  : t("partnerDashboard.listingForm.submitForApproval")}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Projects list view ───────────────────────────────────────────────────────
+
+function PartnerProjectsView({
+  projects,
+  loading,
+  onAdd,
+  onEdit,
+}: {
+  projects: ApiProject[];
+  loading: boolean;
+  onAdd: () => void;
+  onEdit: (p: ApiProject) => void;
+}) {
+  const { t } = useLanguage();
+  return (
+    <div>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {t("partnerDashboard.projectsView.heading")}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("partnerDashboard.projectsView.subtitle")}
+          </p>
+        </div>
+        <Button onClick={onAdd} className="shrink-0">
+          <Plus className="size-4" /> {t("partnerDashboard.projectsView.addProject")}
+        </Button>
+      </div>
+
+      {loading && (
+        <div className="py-16 text-center text-sm text-muted-foreground">
+          {t("partnerDashboard.projectsView.loadingProjects")}
+        </div>
+      )}
+
+      {!loading && projects.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-border py-16 text-center space-y-3">
+          <Building2 className="mx-auto size-10 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">
+            {t("partnerDashboard.projectsView.noProjectsYet")}
+          </p>
+          <Button variant="outline" onClick={onAdd}>
+            <Plus className="size-4" /> {t("partnerDashboard.projectsView.addProject")}
+          </Button>
+        </div>
+      )}
+
+      {!loading && projects.length > 0 && (
+        <div className="space-y-3">
+          {projects.map((p) => {
+            const canEdit = p.listing_status === "Published";
+            return (
+              <div key={p.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold truncate">{p.title}</span>
+                      <ListingStatusBadge status={p.listing_status} />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {p.area}, {p.city}
+                      {p.unit_count != null ? ` · ${p.unit_count} units` : ""}
+                    </p>
+                    <p className="text-sm font-semibold text-primary">
+                      {p.price_min != null || p.price_max != null
+                        ? `SAR ${formatSAR(p.price_min ?? p.price_max ?? 0)}${
+                            p.price_max != null && p.price_min !== p.price_max
+                              ? ` – ${formatSAR(p.price_max)}`
+                              : ""
+                          }`
+                        : "—"}
+                    </p>
+                    {p.listing_status === "Pending Approval" && (
+                      <p className="text-xs text-muted-foreground">
+                        {t("partnerDashboard.listingsView.underReview")}
+                      </p>
+                    )}
+                    {p.listing_status === "Rejected" && (
+                      <p className="text-xs text-destructive">
+                        {t("partnerDashboard.listingsView.rejectedContact")}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!canEdit}
+                    onClick={() => canEdit && onEdit(p)}
+                    title={
+                      canEdit
+                        ? t("partnerDashboard.listingsView.editTitle")
+                        : t("partnerDashboard.listingsView.editLockedTitle")
+                    }
+                    className={cn(
+                      "grid size-9 shrink-0 place-items-center rounded-xl border transition-colors",
+                      canEdit
+                        ? "border-border text-muted-foreground hover:border-primary hover:text-primary"
+                        : "border-border/40 text-muted-foreground/30 cursor-not-allowed",
+                    )}
+                  >
+                    <Pencil className="size-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Project creation / edit form ─────────────────────────────────────────────
+
+type ProjectFormState = {
+  title: string;
+  city: string;
+  district: string;
+  developer_name: string;
+  developer_logo_url: string;
+  image_url: string;
+  price_min: string;
+  price_max: string;
+  area_min: string;
+  area_max: string;
+  unit_count: string;
+  completion_status: string;
+  property_category: string;
+  intro_document_url: string;
+  description: string;
+  contact_phone: string;
+  whatsapp_phone: string;
+  whatsappSameAsCall: boolean;
+};
+
+function PartnerProjectForm({
+  editing,
+  onClose,
+  onSave,
+}: {
+  editing: ApiProject | null;
+  onClose: () => void;
+  onSave: (p: PartnerProjectPayload) => Promise<void>;
+}) {
+  const { t } = useLanguage();
+  const [form, setForm] = useState<ProjectFormState>({
+    title: editing?.title ?? "",
+    city: editing?.city ?? "",
+    district: editing?.area ?? "",
+    developer_name: editing?.developer_name ?? "",
+    developer_logo_url: editing?.developer_logo_url ?? "",
+    image_url: editing?.image_url ?? "",
+    price_min: editing?.price_min != null ? String(editing.price_min) : "",
+    price_max: editing?.price_max != null ? String(editing.price_max) : "",
+    area_min: editing?.area_min != null ? String(editing.area_min) : "",
+    area_max: editing?.area_max != null ? String(editing.area_max) : "",
+    unit_count: editing?.unit_count != null ? String(editing.unit_count) : "",
+    completion_status: editing?.completion_status ?? "",
+    property_category: editing?.property_category ?? "",
+    intro_document_url: editing?.intro_document_url ?? "",
+    description: editing?.description ?? "",
+    contact_phone: editing?.contact_phone ?? "",
+    whatsapp_phone: editing?.whatsapp_phone ?? "",
+    whatsappSameAsCall: !editing || editing.whatsapp_phone === editing.contact_phone,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!form.city.trim()) {
+      setError(t("partnerDashboard.listingForm.errors.selectCity"));
+      return;
+    }
+    if (!form.district.trim()) {
+      setError(t("partnerDashboard.listingForm.errors.selectDistrict"));
+      return;
+    }
+    if (!form.title.trim()) {
+      setError(t("partnerDashboard.projectForm.errors.enterTitle"));
+      return;
+    }
+    if (!form.contact_phone.trim()) {
+      setError(t("partnerDashboard.listingForm.errors.enterContactPhone"));
+      return;
+    }
+    const whatsappPhone = form.whatsappSameAsCall ? form.contact_phone : form.whatsapp_phone;
+    if (!whatsappPhone.trim()) {
+      setError(t("partnerDashboard.listingForm.errors.enterWhatsappPhone"));
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave({
+        title: form.title.trim(),
+        city: form.city.trim(),
+        area: form.district.trim(),
+        developer_name: form.developer_name.trim() || undefined,
+        developer_logo_url: form.developer_logo_url.trim() || undefined,
+        image_url: form.image_url.trim() || undefined,
+        price_min: form.price_min ? parseFloat(form.price_min) : undefined,
+        price_max: form.price_max ? parseFloat(form.price_max) : undefined,
+        area_min: form.area_min ? parseInt(form.area_min) : undefined,
+        area_max: form.area_max ? parseInt(form.area_max) : undefined,
+        unit_count: form.unit_count ? parseInt(form.unit_count) : undefined,
+        completion_status: form.completion_status || undefined,
+        property_category: form.property_category || undefined,
+        intro_document_url: form.intro_document_url.trim() || undefined,
+        description: form.description.trim() || undefined,
+        contact_phone: form.contact_phone.trim(),
+        whatsapp_phone: whatsappPhone.trim(),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("partnerDashboard.projectForm.errors.failedToSave"));
+      setSaving(false);
+    }
+  }
+
+  const isEdit = !!editing;
+
+  return (
+    <div>
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mb-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            {t("partnerDashboard.projectForm.backToProjects")}
+          </button>
+          <h1 className="text-2xl font-bold">
+            {isEdit ? t("partnerDashboard.projectForm.editHeading") : t("partnerDashboard.projectForm.newHeading")}
+          </h1>
+          {isEdit && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("partnerDashboard.projectForm.resubmitNote")}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Left column */}
+        <div className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-card">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            {t("partnerDashboard.projectForm.projectDetails")}
+          </h2>
+
+          <FormField label={t("partnerDashboard.projectForm.projectTitle")}>
+            <Input
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder={t("partnerDashboard.projectForm.projectTitlePlaceholder")}
+            />
+          </FormField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label={t("partnerDashboard.listingForm.city")}>
+              <select
+                value={form.city}
+                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">{t("partnerDashboard.listingForm.selectCity")}</option>
+                {CITY_LIST.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {t(`cities.${c.name}`)}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label={t("partnerDashboard.listingForm.district")}>
+              <Input
+                value={form.district}
+                onChange={(e) => setForm((f) => ({ ...f, district: e.target.value }))}
+              />
+            </FormField>
+          </div>
+
+          <FormField label={t("partnerDashboard.projectForm.developerName")}>
+            <Input
+              value={form.developer_name}
+              onChange={(e) => setForm((f) => ({ ...f, developer_name: e.target.value }))}
+              placeholder={t("partnerDashboard.projectForm.developerNamePlaceholder")}
+            />
+          </FormField>
+
+          <FormField label={t("partnerDashboard.projectForm.developerLogoUrl")}>
+            <Input
+              type="url"
+              value={form.developer_logo_url}
+              onChange={(e) => setForm((f) => ({ ...f, developer_logo_url: e.target.value }))}
+            />
+          </FormField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label={t("partnerDashboard.projectForm.priceMin")}>
+              <Input
+                type="number"
+                min={0}
+                value={form.price_min}
+                onChange={(e) => setForm((f) => ({ ...f, price_min: e.target.value }))}
+              />
+            </FormField>
+            <FormField label={t("partnerDashboard.projectForm.priceMax")}>
+              <Input
+                type="number"
+                min={0}
+                value={form.price_max}
+                onChange={(e) => setForm((f) => ({ ...f, price_max: e.target.value }))}
+              />
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label={t("partnerDashboard.projectForm.areaMin")}>
+              <Input
+                type="number"
+                min={0}
+                value={form.area_min}
+                onChange={(e) => setForm((f) => ({ ...f, area_min: e.target.value }))}
+              />
+            </FormField>
+            <FormField label={t("partnerDashboard.projectForm.areaMax")}>
+              <Input
+                type="number"
+                min={0}
+                value={form.area_max}
+                onChange={(e) => setForm((f) => ({ ...f, area_max: e.target.value }))}
+              />
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label={t("partnerDashboard.projectForm.unitCount")}>
+              <Input
+                type="number"
+                min={0}
+                value={form.unit_count}
+                onChange={(e) => setForm((f) => ({ ...f, unit_count: e.target.value }))}
+              />
+            </FormField>
+            <FormField label={t("partnerDashboard.projectForm.completionStatus")}>
+              <select
+                value={form.completion_status}
+                onChange={(e) => setForm((f) => ({ ...f, completion_status: e.target.value }))}
+                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">{t("partnerDashboard.listingForm.selectDash")}</option>
+                <option value="Off-plan">Off-plan</option>
+                <option value="Under Construction">Under Construction</option>
+                <option value="Ready">Ready</option>
+              </select>
+            </FormField>
+          </div>
+
+          <FormField label={t("partnerDashboard.projectForm.propertyCategory")}>
+            <select
+              value={form.property_category}
+              onChange={(e) => setForm((f) => ({ ...f, property_category: e.target.value }))}
+              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="">{t("partnerDashboard.listingForm.selectType")}</option>
+              <option value="Apartment">{t("propertyTypes.Apartment")}</option>
+              <option value="Villa">{t("propertyTypes.Villa")}</option>
+              <option value="Floor">{t("propertyTypes.Floor")}</option>
+              <option value="Townhouse">{t("propertyTypes.Townhouse")}</option>
+            </select>
+          </FormField>
+
+          <FormField label={t("partnerDashboard.listingForm.contactPhone")}>
+            <Input
+              type="tel"
+              value={form.contact_phone}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  contact_phone: e.target.value,
+                  whatsapp_phone: f.whatsappSameAsCall ? e.target.value : f.whatsapp_phone,
+                }))
+              }
+              placeholder={t("partnerDashboard.listingForm.contactPhonePlaceholder")}
+            />
+          </FormField>
+
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={form.whatsappSameAsCall}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  whatsappSameAsCall: e.target.checked,
+                  whatsapp_phone: e.target.checked ? f.contact_phone : f.whatsapp_phone,
+                }))
+              }
+              className="size-3.5 rounded border-border"
+            />
+            {t("partnerDashboard.listingForm.whatsappSameAsCall")}
+          </label>
+
+          {!form.whatsappSameAsCall && (
+            <FormField label={t("partnerDashboard.listingForm.whatsappPhone")}>
+              <Input
+                type="tel"
+                value={form.whatsapp_phone}
+                onChange={(e) => setForm((f) => ({ ...f, whatsapp_phone: e.target.value }))}
+                placeholder={t("partnerDashboard.listingForm.whatsappPhonePlaceholder")}
+              />
+            </FormField>
+          )}
+        </div>
+
+        {/* Right column */}
+        <div className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-card">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            {t("partnerDashboard.projectForm.imageUrl")}
+          </h2>
+          <Input
+            type="url"
+            value={form.image_url}
+            onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))}
+          />
+
+          <FormField label={t("partnerDashboard.projectForm.introDocumentUrl")}>
+            <Input
+              type="url"
+              value={form.intro_document_url}
+              onChange={(e) => setForm((f) => ({ ...f, intro_document_url: e.target.value }))}
+            />
+          </FormField>
+
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground pt-2">
+            {t("partnerDashboard.projectForm.description")}
+          </h2>
+          <textarea
+            value={form.description}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            rows={6}
+            placeholder={t("partnerDashboard.projectForm.descriptionPlaceholder")}
+            className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+
+          <div className="rounded-xl border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
+            {isEdit ? t("partnerDashboard.listingForm.editNote") : t("partnerDashboard.listingForm.newNote")}
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

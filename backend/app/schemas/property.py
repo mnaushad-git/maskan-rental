@@ -36,6 +36,8 @@ class PropertyBase(BaseModel):
     license_number: str | None = None
     license_expiration_date: date | None = None
     deed_area: int | None = None
+    contact_phone: str | None = None
+    whatsapp_phone: str | None = None
     is_bookable: bool = False
     nightly_rate: float | None = None
     has_elevator: bool = False
@@ -77,6 +79,10 @@ class PartnerPropertyCreate(BaseModel):
     has_separate_electrical_meter: bool = False
     license_number: str | None = None
     deed_area: int | None = None
+    # Mandatory — every partner listing must expose a way to call and a way
+    # to WhatsApp the agent/owner, even if it's the same number for both.
+    contact_phone: str
+    whatsapp_phone: str
 
 
 class PropertyUpdate(BaseModel):
@@ -112,6 +118,8 @@ class PropertyUpdate(BaseModel):
     license_number: str | None = None
     license_expiration_date: date | None = None
     deed_area: int | None = None
+    contact_phone: str | None = None
+    whatsapp_phone: str | None = None
     is_bookable: bool | None = None
     nightly_rate: float | None = None
     has_elevator: bool | None = None
@@ -149,6 +157,8 @@ class PartnerPropertyUpdate(BaseModel):
     has_separate_electrical_meter: bool | None = None
     license_number: str | None = None
     deed_area: int | None = None
+    contact_phone: str | None = None
+    whatsapp_phone: str | None = None
 
 
 class ListingImageOut(BaseModel):
@@ -172,6 +182,12 @@ class PropertyOut(PropertyBase):
     # actual data.
     images: list[ListingImageOut] = Field(default=[], validation_alias="listing_images")
     mediator_phone: str | None = None
+    # Effective numbers the Call/WhatsApp buttons should use — listing's own
+    # contact_phone/whatsapp_phone, falling back to mediator_phone for rows
+    # created before these per-listing fields existed. See Property.call_phone
+    # / Property.whatsapp_number.
+    call_phone: str | None = None
+    whatsapp_number: str | None = None
     mediator_profile_image_url: str | None = None
     mediator_agent_name: str | None = None
     mediator_is_verified: bool = False

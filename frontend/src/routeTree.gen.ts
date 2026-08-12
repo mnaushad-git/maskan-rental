@@ -13,6 +13,7 @@ import { Route as SearchRouteImport } from './routes/search'
 import { Route as SavedSearchesRouteImport } from './routes/saved-searches'
 import { Route as SavedRouteImport } from './routes/saved'
 import { Route as PropertyRequestsRouteImport } from './routes/property-requests'
+import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as PartnersRouteImport } from './routes/partners'
 import { Route as PartnerRouteImport } from './routes/partner'
 import { Route as NotificationsRouteImport } from './routes/notifications'
@@ -31,6 +32,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PropertyIdRouteImport } from './routes/property.$id'
 import { Route as PropertyRequestsNewRouteImport } from './routes/property-requests.new'
 import { Route as PropertyRequestsIdRouteImport } from './routes/property-requests.$id'
+import { Route as ProjectIdRouteImport } from './routes/project.$id'
 import { Route as PartnerRequestsRouteImport } from './routes/partner.requests'
 import { Route as PartnerRegisterRouteImport } from './routes/partner.register'
 import { Route as LeadNewRouteImport } from './routes/lead.new'
@@ -61,6 +63,11 @@ const SavedRoute = SavedRouteImport.update({
 const PropertyRequestsRoute = PropertyRequestsRouteImport.update({
   id: '/property-requests',
   path: '/property-requests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PartnersRoute = PartnersRouteImport.update({
@@ -153,6 +160,11 @@ const PropertyRequestsIdRoute = PropertyRequestsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => PropertyRequestsRoute,
 } as any)
+const ProjectIdRoute = ProjectIdRouteImport.update({
+  id: '/project/$id',
+  path: '/project/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PartnerRequestsRoute = PartnerRequestsRouteImport.update({
   id: '/requests',
   path: '/requests',
@@ -225,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof NotificationsRoute
   '/partner': typeof PartnerRouteWithChildren
   '/partners': typeof PartnersRoute
+  '/projects': typeof ProjectsRoute
   '/property-requests': typeof PropertyRequestsRouteWithChildren
   '/saved': typeof SavedRoute
   '/saved-searches': typeof SavedSearchesRoute
@@ -238,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/lead/new': typeof LeadNewRoute
   '/partner/register': typeof PartnerRegisterRoute
   '/partner/requests': typeof PartnerRequestsRouteWithChildren
+  '/project/$id': typeof ProjectIdRoute
   '/property-requests/$id': typeof PropertyRequestsIdRoute
   '/property-requests/new': typeof PropertyRequestsNewRoute
   '/property/$id': typeof PropertyIdRoute
@@ -260,6 +274,7 @@ export interface FileRoutesByTo {
   '/notifications': typeof NotificationsRoute
   '/partner': typeof PartnerRouteWithChildren
   '/partners': typeof PartnersRoute
+  '/projects': typeof ProjectsRoute
   '/property-requests': typeof PropertyRequestsRouteWithChildren
   '/saved': typeof SavedRoute
   '/saved-searches': typeof SavedSearchesRoute
@@ -273,6 +288,7 @@ export interface FileRoutesByTo {
   '/lead/new': typeof LeadNewRoute
   '/partner/register': typeof PartnerRegisterRoute
   '/partner/requests': typeof PartnerRequestsRouteWithChildren
+  '/project/$id': typeof ProjectIdRoute
   '/property-requests/$id': typeof PropertyRequestsIdRoute
   '/property-requests/new': typeof PropertyRequestsNewRoute
   '/property/$id': typeof PropertyIdRoute
@@ -296,6 +312,7 @@ export interface FileRoutesById {
   '/notifications': typeof NotificationsRoute
   '/partner': typeof PartnerRouteWithChildren
   '/partners': typeof PartnersRoute
+  '/projects': typeof ProjectsRoute
   '/property-requests': typeof PropertyRequestsRouteWithChildren
   '/saved': typeof SavedRoute
   '/saved-searches': typeof SavedSearchesRoute
@@ -309,6 +326,7 @@ export interface FileRoutesById {
   '/lead/new': typeof LeadNewRoute
   '/partner/register': typeof PartnerRegisterRoute
   '/partner/requests': typeof PartnerRequestsRouteWithChildren
+  '/project/$id': typeof ProjectIdRoute
   '/property-requests/$id': typeof PropertyRequestsIdRoute
   '/property-requests/new': typeof PropertyRequestsNewRoute
   '/property/$id': typeof PropertyIdRoute
@@ -333,6 +351,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/partner'
     | '/partners'
+    | '/projects'
     | '/property-requests'
     | '/saved'
     | '/saved-searches'
@@ -346,6 +365,7 @@ export interface FileRouteTypes {
     | '/lead/new'
     | '/partner/register'
     | '/partner/requests'
+    | '/project/$id'
     | '/property-requests/$id'
     | '/property-requests/new'
     | '/property/$id'
@@ -368,6 +388,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/partner'
     | '/partners'
+    | '/projects'
     | '/property-requests'
     | '/saved'
     | '/saved-searches'
@@ -381,6 +402,7 @@ export interface FileRouteTypes {
     | '/lead/new'
     | '/partner/register'
     | '/partner/requests'
+    | '/project/$id'
     | '/property-requests/$id'
     | '/property-requests/new'
     | '/property/$id'
@@ -403,6 +425,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/partner'
     | '/partners'
+    | '/projects'
     | '/property-requests'
     | '/saved'
     | '/saved-searches'
@@ -416,6 +439,7 @@ export interface FileRouteTypes {
     | '/lead/new'
     | '/partner/register'
     | '/partner/requests'
+    | '/project/$id'
     | '/property-requests/$id'
     | '/property-requests/new'
     | '/property/$id'
@@ -439,6 +463,7 @@ export interface RootRouteChildren {
   NotificationsRoute: typeof NotificationsRoute
   PartnerRoute: typeof PartnerRouteWithChildren
   PartnersRoute: typeof PartnersRoute
+  ProjectsRoute: typeof ProjectsRoute
   PropertyRequestsRoute: typeof PropertyRequestsRouteWithChildren
   SavedRoute: typeof SavedRoute
   SavedSearchesRoute: typeof SavedSearchesRoute
@@ -450,6 +475,7 @@ export interface RootRouteChildren {
   ContractLeadIdRoute: typeof ContractLeadIdRoute
   LeadLeadIdRoute: typeof LeadLeadIdRoute
   LeadNewRoute: typeof LeadNewRoute
+  ProjectIdRoute: typeof ProjectIdRoute
   PropertyIdRoute: typeof PropertyIdRoute
 }
 
@@ -481,6 +507,13 @@ declare module '@tanstack/react-router' {
       path: '/property-requests'
       fullPath: '/property-requests'
       preLoaderRoute: typeof PropertyRequestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/partners': {
@@ -608,6 +641,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/property-requests/$id'
       preLoaderRoute: typeof PropertyRequestsIdRouteImport
       parentRoute: typeof PropertyRequestsRoute
+    }
+    '/project/$id': {
+      id: '/project/$id'
+      path: '/project/$id'
+      fullPath: '/project/$id'
+      preLoaderRoute: typeof ProjectIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/partner/requests': {
       id: '/partner/requests'
@@ -745,6 +785,7 @@ const rootRouteChildren: RootRouteChildren = {
   NotificationsRoute: NotificationsRoute,
   PartnerRoute: PartnerRouteWithChildren,
   PartnersRoute: PartnersRoute,
+  ProjectsRoute: ProjectsRoute,
   PropertyRequestsRoute: PropertyRequestsRouteWithChildren,
   SavedRoute: SavedRoute,
   SavedSearchesRoute: SavedSearchesRoute,
@@ -756,6 +797,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContractLeadIdRoute: ContractLeadIdRoute,
   LeadLeadIdRoute: LeadLeadIdRoute,
   LeadNewRoute: LeadNewRoute,
+  ProjectIdRoute: ProjectIdRoute,
   PropertyIdRoute: PropertyIdRoute,
 }
 export const routeTree = rootRouteImport

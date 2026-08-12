@@ -28,6 +28,7 @@ export type Property = {
   pricePerSqm: number;
   agent: string;
   agentPhone: string | null;
+  agentWhatsapp: string | null;
   agentProfileImage: string | null;
   mediatorId: number | null;
   description: string | null;
@@ -44,6 +45,47 @@ export type Property = {
   updatedAt: string;
   mediatorRating: number | null;
   mediatorReviewCount: number;
+};
+
+export type ProjectUnit = {
+  id: number;
+  unitType: string;
+  price: number;
+  areaSqm: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  livingRooms: number | null;
+  status: string;
+};
+
+export type Project = {
+  id: string;
+  title: string;
+  district: string;
+  city: string;
+  description: string | null;
+  image: string;
+  images: string[];
+  status: string;
+  completionStatus: string | null;
+  category: string | null;
+  priceMin: number | null;
+  priceMax: number | null;
+  areaMin: number | null;
+  areaMax: number | null;
+  unitCount: number | null;
+  introDocumentUrl: string | null;
+  isFeatured: boolean;
+  developerName: string | null;
+  developerLogoUrl: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  units: ProjectUnit[];
+  viewsCount: number;
+  agentPhone: string | null;
+  agentWhatsapp: string | null;
+  mediatorId: number | null;
+  listingStatus: string;
 };
 
 export const marketStats = [

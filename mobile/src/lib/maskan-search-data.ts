@@ -17,6 +17,7 @@ export type SearchProperty = {
   matchScore: number;
   isVerified: boolean;
   agentPhone: string | null;
+  agentWhatsapp: string | null;
   latitude: number | null;
   longitude: number | null;
 };

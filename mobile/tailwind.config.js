@@ -28,6 +28,12 @@ module.exports = {
         "info-foreground": "#FFFFFF",
         ai: "#7C3AED",
         "ai-soft": "#EDE9FE",
+        // Fixed third-party brand mark — mirrors src/lib/colors.ts's
+        // `whatsapp`/`whatsappForeground` so `bg-whatsapp`/`text-whatsapp`
+        // classNames resolve the same color NativeWind-side as the inline
+        // `style={{ color: colors.whatsapp }}` usages do.
+        whatsapp: "#25D366",
+        "whatsapp-foreground": "#128C7E",
       },
       // Radius scale — same shape as the web app's --radius-{sm..4xl} tokens
       // (frontend/src/styles.css), so a "lg" card reads as the same relative

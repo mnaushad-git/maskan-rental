@@ -2,7 +2,7 @@
 import prop2 from "@/assets/prop-2.jpg";
 import prop3 from "@/assets/prop-3.jpg";
 import prop4 from "@/assets/prop-4.jpg";
-import type { Property as UiProperty } from "@/lib/maskan-data";
+import type { Property as UiProperty, Project as UiProject } from "@/lib/maskan-data";
 import type { SearchProperty as UiSearchProperty } from "@/lib/maskan-search-data";
 import { currentScope, readStoredToken, clearStoredAuth } from "@/lib/auth-storage";
 
@@ -51,6 +51,10 @@ export type ApiProperty = {
   mediator_id: number | null;
   images: ApiListingImage[];
   mediator_phone: string | null;
+  contact_phone: string | null;
+  whatsapp_phone: string | null;
+  call_phone: string | null;
+  whatsapp_number: string | null;
   mediator_profile_image_url: string | null;
   mediator_agent_name: string | null;
   mediator_is_verified: boolean;
@@ -233,7 +237,8 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
           : "Available",
     pricePerSqm: estimatedArea > 0 ? Math.round(displayPrice / estimatedArea) : 0,
     agent: property.mediator_agent_name ?? property.owner_name ?? "Maskan Agent",
-    agentPhone: property.mediator_phone ?? null,
+    agentPhone: property.call_phone ?? property.mediator_phone ?? null,
+    agentWhatsapp: property.whatsapp_number ?? property.mediator_phone ?? null,
     agentProfileImage: property.mediator_profile_image_url ?? null,
     mediatorId: property.mediator_id ?? null,
     description: property.description ?? null,
@@ -292,7 +297,8 @@ export function mapApiSearchProperty(property: ApiProperty): UiSearchProperty {
       property.description ? "Detailed description available" : "Fresh inventory",
       "Good rental value",
     ],
-    agentPhone: property.mediator_phone ?? null,
+    agentPhone: property.call_phone ?? property.mediator_phone ?? null,
+    agentWhatsapp: property.whatsapp_number ?? property.mediator_phone ?? null,
   };
 }
 
@@ -515,6 +521,8 @@ export type PartnerPropertyPayload = {
   description?: string;
   property_type?: string;
   furnished?: string;
+  contact_phone: string;
+  whatsapp_phone: string;
 };
 
 export function fetchPartnerListings() {
@@ -530,6 +538,174 @@ export function createPartnerListing(payload: PartnerPropertyPayload) {
 
 export function patchPartnerListing(id: number, payload: Partial<PartnerPropertyPayload>) {
   return requestJson<ApiProperty>(`/properties/partner/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export type ApiProjectUnit = {
+  id: number;
+  unit_type: string;
+  price: number;
+  area_sq_m: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  living_rooms: number | null;
+  status: string;
+};
+
+export type ApiProjectImage = {
+  id: number;
+  url: string;
+  display_order: number;
+};
+
+export type ApiProject = {
+  id: number;
+  external_id: string | null;
+  title: string;
+  city: string;
+  area: string;
+  description: string | null;
+  image_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  status: string;
+  completion_status: string | null;
+  property_category: string | null;
+  price_min: number | null;
+  price_max: number | null;
+  area_min: number | null;
+  area_max: number | null;
+  unit_count: number | null;
+  intro_document_url: string | null;
+  is_featured: boolean;
+  developer_name: string | null;
+  developer_logo_url: string | null;
+  mediator_id: number | null;
+  contact_phone: string | null;
+  whatsapp_phone: string | null;
+  listing_status: string;
+  created_at: string;
+  updated_at: string;
+  views_count: number;
+  units: ApiProjectUnit[];
+  images: ApiProjectImage[];
+  mediator_phone: string | null;
+  call_phone: string | null;
+  whatsapp_number: string | null;
+};
+
+function imageForProject(id: number) {
+  return PROPERTY_IMAGES[(id - 1) % PROPERTY_IMAGES.length];
+}
+
+export function mapApiProject(project: ApiProject): UiProject {
+  const imageUrls = (project.images ?? []).map((i) => i.url);
+  const primaryImage = imageUrls[0] ?? project.image_url ?? imageForProject(project.id);
+
+  return {
+    id: String(project.id),
+    title: project.title,
+    district: project.area,
+    city: project.city,
+    description: project.description ?? null,
+    image: primaryImage,
+    images: imageUrls.length > 0 ? imageUrls : [primaryImage],
+    status: project.status,
+    completionStatus: project.completion_status ?? null,
+    category: project.property_category ?? null,
+    priceMin: project.price_min ?? null,
+    priceMax: project.price_max ?? null,
+    areaMin: project.area_min ?? null,
+    areaMax: project.area_max ?? null,
+    unitCount: project.unit_count ?? null,
+    introDocumentUrl: project.intro_document_url ?? null,
+    isFeatured: project.is_featured,
+    developerName: project.developer_name ?? null,
+    developerLogoUrl: project.developer_logo_url ?? null,
+    latitude: project.latitude ?? null,
+    longitude: project.longitude ?? null,
+    units: (project.units ?? []).map((u) => ({
+      id: u.id,
+      unitType: u.unit_type,
+      price: u.price,
+      areaSqm: u.area_sq_m ?? null,
+      bedrooms: u.bedrooms ?? null,
+      bathrooms: u.bathrooms ?? null,
+      livingRooms: u.living_rooms ?? null,
+      status: u.status,
+    })),
+    viewsCount: project.views_count,
+    agentPhone: project.call_phone ?? project.mediator_phone ?? null,
+    agentWhatsapp: project.whatsapp_number ?? project.mediator_phone ?? null,
+    mediatorId: project.mediator_id ?? null,
+    listingStatus: project.listing_status,
+  };
+}
+
+export function fetchProjects(params?: { city?: string; area?: string; status?: string }) {
+  const search = new URLSearchParams();
+  if (params?.city) search.set("city", params.city);
+  if (params?.area) search.set("area", params.area);
+  if (params?.status) search.set("status", params.status);
+  const qs = search.toString();
+  return requestJson<ApiProject[]>(`/projects/${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchProject(id: number) {
+  return requestJson<ApiProject>(`/projects/${id}`);
+}
+
+export function fetchSimilarProjects(id: number, limit = 6) {
+  return requestJson<ApiProject[]>(`/projects/${id}/similar?limit=${limit}`);
+}
+
+export function fetchAdminProjects() {
+  return requestJson<ApiProject[]>("/projects/?include_all=true&limit=500");
+}
+
+export function patchProjectAdmin(id: number, payload: Partial<ApiProject>) {
+  return requestJson<ApiProject>(`/projects/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export type PartnerProjectPayload = {
+  title: string;
+  city: string;
+  area: string;
+  description?: string;
+  image_url?: string;
+  status?: string;
+  completion_status?: string;
+  property_category?: string;
+  price_min?: number;
+  price_max?: number;
+  area_min?: number;
+  area_max?: number;
+  unit_count?: number;
+  intro_document_url?: string;
+  developer_name?: string;
+  developer_logo_url?: string;
+  contact_phone: string;
+  whatsapp_phone: string;
+};
+
+export function fetchPartnerProjects() {
+  return requestJson<ApiProject[]>("/projects/partner/mine");
+}
+
+export function createPartnerProject(payload: PartnerProjectPayload) {
+  return requestJson<ApiProject>("/projects/partner/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function patchPartnerProject(id: number, payload: Partial<PartnerProjectPayload>) {
+  return requestJson<ApiProject>(`/projects/partner/${id}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });

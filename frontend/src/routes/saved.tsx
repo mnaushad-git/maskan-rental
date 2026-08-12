@@ -556,7 +556,12 @@ function SavedCard({
 
       {/* Contact CTA */}
       {p.agentPhone && (
-        <ContactButtons phone={p.agentPhone} callLabel={t("saved.callAgent")} whatsappLabel={t("saved.whatsapp")} />
+        <ContactButtons
+          phone={p.agentPhone}
+          whatsappPhone={p.agentWhatsapp ?? undefined}
+          callLabel={t("saved.callAgent")}
+          whatsappLabel={t("saved.whatsapp")}
+        />
       )}
 
       {/* Actions */}

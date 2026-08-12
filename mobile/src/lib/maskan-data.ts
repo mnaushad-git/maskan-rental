@@ -30,6 +30,7 @@ export type Property = {
   pricePerSqm: number;
   agent: string;
   agentPhone: string | null;
+  agentWhatsapp: string | null;
   agentProfileImage: string | null;
   mediatorId: number | null;
   latitude: number | null;
@@ -85,6 +86,7 @@ export function toCardProperty(p: SearchProperty): Property {
     pricePerSqm: p.area > 0 ? Math.round(p.price / p.area) : 0,
     agent: "myHome Agent",
     agentPhone: p.agentPhone,
+    agentWhatsapp: p.agentWhatsapp,
     agentProfileImage: null,
     mediatorId: null,
     latitude: p.latitude,
@@ -174,4 +176,6 @@ export type Project = {
   isFeatured: boolean;
   units: ProjectUnit[];
   createdAt: string;
+  agentPhone: string | null;
+  agentWhatsapp: string | null;
 };

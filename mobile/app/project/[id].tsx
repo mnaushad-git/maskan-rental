@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { View, Text, ScrollView, Pressable, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { MapPin, Building2, FileText, Maximize, Layers, BedDouble, Bath, Sofa, School, Hospital } from "lucide-react-native";
+import { MapPin, Building2, FileText, Maximize, Layers, BedDouble, Bath, Sofa, School, Hospital, MessageCircle, Phone } from "lucide-react-native";
 import { fetchProject, mapApiProject, fetchAreaIntelligence, type ApiAreaIntelligence } from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
 import type { Project } from "@/lib/maskan-data";
 import { useLanguage } from "@/lib/i18n/context";
+import { whatsappLink } from "@/lib/whatsapp";
 import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -89,6 +90,11 @@ export default function ProjectDetailScreen() {
     );
   }
 
+  const waLink = project.agentWhatsapp
+    ? whatsappLink(project.agentWhatsapp)
+    : project.agentPhone
+      ? whatsappLink(project.agentPhone)
+      : undefined;
   const fullDescription = project.description ?? "";
   const landmarks = [
     ...(areaIntel?.schools ?? []).map((s) => ({ name: s.name, distanceKm: s.distance_km, Icon: School })),
@@ -268,7 +274,27 @@ export default function ProjectDetailScreen() {
               {priceRangeLabel(project.priceMin, project.priceMax)}
             </Text>
           </View>
-          <Button onPress={handleContact}>{t("projects.detail.contact")}</Button>
+          {project.agentPhone ? (
+            <>
+              <Pressable
+                onPress={() => waLink && Linking.openURL(waLink)}
+                className="flex-row items-center gap-1.5 rounded-xl px-4 py-2.5"
+                style={{ backgroundColor: colors.whatsapp }}
+              >
+                <MessageCircle size={16} color="#FFFFFF" />
+                <Text className="text-sm font-semibold text-white">{t("propertyCard.whatsapp")}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => Linking.openURL(`tel:${project.agentPhone}`)}
+                className="flex-row items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5"
+              >
+                <Phone size={16} color={colors.foreground} />
+                <Text className="text-sm font-semibold text-foreground">{t("propertyCard.call")}</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Button onPress={handleContact}>{t("projects.detail.contact")}</Button>
+          )}
         </View>
       </SafeAreaView>
     </View>

@@ -40,6 +40,19 @@ class Booking(Base):
     # the pricing/payment session.
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="confirmed", server_default="confirmed", index=True)
 
+    # Reservation-form fields — captured at booking time, no gateway charge
+    # yet (pay-at-property, mirrors the Booking.com "no prepayment needed"
+    # flow). guest_name/guest_phone default to the renter's account details
+    # client-side but are stored separately since a booking can be made on
+    # someone else's behalf. Nullable at the DB level (bookings created
+    # before this field existed have none) — BookingCreate requires them
+    # for every new booking.
+    guest_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    guest_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    arrival_time: Mapped[str | None] = mapped_column(String(20), nullable=True)  # e.g. "14:00"
+    payment_method: Mapped[str] = mapped_column(String(20), nullable=False, default="cash", server_default="cash")  # "cash" | "card"
+    special_requests: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

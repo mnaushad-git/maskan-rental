@@ -78,8 +78,11 @@ import {
   removeProperty,
   addPropertyImage,
   deletePropertyImage,
+  fetchAdminProjects,
+  patchProjectAdmin,
   type ApiAreaSummary,
   type ApiProperty,
+  type ApiProject,
   type ApiPartner,
   type ApiUser,
   type ApiLeadDetail,
@@ -128,13 +131,15 @@ type Listing = {
 
 // ---------- Page ----------
 
-type AdminView = "listings" | "mediators" | "leads" | "users" | "reviews";
+type AdminView = "listings" | "projects" | "mediators" | "leads" | "users" | "reviews";
 
 function AdminPage() {
   const { user, authLoading, setAuth } = useAuth();
   const [view, setView] = useState<AdminView>("listings");
   const [listings, setListings] = useState<Listing[]>([]);
   const [loadingListings, setLoadingListings] = useState(true);
+  const [projects, setProjects] = useState<ApiProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
   const [mediators, setMediators] = useState<ApiPartner[]>([]);
   const [loadingMediators, setLoadingMediators] = useState(false);
   const [leads, setLeads] = useState<ApiLeadDetail[]>([]);
@@ -204,6 +209,13 @@ function AdminPage() {
         .then((l) => setLeads(l))
         .catch((err) => console.error("fetchAdminLeads failed:", err))
         .finally(() => setLoadingLeads(false));
+    }
+    if (view === "projects" && projects.length === 0 && !loadingProjects) {
+      setLoadingProjects(true);
+      fetchAdminProjects()
+        .then((p) => setProjects(p))
+        .catch(() => {})
+        .finally(() => setLoadingProjects(false));
     }
     if (view === "reviews" && !loadingReviews) {
       setLoadingReviews(true);
@@ -303,6 +315,15 @@ function AdminPage() {
     }
     setListings((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
   }
+  async function setProjectStatus(id: number, listing_status: ListingStatus) {
+    try {
+      const updated = await patchProjectAdmin(id, { listing_status });
+      setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
+    } catch (err) {
+      alert(`Failed to update status: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   async function remove(id: string) {
     const numericId = Number(id);
     if (Number.isFinite(numericId)) {
@@ -526,6 +547,15 @@ function AdminPage() {
                   status === "approved" ? Math.max(0, c - 1) : Math.max(0, c - 1),
                 );
               }}
+            />
+          )}
+
+          {/* Projects moderation view */}
+          {view === "projects" && (
+            <ProjectsModerationView
+              projects={projects}
+              loading={loadingProjects}
+              onSetStatus={setProjectStatus}
             />
           )}
 
@@ -821,6 +851,130 @@ function ReviewStaticStars({ score }: { score: number }) {
   );
 }
 
+function ProjectsModerationView({
+  projects,
+  loading,
+  onSetStatus,
+}: {
+  projects: ApiProject[];
+  loading: boolean;
+  onSetStatus: (id: number, status: ListingStatus) => Promise<void>;
+}) {
+  const [filter, setFilter] = useState<ListingStatus | "All">("All");
+  const [acting, setActing] = useState<number | null>(null);
+
+  const visible = filter === "All" ? projects : projects.filter((p) => p.listing_status === filter);
+
+  async function act(id: number, status: ListingStatus) {
+    setActing(id);
+    try {
+      await onSetStatus(id, status);
+    } finally {
+      setActing(null);
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Moderation
+        </p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">Projects</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Approve, reject, or suspend developer projects submitted by partners.
+        </p>
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-2">
+        {(["All", "Pending Approval", "Published", "Suspended", "Rejected", "Draft"] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setFilter(f)}
+            className={cn(
+              "rounded-full px-3 py-1 text-sm font-medium transition-colors",
+              filter === f
+                ? "bg-primary text-primary-foreground"
+                : "bg-surface-2 text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
+          <div className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          Loading projects…
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="flex h-40 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+          <CheckCircle2 className="size-8 text-success/60" />
+          No projects in this category.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {visible.map((p) => (
+            <div key={p.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold truncate">{p.title}</span>
+                    <ListingStatusBadge status={p.listing_status} />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {p.area}, {p.city}
+                    {p.developer_name ? ` · ${p.developer_name}` : ""}
+                  </p>
+                  <p className="text-sm font-semibold text-primary">
+                    {p.price_min != null ? `SAR ${formatSAR(p.price_min)}+` : "—"}
+                    {p.contact_phone ? ` · ${p.contact_phone}` : ""}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  {p.listing_status !== "Published" && (
+                    <button
+                      type="button"
+                      disabled={acting === p.id}
+                      onClick={() => void act(p.id, "Published")}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-success/10 px-3 py-1.5 text-sm font-semibold text-success hover:bg-success/20 transition-colors disabled:opacity-50"
+                    >
+                      <CheckCircle2 className="size-4" /> Publish
+                    </button>
+                  )}
+                  {p.listing_status !== "Rejected" && (
+                    <button
+                      type="button"
+                      disabled={acting === p.id}
+                      onClick={() => void act(p.id, "Rejected")}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-destructive/10 px-3 py-1.5 text-sm font-semibold text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50"
+                    >
+                      <X className="size-4" /> Reject
+                    </button>
+                  )}
+                  {p.listing_status === "Published" && (
+                    <button
+                      type="button"
+                      disabled={acting === p.id}
+                      onClick={() => void act(p.id, "Suspended")}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-surface-2 px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                    >
+                      <ShieldAlert className="size-4" /> Suspend
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReviewsModerationView({
   reviews,
   loading,
@@ -999,6 +1153,7 @@ function adminNavItems(
 ): { view: AdminView; icon: React.ElementType; label: string; badge?: number }[] {
   return [
     { view: "listings", icon: ListChecks, label: "Listings" },
+    { view: "projects", icon: Building2, label: "Projects" },
     { view: "mediators", icon: Briefcase, label: "Partners" },
     { view: "leads", icon: Users, label: "Leads" },
     { view: "users", icon: UserPlus, label: "Users" },

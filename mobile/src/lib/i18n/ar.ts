@@ -14,6 +14,7 @@ export const ar: TranslationDict = {
     loadFailed: "حدث خطأ أثناء التحميل. تحقق من اتصالك وحاول مرة أخرى.",
     retry: "إعادة المحاولة",
     refresh: "تحديث",
+    cancel: "إلغاء",
   },
   cities: {
     Riyadh: "الرياض",
@@ -369,6 +370,9 @@ export const ar: TranslationDict = {
     bathroomsAbbr: "حمامات",
     perYear: "/سنويًا",
     approxLocation: "الدبوس يوضح المنطقة التقريبية وليس العنوان الدقيق",
+    locateMe: "تحديد موقعي",
+    locationServicesOff: "فعّل خدمة الموقع في إعدادات جهازك للعثور على منازل قريبة منك.",
+    openSettings: "فتح الإعدادات",
   },
   home: {
     changeCity: "تغيير المدينة",
@@ -750,6 +754,7 @@ export const ar: TranslationDict = {
       perMonth: "~ SAR {{amount}}/شهريًا",
       contactLandlord: "التواصل مع المالك",
       askAI: "اسأل الذكاء الاصطناعي",
+      share: "مشاركة",
       saved: "محفوظ",
       save: "حفظ",
       savedToFavorites: "تم الحفظ في المفضلة",
