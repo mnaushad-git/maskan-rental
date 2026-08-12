@@ -68,8 +68,13 @@ export const en = {
     Workshop: "Workshop",
   },
   nav: {
+    home: "Home",
+    rent: "Rent",
+    buy: "Buy",
+    map: "Map",
     search: "Search",
     exploreAreas: "Explore Areas",
+    areaIntelligence: "Area Intelligence",
     partners: "Partners",
     aiAdvisor: "AI Advisor",
     saved: "Saved",
@@ -381,6 +386,17 @@ export const en = {
   },
   home: {
     changeCity: "Change city",
+    hero: {
+      title: "Find the right property to rent or buy with AI-powered intelligence",
+      subtitle:
+        "Search verified listings, compare neighborhoods, and get instant AI guidance — all in one place.",
+    },
+    quickLinks: {
+      rent: "Browse rentals",
+      buy: "Browse for sale",
+      map: "View map",
+      aiAdvisor: "Ask AI Advisor",
+    },
     stats: {
       verifiedListingsSingular: "{{count}}+ verified listing",
       verifiedListingsPlural: "{{count}}+ verified listings",

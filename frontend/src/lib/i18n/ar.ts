@@ -70,8 +70,13 @@ export const ar: TranslationDict = {
     Workshop: "ورشة",
   },
   nav: {
+    home: "الرئيسية",
+    rent: "إيجار",
+    buy: "شراء",
+    map: "الخريطة",
     search: "بحث",
     exploreAreas: "استكشاف الأحياء",
+    areaIntelligence: "ذكاء الأحياء",
     partners: "الشركاء",
     aiAdvisor: "المستشار الذكي",
     saved: "المحفوظات",
@@ -378,6 +383,17 @@ export const ar: TranslationDict = {
   },
   home: {
     changeCity: "تغيير المدينة",
+    hero: {
+      title: "اعثر على العقار المناسب للإيجار أو الشراء بذكاء اصطناعي",
+      subtitle:
+        "ابحث في إعلانات موثّقة، قارن بين الأحياء، واحصل على إرشاد فوري من الذكاء الاصطناعي — كل ذلك في مكان واحد.",
+    },
+    quickLinks: {
+      rent: "تصفح الإيجارات",
+      buy: "تصفح العقارات للبيع",
+      map: "عرض الخريطة",
+      aiAdvisor: "اسأل المستشار الذكي",
+    },
     stats: {
       verifiedListingsSingular: "{{count}}+ إعلان موثّق",
       verifiedListingsPlural: "{{count}}+ إعلان موثّق",

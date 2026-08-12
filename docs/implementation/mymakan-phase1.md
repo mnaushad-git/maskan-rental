@@ -151,11 +151,74 @@ TODO — filled in by a later prompt
 
 ## Routes changed
 
-TODO — filled in by a later prompt
+**Prompt 4 — Customer web navigation cleanup.** No route files added, removed,
+or renamed — only the home page component (`frontend/src/routes/index.tsx`)
+changed:
+
+- `HomeSearchSection` gained a hero `<h1>` + subtitle (new `home.hero.title` /
+  `home.hero.subtitle` i18n keys) communicating "Find the right property to
+  rent or buy with AI-powered intelligence", plus a row of four quick-link
+  pills — Rent (`/search?listingType=rent`), Buy (`/search?listingType=sale`),
+  Map (`/search`, whose default view is already the map), and AI Advisor
+  (`/advisor`) — using new `home.quickLinks.*` i18n keys. Search itself is
+  already prominently surfaced by the existing `SearchBar` component
+  immediately below the hero (unchanged).
+- Reused the existing design system only: same pill styling already used
+  elsewhere on this page (`rounded-full border ... shadow-card`), same
+  `font-display` heading classes used site-wide — no new components, no
+  layout system changes.
+
+All Hide-Phase1 route files (`projects.tsx`, `project.$id.tsx`,
+`contract.$leadId.tsx`, etc.) are untouched and still resolve normally if
+navigated to directly — only their nav entry points were removed (see
+"Navigation changed" below).
 
 ## Navigation changed
 
-TODO — filled in by a later prompt
+**Prompt 4.** `frontend/src/components/maskan/TopNav.tsx`'s `NAV_LINKS` was
+trimmed to exactly the Phase-1 set requested: Home, Rent, Buy, Map, AI
+Advisor, Area Intelligence, Saved (+ My Leads, appended only when signed in,
+as before). Before → after:
+
+| Before | After |
+|---|---|
+| Search (`/search`) | split into **Rent** (`/search?listingType=rent`), **Buy** (`/search?listingType=sale`), **Map** (`/search`) |
+| Projects (`/projects`) | **removed** (Hide-Phase1) |
+| Explore Areas (`/areas`) | relabeled **Area Intelligence** (same route — matches the Prompt 1 classification, which called this feature "area intelligence") |
+| Partners (`/partners`) | **removed** from top nav (Keep-Phase1 route, but not one of the 9 requested nav items — still reachable via its URL and any in-page links; not deleted) |
+| AI Advisor (`/advisor`) | kept |
+| Saved (`/saved`) | kept |
+| Compare (`/compare`) | **removed** from top nav (same rationale as Partners — Keep-Phase1, still reachable, just not top-nav) |
+| My Leads (`/my-leads`, signed-in only) | kept, appended after the base list as before |
+| — | **Home** (`/`) added as an explicit nav item (previously only reachable via the logo) |
+
+**Profile** (from the requested 9-item list) was not added as a new nav
+link — the existing account avatar / dropdown (`NavAuthButton.tsx`, always
+rendered at the end of `TopNav`) already serves as the Profile entry point
+(saved properties, my leads, property requests, saved searches, notification
+settings, admin console, sign out) and a "Sign in" button when signed out.
+Adding a second, redundant "Profile" link was judged unnecessary — a
+judgment call, flagged here in case a later prompt disagrees.
+
+Implementation notes:
+- Rent/Buy/Map all navigate to the same `/search` route with different (or no)
+  `listingType` search param — `search.tsx` already reads `listingType` from
+  the query string itself (not a typed route search schema), so this needed
+  no changes to `search.tsx`.
+- Known limitation: the nav's active-state highlighting is `pathname`-based
+  (desktop `activeProps`, mobile manual `isActive`) and doesn't distinguish
+  between Rent/Buy/Map's shared `/search` pathname — all three can render as
+  "active" simultaneously while on `/search`. Fixing this would mean adding
+  search-param-aware active-state logic, which felt like it crossed from
+  "trim the nav" into "redesign the nav", so it was left as-is per the
+  prompt's "reuse the existing design system — no redesign" instruction.
+- Verified end-to-end: ran `npm run typecheck` and `npm run build` (both
+  clean), then started the dev server and fetched the rendered home page HTML
+  — confirmed the desktop nav renders exactly `Home, Rent, Buy, Map, AI
+  Advisor, Area Intelligence, Saved` (in that order) with correct hrefs
+  (`/search?listingType=rent`, `/search?listingType=sale`, `/search`,
+  `/advisor`, `/areas`, `/saved`), and the hero heading/quick-links render
+  the new copy.
 
 ## Feature flags
 

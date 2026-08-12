@@ -167,7 +167,45 @@ function HomeSearchSection({
           </button>
         </div>
 
+        <div className="mb-6 max-w-2xl">
+          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
+            {t("home.hero.title")}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+            {t("home.hero.subtitle")}
+          </p>
+        </div>
+
         <SearchBar onSearch={onSearch} onListingTypeChange={onListingTypeChange} />
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            to="/search"
+            search={{ listingType: "rent" }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-card transition-colors hover:bg-surface"
+          >
+            <Home className="size-3.5 text-primary" /> {t("home.quickLinks.rent")}
+          </Link>
+          <Link
+            to="/search"
+            search={{ listingType: "sale" }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-card transition-colors hover:bg-surface"
+          >
+            <Building2 className="size-3.5 text-primary" /> {t("home.quickLinks.buy")}
+          </Link>
+          <Link
+            to="/search"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-card transition-colors hover:bg-surface"
+          >
+            <Map className="size-3.5 text-primary" /> {t("home.quickLinks.map")}
+          </Link>
+          <Link
+            to="/advisor"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-card transition-colors hover:bg-surface"
+          >
+            <Sparkles className="size-3.5 text-primary" /> {t("home.quickLinks.aiAdvisor")}
+          </Link>
+        </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
