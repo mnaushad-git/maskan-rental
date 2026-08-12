@@ -383,6 +383,83 @@ spec exactly, the filter and form toggle both work, and every new view
 renders real data with no console/render errors. Test account deleted from
 the database afterward.
 
+**Prompt 7 — Admin portal cleanup.** `frontend/src/routes/admin.tsx`'s
+sidebar/mobile nav was rebuilt from 6 items (Listings, Projects, Partners,
+Leads, Users, Reviews + separate `/admin/notifications` and
+`/admin/property-requests` links) into exactly the 12-item spec: Dashboard,
+Properties, Rentals, Sales, Mediators, Leads, Reviews, Area Intelligence,
+Data Import, Analytics, Users, Settings. Same refactor as Prompt 6: both
+sidebar and mobile nav now render from one shared `navItems` array (built in
+`AdminPage`, passed down as a prop) instead of a standalone `adminNavItems()`
+helper each component called independently.
+
+Mapping from old → new:
+
+| Old | New |
+|---|---|
+| Listings (all types) | split into **Properties** (all, with a full filter panel), **Rentals**, **Sales** — same `filtered`/`view === "listings"` table and `transactionTypeFilter` state, not three separate tables |
+| Projects (off-plan) | **removed** from nav — gated behind `PHASE1_FLAGS.projects` (reusing Prompt 5/6's flags file), same as the partner portal's Projects tab; `ProjectsModerationView` untouched |
+| Partners | relabeled **Mediators** (view key/internal page heading left as-is — only the nav label changed, matching how Prompt 6 didn't rename partner-side internal copy either) |
+| `/admin/notifications` link ("Notification ops") | relabeled **Settings** — see judgment call below |
+| `/admin/property-requests` link ("Property requests") | **removed** from nav — see judgment call below |
+| — | **Dashboard** (new, default view): stat tiles reusing already-loaded state (listing stats, mediator/lead/user counts, pending reviews) — no new API calls, same pattern as the partner portal's Dashboard |
+| — | **Area Intelligence** (new link → `/areas`): no admin-specific area-management UI exists anywhere in the codebase (checked `admin.tsx` and `areas.tsx` for `is_admin`/refresh/sync code — none), so this reuses the same public area-intelligence page the customer nav links to |
+| — | **Data Import** (new link → `/import`): existing standalone admin page, previously reachable only via the "Import CSV" button inside the Listings toolbar or a direct URL, never from the nav |
+| — | **Analytics** (new link → `/analytics`): existing standalone admin page (its own "← Admin" back-link confirms it's part of this portal), previously unreachable from the nav at all |
+
+**Two judgment calls, both flagged here rather than silently made:**
+- **"Settings"** has no dedicated settings page in this codebase. The
+  closest existing thing is `admin.notifications.tsx` ("Notification
+  Operations" — quiet hours, digest schedules, push test tools), so the
+  admin nav's Settings entry points there instead of building a new page.
+  If a future prompt adds real platform-wide settings, this mapping should
+  be revisited.
+- **"Property requests"** (the admin-side AI-property-request-marketplace
+  dashboard, Keep-Phase1 per Prompt 1's classification) was dropped from
+  nav — like Prompt 6's `/partner/requests`, it's not in the prompt's
+  explicit item list, and dropping it removes its only in-app entry point
+  (grepped the frontend; nothing else links to `/admin/property-requests`).
+  Flagged as a discoverability regression for a Keep-Phase1 feature, same
+  caveat as Prompt 6, not deleted — `admin_.property-requests.tsx` is
+  untouched and still reachable by direct URL.
+
+**Filters** (`PartnerListingsView`-equivalent toolbar inside the "listings"
+view) gained everything Prompt 7 asked for beyond status (which already
+existed): an All/Rent/Sale segmented control (doubles as the always-visible
+control for the same state the Rentals/Sales nav items set), and a
+collapsible "More filters" panel with City, District, Mediator,
+Verification, and Property Type — all five populated by deriving unique
+values from the currently-loaded `listings` array (no extra fetch, and it
+means a filter only ever offers options that can return a result). The
+`Listing` type gained `listingType`/`mediatorId`/`mediatorName`/
+`mediatorVerified` (mapped from `ApiProperty.listing_type`/`mediator_id`/
+`mediator_agent_name`/`mediator_is_verified` in `toListing()`) to support
+this — made optional rather than required because the create/edit form
+(`ListingFormDrawer`) builds an intermediate `Listing`-shaped object that
+doesn't set them and was out of scope to change (see below). "Verification"
+means whether the listing's mediator is verified, not a property-level
+field — there's no such thing on `Property` itself.
+
+**Explicitly out of scope, left as a gap:** the admin create/edit listing
+form (`ListingFormDrawer`) still has no transaction-type selector — it only
+ever creates `listing_type: "rent"` (the backend default), unlike the
+partner portal's form, which Prompt 6 already extended. Prompt 7's task was
+scoped to nav + filters, not the create form, so this wasn't touched; admin
+can still see and filter sale listings (e.g. ones partners create), just not
+create one directly. Worth a follow-up prompt for parity with Prompt 6.
+
+Verified: `npm run typecheck` and `npm run build` both clean. Logged into
+the running dev server as the seeded admin account
+(`backend/seed.py`'s `mnaushad.fms@gmail.com` / `Admin@1234`, an existing
+local dev fixture — no new account created this time) via the same
+headless-Chrome-over-DevTools-Protocol approach as Prompt 6, and
+screenshotted Dashboard (real counts), Properties with the More Filters
+panel open (all 5 dropdowns present), Rentals, Sales (confirmed the
+`Showing 1–20 of 38 listings` count differs correctly from Properties'
+149), and Mediators (nav label renamed, page contents untouched) — all
+render real seeded data with the nav in the exact spec order and no
+console/render errors.
+
 ## Feature flags
 
 Added by Prompt 2 to the existing env-var-backed registry in
@@ -405,7 +482,7 @@ Prompt 5, both of which read frontend-web files only.
 | `saved_searches` | On | `FEATURE_SAVED_SEARCHES` | n/a (`saved_searches.router` always on) |
 | `notifications` | On | `FEATURE_NOTIFICATIONS` | n/a (`notifications.router` always on) |
 | `leads` | On | `FEATURE_LEADS` | n/a (`leads.router` always on) |
-| `projects` | Off | `FEATURE_PROJECTS` | Yes — `projects.router`. Frontend: `projects.tsx`/`project.$id.tsx` gated to `PhaseGate` (Prompt 5); `partner.tsx`'s Projects nav item gated the same way (Prompt 6) — `PartnerProjectsView`/`PartnerProjectForm` still work if flipped on. |
+| `projects` | Off | `FEATURE_PROJECTS` | Yes — `projects.router`. Frontend: `projects.tsx`/`project.$id.tsx` gated to `PhaseGate` (Prompt 5); `partner.tsx`'s and `admin.tsx`'s Projects nav items gated the same way (Prompts 6 & 7) — `PartnerProjectsView`/`PartnerProjectForm`/`ProjectsModerationView` all still work if flipped on. |
 | `booking` | Off | `FEATURE_BOOKING` | Yes — `bookings.router`. Frontend: `property.$id.tsx`'s embedded `ShortTermBooking` widget gated (Prompt 5) — no separate booking route exists on web (see "Routes changed"); `partner.tsx`'s listing-form "AI short-stay pricing" widget also gated on this (Prompt 6, found while working on the listing form, not asked for). |
 | `short_stay` | Off | `FEATURE_SHORT_STAY` | No dedicated router or frontend usage — still unused on both sides, kept as a placeholder in `PHASE1_FLAGS` too |
 | `financing` | Off | `FEATURE_FINANCING` | Yes — `financing.router`. Frontend: `RentNowPayLaterBanner`/`FinancingModal`, `ActionsCard`'s "Request Financing" button, and `PurchaseCostBreakdown`'s financing-estimate/affordability sub-sections all gated (Prompt 5). |

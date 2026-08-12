@@ -7,19 +7,18 @@ import prop4 from "@/assets/prop-4.jpg";
 
 const PROP_IMAGES = [prop1, prop2, prop3, prop4] as const;
 import {
+  BarChart3,
   Bath,
   BedDouble,
-  Bell,
   Briefcase,
   Building2,
   CheckCircle2,
-  ClipboardList,
   Clock,
   FileText,
   Filter,
   Home,
   Image as ImageIcon,
-  ListChecks,
+  LayoutDashboard,
   LogOut,
   MapPin,
   Menu,
@@ -48,6 +47,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/maskan/Badges";
 import { ListingStatusBadge } from "@/components/maskan/ListingStatusBadge";
 import { formatSAR, cities } from "@/lib/maskan-data"; // cities: { name, listings }[]
+import { PHASE1_FLAGS } from "@/lib/phase1-flags";
 import {
   adminAiChat,
   adminCreateUser,
@@ -127,15 +127,43 @@ type Listing = {
   description?: string;
   property_type?: string;
   furnished?: string;
+  // Optional because the create/edit form (ListingFormDrawer.submit) builds a
+  // partial Listing to hand to saveListing, which only forwards a handful of
+  // fields to the API and always re-fetches from the server afterward — these
+  // three are only ever meaningfully populated by toListing() from real API
+  // data, for the filter panel below.
+  listingType?: "rent" | "sale";
+  mediatorId?: number | null;
+  mediatorName?: string | null;
+  mediatorVerified?: boolean;
 };
 
 // ---------- Page ----------
 
-type AdminView = "listings" | "projects" | "mediators" | "leads" | "users" | "reviews";
+// "listings" is the single reused table backing the Properties / Rentals /
+// Sales nav items — those three just set `listingTypeFilter` differently
+// rather than being three separate views (same pattern as the partner
+// portal's My Properties / Rental / Sale Listings, see
+// docs/implementation/mymakan-phase1.md "Navigation changed", Prompt 7).
+type AdminView =
+  | "dashboard"
+  | "listings"
+  | "projects"
+  | "mediators"
+  | "leads"
+  | "reviews"
+  | "users";
+type TransactionTypeFilter = "all" | "rent" | "sale";
+type VerificationFilter = "All" | "Verified" | "Unverified";
+
+type AdminNavItem = { key: string; icon: React.ElementType; label: string; badge?: number } & (
+  | { kind: "view"; active: boolean; onClick: () => void }
+  | { kind: "link"; to: string }
+);
 
 function AdminPage() {
   const { user, authLoading, setAuth } = useAuth();
-  const [view, setView] = useState<AdminView>("listings");
+  const [view, setView] = useState<AdminView>("dashboard");
   const [listings, setListings] = useState<Listing[]>([]);
   const [loadingListings, setLoadingListings] = useState(true);
   const [projects, setProjects] = useState<ApiProject[]>([]);
@@ -152,6 +180,13 @@ function AdminPage() {
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ListingStatus | "All">("All");
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState<TransactionTypeFilter>("all");
+  const [cityFilter, setCityFilter] = useState("All");
+  const [districtFilter, setDistrictFilter] = useState("All");
+  const [mediatorFilter, setMediatorFilter] = useState<number | "All">("All");
+  const [verificationFilter, setVerificationFilter] = useState<VerificationFilter>("All");
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState("All");
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Listing | Partial<Listing> | null>(null);
@@ -196,14 +231,17 @@ function AdminPage() {
   }, [user]);
 
   useEffect(() => {
-    if (view === "mediators" && mediators.length === 0 && !loadingMediators) {
+    // Dashboard also triggers mediators/leads/users so its stat tiles have
+    // real counts — same reasoning as Prompt 6's partner Dashboard reusing
+    // the listings-fetch trigger instead of adding new API calls.
+    if ((view === "mediators" || view === "dashboard") && mediators.length === 0 && !loadingMediators) {
       setLoadingMediators(true);
       fetchAdminMediators()
         .then((m) => setMediators(m))
         .catch(() => {})
         .finally(() => setLoadingMediators(false));
     }
-    if (view === "leads" && leads.length === 0 && !loadingLeads) {
+    if ((view === "leads" || view === "dashboard") && leads.length === 0 && !loadingLeads) {
       setLoadingLeads(true);
       fetchAdminLeads()
         .then((l) => setLeads(l))
@@ -227,6 +265,10 @@ function AdminPage() {
         .catch(() => {})
         .finally(() => setLoadingReviews(false));
     }
+    if (view === "dashboard" && users.length === 0 && !loadingUsers && !usersError) {
+      loadUsers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
   function loadUsers() {
@@ -265,6 +307,15 @@ function AdminPage() {
     setPage(0);
     const list = listings.filter((l) => {
       if (statusFilter !== "All" && l.status !== statusFilter) return false;
+      if (transactionTypeFilter !== "all" && l.listingType !== transactionTypeFilter) return false;
+      if (cityFilter !== "All" && l.city !== cityFilter) return false;
+      if (districtFilter !== "All" && l.district !== districtFilter) return false;
+      if (mediatorFilter !== "All" && l.mediatorId !== mediatorFilter) return false;
+      if (verificationFilter !== "All") {
+        const wantVerified = verificationFilter === "Verified";
+        if (l.mediatorVerified !== wantVerified) return false;
+      }
+      if (propertyTypeFilter !== "All" && l.property_type !== propertyTypeFilter) return false;
       if (query) {
         const q = query.toLowerCase();
         return (
@@ -285,7 +336,56 @@ function AdminPage() {
       if (valA > valB) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
-  }, [listings, query, statusFilter, sortKey, sortDir]);
+  }, [
+    listings,
+    query,
+    statusFilter,
+    transactionTypeFilter,
+    cityFilter,
+    districtFilter,
+    mediatorFilter,
+    verificationFilter,
+    propertyTypeFilter,
+    sortKey,
+    sortDir,
+  ]);
+
+  // Filter dropdown options derived from the loaded listings themselves
+  // (rather than a separate fetch) so they only ever offer choices that can
+  // actually return results.
+  const cityOptions = useMemo(
+    () => Array.from(new Set(listings.map((l) => l.city))).sort(),
+    [listings],
+  );
+  const districtOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          listings
+            .filter((l) => cityFilter === "All" || l.city === cityFilter)
+            .map((l) => l.district),
+        ),
+      ).sort(),
+    [listings, cityFilter],
+  );
+  const mediatorOptions = useMemo(() => {
+    const byId = new Map<number, string>();
+    for (const l of listings) {
+      if (l.mediatorId != null) byId.set(l.mediatorId, l.mediatorName ?? `Partner #${l.mediatorId}`);
+    }
+    return Array.from(byId.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [listings]);
+  const propertyTypeOptions = useMemo(
+    () => Array.from(new Set(listings.map((l) => l.property_type).filter((v): v is string => !!v))).sort(),
+    [listings],
+  );
+  const activeMoreFilterCount = [
+    cityFilter !== "All",
+    districtFilter !== "All",
+    mediatorFilter !== "All",
+    verificationFilter !== "All",
+    propertyTypeFilter !== "All",
+  ].filter(Boolean).length;
 
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
@@ -480,23 +580,88 @@ function AdminPage() {
   if (!user || !user.is_admin)
     return <AdminLoginGate onAuth={setAuth} nonAdminUser={user !== null} />;
 
+  // Shared by both the desktop sidebar and mobile nav (previously two
+  // independently hand-written lists) — see docs/implementation/
+  // mymakan-phase1.md "Navigation changed" (Prompt 7) for the full spec this
+  // implements. "Properties"/"Rentals"/"Sales" are the same "listings" view
+  // with a different default transactionTypeFilter, not three separate
+  // views/tables. Off-plan Projects is gated behind PHASE1_FLAGS.projects
+  // (reusing Prompt 5/6's flags file) rather than deleted. "Area
+  // Intelligence"/"Data Import"/"Analytics"/"Settings" are existing routes
+  // (`areas.tsx`, `import.tsx`, `analytics.tsx`, `admin.notifications.tsx`)
+  // that had no admin-nav entry point before this — reused as-is, no new
+  // pages built.
+  const navItems: AdminNavItem[] = [
+    { key: "dashboard", kind: "view", icon: LayoutDashboard, label: "Dashboard", active: view === "dashboard", onClick: () => setView("dashboard") },
+    {
+      key: "properties",
+      kind: "view",
+      icon: Home,
+      label: "Properties",
+      active: view === "listings" && transactionTypeFilter === "all",
+      onClick: () => {
+        setView("listings");
+        setTransactionTypeFilter("all");
+      },
+    },
+    {
+      key: "rentals",
+      kind: "view",
+      icon: Home,
+      label: "Rentals",
+      active: view === "listings" && transactionTypeFilter === "rent",
+      onClick: () => {
+        setView("listings");
+        setTransactionTypeFilter("rent");
+      },
+    },
+    {
+      key: "sales",
+      kind: "view",
+      icon: Home,
+      label: "Sales",
+      active: view === "listings" && transactionTypeFilter === "sale",
+      onClick: () => {
+        setView("listings");
+        setTransactionTypeFilter("sale");
+      },
+    },
+    { key: "mediators", kind: "view", icon: Briefcase, label: "Mediators", active: view === "mediators", onClick: () => setView("mediators") },
+    { key: "leads", kind: "view", icon: Users, label: "Leads", active: view === "leads", onClick: () => setView("leads") },
+    { key: "reviews", kind: "view", icon: Star, label: "Reviews", badge: pendingReviewCount, active: view === "reviews", onClick: () => setView("reviews") },
+    { key: "areas", kind: "link", icon: MapPin, label: "Area Intelligence", to: "/areas" },
+    { key: "import", kind: "link", icon: Upload, label: "Data Import", to: "/import" },
+    { key: "analytics", kind: "link", icon: BarChart3, label: "Analytics", to: "/analytics" },
+    { key: "users", kind: "view", icon: UserPlus, label: "Users", active: view === "users", onClick: () => setView("users") },
+    // The closest thing this codebase has to platform/notification settings —
+    // see the "Settings" judgment call in the doc's "Navigation changed".
+    { key: "settings", kind: "link", icon: Settings, label: "Settings", to: "/admin/notifications" },
+    ...(PHASE1_FLAGS.projects
+      ? ([{ key: "projects", kind: "view", icon: Building2, label: "Projects", active: view === "projects", onClick: () => setView("projects") }] as AdminNavItem[])
+      : []),
+  ];
+
   return (
     <div className="flex min-h-screen bg-surface">
-      <AdminSidebar
-        activeView={view}
-        onViewChange={setView}
-        pendingReviewCount={pendingReviewCount}
-      />
+      <AdminSidebar navItems={navItems} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar onAiOpen={() => setAiPanelOpen(true)} />
-        <AdminMobileNav
-          activeView={view}
-          onViewChange={setView}
-          pendingReviewCount={pendingReviewCount}
-        />
+        <AdminMobileNav navItems={navItems} />
 
         <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
+          {/* Dashboard view */}
+          {view === "dashboard" && (
+            <AdminDashboardOverview
+              stats={stats}
+              mediatorCount={mediators.length}
+              leadCount={leads.length}
+              userCount={users.length}
+              pendingReviewCount={pendingReviewCount}
+              onGo={setView}
+            />
+          )}
+
           {/* Users view */}
           {view === "users" && (
             <UsersView
@@ -566,7 +731,11 @@ function AdminPage() {
               <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Listings
+                    {transactionTypeFilter === "rent"
+                      ? "Rentals"
+                      : transactionTypeFilter === "sale"
+                        ? "Sales"
+                        : "Properties"}
                   </p>
                   <h1 className="mt-1 text-2xl font-bold tracking-tight">Listing Console</h1>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -630,9 +799,39 @@ function AdminPage() {
                       className="ps-9"
                     />
                   </div>
+                  {/* Transaction type — also settable from the nav (Properties
+                      = all, Rentals = rent, Sales = sale) but kept here too so
+                      it's visible/changeable without leaving the table. */}
+                  <div className="flex gap-1 rounded-lg border border-border bg-surface p-0.5">
+                    {(["all", "rent", "sale"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setTransactionTypeFilter(t)}
+                        className={cn(
+                          "rounded-md px-2.5 py-1 text-xs font-semibold transition-colors",
+                          transactionTypeFilter === t
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {t === "all" ? "All" : t === "rent" ? "Rent" : "Sale"}
+                      </button>
+                    ))}
+                  </div>
                   <StatusFilter value={statusFilter} onChange={setStatusFilter} stats={stats} />
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMoreFiltersOpen((o) => !o)}
+                    aria-expanded={moreFiltersOpen}
+                  >
                     <Filter className="size-4" /> More filters
+                    {activeMoreFilterCount > 0 && (
+                      <span className="ms-1 rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                        {activeMoreFilterCount}
+                      </span>
+                    )}
                   </Button>
                   {selected.size > 0 && (
                     <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold">
@@ -656,6 +855,63 @@ function AdminPage() {
                     </div>
                   )}
                 </div>
+
+                {/* More filters panel — city, district, mediator,
+                    verification, property type (the rest of the "filters
+                    should include" list from Prompt 7; transaction type and
+                    status have their own always-visible controls above). */}
+                {moreFiltersOpen && (
+                  <div className="flex flex-wrap items-end gap-3 border-b border-border bg-surface/60 px-5 py-4">
+                    <FilterSelect
+                      label="City"
+                      value={cityFilter}
+                      onChange={(v) => {
+                        setCityFilter(v);
+                        setDistrictFilter("All");
+                      }}
+                      options={cityOptions}
+                    />
+                    <FilterSelect
+                      label="District"
+                      value={districtFilter}
+                      onChange={setDistrictFilter}
+                      options={districtOptions}
+                    />
+                    <FilterSelect
+                      label="Mediator"
+                      value={mediatorFilter === "All" ? "All" : String(mediatorFilter)}
+                      onChange={(v) => setMediatorFilter(v === "All" ? "All" : Number(v))}
+                      options={mediatorOptions.map(([id, name]) => ({ value: String(id), label: name }))}
+                    />
+                    <FilterSelect
+                      label="Verification"
+                      value={verificationFilter}
+                      onChange={(v) => setVerificationFilter(v as VerificationFilter)}
+                      options={["Verified", "Unverified"]}
+                    />
+                    <FilterSelect
+                      label="Property type"
+                      value={propertyTypeFilter}
+                      onChange={setPropertyTypeFilter}
+                      options={propertyTypeOptions}
+                    />
+                    {activeMoreFilterCount > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setCityFilter("All");
+                          setDistrictFilter("All");
+                          setMediatorFilter("All");
+                          setVerificationFilter("All");
+                          setPropertyTypeFilter("All");
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    )}
+                  </div>
+                )}
 
                 {/* Table */}
                 <div className="overflow-x-auto">
@@ -1148,33 +1404,13 @@ function ReviewsModerationView({
 
 // ---------- Sidebar ----------
 
-function adminNavItems(
-  pendingReviewCount: number,
-): { view: AdminView; icon: React.ElementType; label: string; badge?: number }[] {
-  return [
-    { view: "listings", icon: ListChecks, label: "Listings" },
-    { view: "projects", icon: Building2, label: "Projects" },
-    { view: "mediators", icon: Briefcase, label: "Partners" },
-    { view: "leads", icon: Users, label: "Leads" },
-    { view: "users", icon: UserPlus, label: "Users" },
-    { view: "reviews", icon: Star, label: "Reviews", badge: pendingReviewCount },
-  ];
-}
-
 // Mobile nav dropdown — the sidebar is hidden below lg, so admins navigate with
 // this hamburger drawer (mirrors the customer portal's mobile menu).
-function AdminMobileNav({
-  activeView,
-  onViewChange,
-  pendingReviewCount,
-}: {
-  activeView: AdminView;
-  onViewChange: (v: AdminView) => void;
-  pendingReviewCount: number;
-}) {
+function AdminMobileNav({ navItems }: { navItems: AdminNavItem[] }) {
   const [open, setOpen] = useState(false);
-  const items = adminNavItems(pendingReviewCount);
-  const active = items.find((it) => it.view === activeView);
+  const active = navItems.find((it) => it.kind === "view" && it.active) as
+    | Extract<AdminNavItem, { kind: "view" }>
+    | undefined;
 
   return (
     <div className="relative border-b border-border bg-background lg:hidden">
@@ -1203,63 +1439,50 @@ function AdminMobileNav({
 
       {open && (
         <nav className="absolute inset-x-0 top-full z-50 flex flex-col gap-0.5 border-b border-border bg-background p-3 shadow-lg">
-          {items.map((it) => (
-            <button
-              key={it.view}
-              type="button"
-              onClick={() => {
-                onViewChange(it.view);
-                setOpen(false);
-              }}
-              className={cn(
-                "flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium transition-colors",
-                activeView === it.view
-                  ? "bg-primary-soft text-accent-foreground"
-                  : "text-muted-foreground hover:bg-surface hover:text-foreground",
-              )}
-            >
-              <it.icon className="size-4" />
-              <span className="flex-1 text-start">{it.label}</span>
-              {!!it.badge && (
-                <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground">
-                  {it.badge}
-                </span>
-              )}
-            </button>
-          ))}
-          <Link
-            to="/admin/notifications"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
-          >
-            <Bell className="size-4" />
-            <span className="flex-1 text-start">Notification ops</span>
-          </Link>
-          <Link
-            to="/admin/property-requests"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
-          >
-            <ClipboardList className="size-4" />
-            <span className="flex-1 text-start">Property requests</span>
-          </Link>
+          {navItems.map((it) =>
+            it.kind === "link" ? (
+              <Link
+                key={it.key}
+                to={it.to}
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+              >
+                <it.icon className="size-4" />
+                <span className="flex-1 text-start">{it.label}</span>
+              </Link>
+            ) : (
+              <button
+                key={it.key}
+                type="button"
+                onClick={() => {
+                  it.onClick();
+                  setOpen(false);
+                }}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium transition-colors",
+                  it.active
+                    ? "bg-primary-soft text-accent-foreground"
+                    : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                )}
+              >
+                <it.icon className="size-4" />
+                <span className="flex-1 text-start">{it.label}</span>
+                {!!it.badge && (
+                  <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground">
+                    {it.badge}
+                  </span>
+                )}
+              </button>
+            ),
+          )}
         </nav>
       )}
     </div>
   );
 }
 
-function AdminSidebar({
-  activeView,
-  onViewChange,
-  pendingReviewCount,
-}: {
-  activeView: AdminView;
-  onViewChange: (v: AdminView) => void;
-  pendingReviewCount: number;
-}) {
+function AdminSidebar({ navItems }: { navItems: AdminNavItem[] }) {
   const { user, clearAuth } = useAuth();
-  const navItems = adminNavItems(pendingReviewCount);
 
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-e border-border bg-background lg:flex">
@@ -1275,45 +1498,39 @@ function AdminSidebar({
         </div>
       </div>
 
-      <nav className="flex-1 space-y-0.5 px-3 py-4">
-        {navItems.map((it) => (
-          <button
-            key={it.view}
-            type="button"
-            onClick={() => onViewChange(it.view)}
-            className={cn(
-              "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-start transition-colors",
-              activeView === it.view
-                ? "bg-primary-soft text-accent-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-surface-2",
-            )}
-          >
-            <it.icon className="size-4" />
-            <span className="flex-1">{it.label}</span>
-            {!!it.badge && (
-              <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground">
-                {it.badge}
-              </span>
-            )}
-          </button>
-        ))}
-        {/* Notification Operations lives at its own route (/admin/notifications),
-            not as a client-state AdminView, so it's a real Link rather than a
-            view-switch button — see routes/admin.notifications.tsx. */}
-        <Link
-          to="/admin/notifications"
-          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-start text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
-        >
-          <Bell className="size-4" />
-          <span className="flex-1">Notification ops</span>
-        </Link>
-        <Link
-          to="/admin/property-requests"
-          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-start text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
-        >
-          <ClipboardList className="size-4" />
-          <span className="flex-1">Property requests</span>
-        </Link>
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
+        {navItems.map((it) =>
+          it.kind === "link" ? (
+            <Link
+              key={it.key}
+              to={it.to}
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-start text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+            >
+              <it.icon className="size-4" />
+              <span className="flex-1">{it.label}</span>
+            </Link>
+          ) : (
+            <button
+              key={it.key}
+              type="button"
+              onClick={it.onClick}
+              className={cn(
+                "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-start transition-colors",
+                it.active
+                  ? "bg-primary-soft text-accent-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-surface-2",
+              )}
+            >
+              <it.icon className="size-4" />
+              <span className="flex-1">{it.label}</span>
+              {!!it.badge && (
+                <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground">
+                  {it.badge}
+                </span>
+              )}
+            </button>
+          ),
+        )}
       </nav>
 
       <div className="border-t border-border p-3 space-y-1">
@@ -1646,6 +1863,92 @@ function StatCard({
   );
 }
 
+// ---------- Dashboard ----------
+// Lightweight stat tiles built from state the other views already load
+// (listings stats, mediator/lead/user counts, pending reviews) — no new API
+// calls, same reasoning as the partner portal's Dashboard (Prompt 6).
+
+function AdminDashboardOverview({
+  stats,
+  mediatorCount,
+  leadCount,
+  userCount,
+  pendingReviewCount,
+  onGo,
+}: {
+  stats: { total: number; pending: number; published: number; rejected: number };
+  mediatorCount: number;
+  leadCount: number;
+  userCount: number;
+  pendingReviewCount: number;
+  onGo: (v: AdminView) => void;
+}) {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Platform overview — properties, mediators, leads and reviews.
+      </p>
+
+      <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          label="Total properties"
+          value={stats.total}
+          delta="All listings"
+          icon={<Home className="size-4" />}
+          tone="primary"
+        />
+        <StatCard
+          label="Pending approval"
+          value={stats.pending}
+          delta="Needs review"
+          icon={<Clock className="size-4" />}
+          tone="warning"
+        />
+        <StatCard
+          label="Published"
+          value={stats.published}
+          delta="Live on the portal"
+          icon={<CheckCircle2 className="size-4" />}
+          tone="success"
+        />
+        <StatCard
+          label="Rejected"
+          value={stats.rejected}
+          delta="Needs follow-up"
+          icon={<ShieldAlert className="size-4" />}
+          tone="destructive"
+        />
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {[
+          { label: "Mediators", value: mediatorCount, view: "mediators" as const, icon: Briefcase },
+          { label: "Leads", value: leadCount, view: "leads" as const, icon: Users },
+          { label: "Users", value: userCount, view: "users" as const, icon: UserPlus },
+          {
+            label: "Pending reviews",
+            value: pendingReviewCount,
+            view: "reviews" as const,
+            icon: Star,
+          },
+        ].map((t) => (
+          <button
+            key={t.label}
+            type="button"
+            onClick={() => onGo(t.view)}
+            className="rounded-2xl border border-border bg-card p-5 text-start shadow-card transition-colors hover:border-primary/40"
+          >
+            <t.icon className="size-5 text-accent-foreground" />
+            <div className="mt-3 text-2xl font-bold tracking-tight tabular-nums">{t.value}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{t.label}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ---------- Status helpers ----------
 
 function RoleBadge({ role }: { role: "admin" | "partner" | "customer" }) {
@@ -1724,6 +2027,42 @@ function StatusFilter({
           </span>
         </button>
       ))}
+    </div>
+  );
+}
+
+// Generic labeled <select> used by the "More filters" panel (city, district,
+// mediator, verification, property type) — always includes an "All" reset
+// option, so every filter state here shares the same "All" sentinel value.
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[] | { value: string; label: string }[];
+}) {
+  const normalized = options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
+  return (
+    <div className="min-w-[150px]">
+      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9 w-full rounded-lg border border-border bg-background px-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+      >
+        <option value="All">All</option>
+        {normalized.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -4350,6 +4689,10 @@ function toListing(property: ApiProperty): Listing {
     description: property.description ?? undefined,
     property_type: property.property_type ?? undefined,
     furnished: property.furnished ?? undefined,
+    listingType: property.listing_type,
+    mediatorId: property.mediator_id,
+    mediatorName: property.mediator_agent_name ?? property.owner_name ?? null,
+    mediatorVerified: property.mediator_is_verified,
   };
 }
 
