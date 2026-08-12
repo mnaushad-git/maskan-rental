@@ -159,10 +159,35 @@ TODO — filled in by a later prompt
 
 ## Feature flags
 
-TODO — filled in by a later prompt. Note: `backend/app/core/feature_flags.py` is a
-minimal env-var-backed flag registry (see `FLAGS` dict) — no per-tenant/per-brand
-targeting exists yet, so myMakan Phase-1 hiding will need either new flags in this
-same registry or a route/navigation-level gate, not a flag-service change.
+Added by Prompt 2 to the existing env-var-backed registry in
+`backend/app/core/feature_flags.py` / `backend/app/core/config.py` — no new flag
+mechanism. Backend-only so far; frontend/mobile gating (via these same flags exposed
+to clients, or a separate nav-level gate) is still TODO for a later prompt.
+
+| Flag | Default | Env var | Router gated in `main.py`? |
+|---|---|---|---|
+| `rent` | On | `FEATURE_RENT` | n/a (no dedicated router) |
+| `buy` | On | `FEATURE_BUY` | n/a (no dedicated router) |
+| `ai_advisor` | On | `FEATURE_AI_ADVISOR` | n/a (`ai.router` always on) |
+| `area_intelligence` | On | `FEATURE_AREA_INTELLIGENCE` | n/a (`areas`/`area_intelligence` routers always on) |
+| `saved_searches` | On | `FEATURE_SAVED_SEARCHES` | n/a (`saved_searches.router` always on) |
+| `notifications` | On | `FEATURE_NOTIFICATIONS` | n/a (`notifications.router` always on) |
+| `leads` | On | `FEATURE_LEADS` | n/a (`leads.router` always on) |
+| `projects` | Off | `FEATURE_PROJECTS` | Yes — `projects.router` |
+| `booking` | Off | `FEATURE_BOOKING` | Yes — `bookings.router` |
+| `short_stay` | Off | `FEATURE_SHORT_STAY` | No dedicated router — TODO Prompt 5 |
+| `financing` | Off | `FEATURE_FINANCING` | Yes — `financing.router` |
+| `property_management` | Off | `FEATURE_PROPERTY_MANAGEMENT` | No dedicated router exists in this codebase — TODO Prompt 5 |
+| `external_transaction` | Off | `FEATURE_EXTERNAL_TRANSACTION` | No dedicated router gated — `payments.router` stays registered because it also backs in-scope flows (mediator lead/subscription fees); revisit in Prompt 5 |
+
+Not gated by a Phase-1 flag yet, left registered as-is: `contracts.router`,
+`verification.router`, `subscriptions.router` (Hide-Phase1 per the classification
+tables above, but no 1:1 flag was requested for them in Prompt 2 — TODO Prompt 5 to
+decide whether they need their own flag or a route-level gate on the frontend only).
+
+Verified via `python -c "from app.core.feature_flags import is_enabled; ..."`: all 13
+flags read their correct default, and `app.main._ROUTERS` drops from 26 to 23 entries
+with defaults in place (projects/bookings/financing excluded).
 
 ## Branding changes
 

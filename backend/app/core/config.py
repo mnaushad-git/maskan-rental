@@ -141,6 +141,27 @@ class Settings(BaseSettings):
     FEATURE_PROPERTY_REQUEST_AI_EXPLANATIONS: bool = True
     FEATURE_PROPERTY_REQUEST_ADMIN_DASHBOARD: bool = True
 
+    # ── myMakan Phase-1 scope flags ────────────────────────────────────────────
+    # See docs/implementation/mymakan-phase1.md ("Phase-1 scope" / "Feature
+    # flags") for the full Keep-Phase1 vs Hide-Phase1 classification these
+    # correspond to. On-by-default flags are the Phase-1 surface; off-by-default
+    # flags are existing functionality kept in the codebase but hidden from
+    # myMakan until a later phase.
+    FEATURE_RENT: bool = True
+    FEATURE_BUY: bool = True
+    FEATURE_AI_ADVISOR: bool = True
+    FEATURE_AREA_INTELLIGENCE: bool = True
+    FEATURE_SAVED_SEARCHES: bool = True
+    FEATURE_NOTIFICATIONS: bool = True
+    FEATURE_LEADS: bool = True
+
+    FEATURE_PROJECTS: bool = False
+    FEATURE_BOOKING: bool = False
+    FEATURE_SHORT_STAY: bool = False
+    FEATURE_FINANCING: bool = False
+    FEATURE_PROPERTY_MANAGEMENT: bool = False
+    FEATURE_EXTERNAL_TRANSACTION: bool = False
+
     @model_validator(mode="after")
     def _warn_insecure_defaults(self) -> "Settings":
         if self.ENV == "production" and self.SECRET_KEY == "maskan-dev-secret-key-change-me":

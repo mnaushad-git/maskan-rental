@@ -94,11 +94,20 @@ def metrics():
 # (existing clients keep working unmodified) and at `/api/v1/...` (the path
 # new clients should move to going forward). Same router instance, same
 # behavior, just reachable from both prefixes.
+#
+# A few routers are additionally gated behind a myMakan Phase-1 feature flag
+# (see docs/implementation/mymakan-phase1.md "Feature flags"): when off, the
+# router is simply never registered, so its endpoints 404 instead of running.
+# Only the routers with an unambiguous 1:1 flag mapping are gated here;
+# contracts/verification/subscriptions/payments stay registered because they
+# either have no dedicated Phase-1 flag yet or are shared with in-scope flows
+# (e.g. payments backs the in-scope mediator lead/subscription fee flow) — see
+# the TODO in that doc's "Feature flags" section for Prompt 5 to revisit.
 _ROUTERS = [
     (auth.router, "/auth", ["auth"]),
     (users.router, "/users", ["users"]),
     (properties.router, "/properties", ["properties"]),
-    (projects.router, "/projects", ["projects"]),
+    *([(projects.router, "/projects", ["projects"])] if settings.FEATURE_PROJECTS else []),
     (saved_properties.router, "/saved-properties", ["saved-properties"]),
     (saved_searches.router, "/saved-searches", ["saved-searches"]),
     (search.router, "/search", ["search"]),
@@ -109,7 +118,7 @@ _ROUTERS = [
     (mediators.router, "/mediators", ["mediators"]),
     (leads.router, "/leads", ["leads"]),
     (contracts.router, "/contracts", ["contracts"]),
-    (bookings.router, "/bookings", ["bookings"]),
+    *([(bookings.router, "/bookings", ["bookings"])] if settings.FEATURE_BOOKING else []),
     (payments.router, "/payments", ["payments"]),
     (reviews.router, "/reviews", ["reviews"]),
     (notifications.router, "/notifications", ["notifications"]),
@@ -120,7 +129,7 @@ _ROUTERS = [
     (property_request_admin.router, "/admin/property-requests", ["admin-property-requests"]),
     (verification.router, "/verification", ["verification"]),
     (subscriptions.router, "/subscriptions", ["subscriptions"]),
-    (financing.router, "/financing", ["financing"]),
+    *([(financing.router, "/financing", ["financing"])] if settings.FEATURE_FINANCING else []),
 ]
 
 for router, path, tags in _ROUTERS:
