@@ -12,9 +12,18 @@ All progress is tracked in `docs/implementation/mymakan-phase1.md` (created in P
 If a session runs out before finishing its prompt, the next session should read that doc
 first to see what's already done before re-running the same prompt.
 
+**Setup status (done 2026-08-12, before Prompt 1 ran):** `main` was committed and pushed
+to `origin/main` (commit `cf845b1`, continuation of the Projects/Bookings feature), then
+`feature/mymakan-phase1` was created from `main` and pushed to
+`origin/feature/mymakan-phase1`. Every prompt below runs on `feature/mymakan-phase1` —
+start each session with `git checkout feature/mymakan-phase1` and `git pull`. If you ever
+have local changes on `main` again before starting a new myMakan prompt, commit + push
+`main` first (same pattern), then `git checkout feature/mymakan-phase1 && git merge main`
+to bring them in, rather than starting a second parallel branch.
+
 ---
 
-## Prompt 1 — Inspection Map + Branch Setup
+## Prompt 1 — Inspection Map
 
 ```
 Read only: frontend/src/routes/ (list the directory, don't open every file),
@@ -22,8 +31,9 @@ backend/app/api/routes/ (list the directory), mobile/app/ (list the directory),
 backend/app/core/feature_flags.py, ROADMAP_AQAR_AI.md (skim headings only).
 
 Task: Set up the myMakan Phase-1 workspace without changing any functional code.
-1. Create git branch `feature/mymakan-phase1` from the current branch. Do not delete or
-   modify the original branch/history.
+1. Confirm you're on branch `feature/mymakan-phase1` (`git branch --show-current`); if
+   not, `git checkout feature/mymakan-phase1 && git pull`. The branch already exists and
+   is pushed — do not create it again or touch `main`.
 2. Classify each frontend route file and each backend router file into one of:
    Keep-Phase1 (rent/buy discovery, map/list search, filters, property details, save,
    compare, saved searches, notifications, leads/enquiries, agent/mediator profile,
