@@ -195,7 +195,49 @@ TODO — filled in by a later prompt
 
 ## Database impact
 
-TODO — filled in by a later prompt
+**Prompt 3 — Rent/Buy terminology audit.** No destructive schema change, no
+migration. Findings:
+
+- `Property.listing_type` (`backend/app/models/property.py:18`, `String(20)`,
+  default `"rent"`) is the field the property listing itself carries — values
+  found in code are only `"rent"` / `"sale"` (see `properties.py`'s
+  `listing_type != "sale"` / `== "sale"` branches). No legacy values like
+  `"lease"`, `"purchase"`, or `"buy"` exist anywhere in models/schemas — the
+  handful of "lease" hits in the codebase are prose strings in AI contract-flag
+  messages (`api/routes/ai.py`), unrelated to this field.
+- `PropertyRequest.transaction_type` and `SavedSearch.transaction_type`
+  (`models/property_request.py:55`, `models/saved_search.py:28`) carry the same
+  rent/sale concept for a user's demand/alert, and both schemas validate it
+  strictly to `"rent"` / `"sale"` (`schemas/property_request.py`,
+  `schemas/saved_search.py` — `field_validator` raises otherwise). Values are
+  consistent with `listing_type`; only the **field name** differs.
+- So the inconsistency is naming, not values: `Property` uses `listing_type`,
+  while `PropertyRequest`/`SavedSearch` use `transaction_type` for the same
+  `rent`/`sale` concept. Per the prompt's recommendation, **`transaction_type`
+  with values `rent`/`sale` is the canonical Phase-1 name** — `PropertyRequest`
+  and `SavedSearch` already use it cleanly; `Property` does not.
+- Renaming the `properties.listing_type` column (or every `Property.listing_type`
+  reference across models/schemas/services/routes) would be a global rename
+  the prompt explicitly rules out and would break existing API consumers, so
+  instead of that: added a **read-only computed field** `transaction_type` to
+  `PropertyOut` (`backend/app/schemas/property.py`) that mirrors
+  `listing_type` on serialization. `listing_type` is untouched (still the DB
+  column, still accepted on create/update) — `transaction_type` is additive,
+  appears in every property API response alongside it, and lets myMakan
+  Phase-1 clients read one consistent field name (`transaction_type`) across
+  properties, saved searches, and property requests without a migration.
+- No input schemas (`PropertyCreate`/`PropertyUpdate`/partner variants) were
+  changed — they still take `listing_type` only, to avoid two writable fields
+  that could drift out of sync.
+
+Verified: `PropertyOut` correctly serializes both `listing_type` and the new
+`transaction_type` (manual check with `pydantic` `model_dump()`); backend test
+suite run (`tests/test_properties.py`, `test_search_provider.py`,
+`test_property_requests.py`, `test_saved_search_alerts.py` — 59 passed). One
+pre-existing failure (`test_list_properties_date_range_filter_excludes_conflicting_booking`,
+`bookings.guest_name` column missing in the test DB) reproduces identically on
+the pre-Prompt-3 commit — confirmed unrelated to this change, a test-DB
+migration-drift issue to flag separately, not fixed here.
 
 ## Known limitations
 

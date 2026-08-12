@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class PropertyBase(BaseModel):
@@ -197,3 +197,15 @@ class PropertyOut(PropertyBase):
     # cost per row.
     mediator_rating: float | None = None
     mediator_review_count: int = 0
+
+    # `Property.listing_type` predates `transaction_type`, the field name used
+    # by PropertyRequest/SavedSearch for the same rent/sale concept (see
+    # docs/implementation/mymakan-phase1.md "Database impact"). Renaming the
+    # column would be a breaking/destructive change for existing API
+    # consumers, so this is an additive, read-only alias: API responses carry
+    # both `listing_type` (unchanged) and `transaction_type` (new, mirrors
+    # it) so myMakan Phase-1 clients can standardize on one field name.
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def transaction_type(self) -> str:
+        return self.listing_type
