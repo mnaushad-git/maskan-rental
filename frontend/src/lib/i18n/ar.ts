@@ -615,7 +615,7 @@ export const ar: TranslationDict = {
     },
     purchaseCost: {
       title: "حاسبة تكلفة الشراء",
-      subtitle: "الدفعة المقدمة، التكاليف الأولية، وتقدير التمويل",
+      subtitle: "الدفعة المقدمة والتكاليف الأولية",
       downPayment: "الدفعة المقدمة",
       downPaymentAmount: "مبلغ الدفعة المقدمة",
       financedAmount: "تمويل {{amount}} ريال",
@@ -1883,6 +1883,11 @@ export const ar: TranslationDict = {
     desc: "حدث خطأ ما من جانبنا. يمكنك المحاولة مرة أخرى أو العودة للرئيسية.",
     tryAgain: "حاول مرة أخرى",
     goHome: "العودة للرئيسية",
+  },
+  phaseGate: {
+    heading: "غير متاح في هذا الإصدار",
+    desc: "هذه الميزة ليست جزءًا من myMakan حتى الآن. نركز حاليًا على البحث عن الإيجار والشراء — تابعنا في تحديث لاحق.",
+    backHome: "العودة للرئيسية",
   },
   auth: {
     brand: "مسكن الذكي",

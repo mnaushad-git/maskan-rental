@@ -66,6 +66,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { formatSAR, type Property } from "@/lib/maskan-data";
+import { PHASE1_FLAGS } from "@/lib/phase1-flags";
 import prop1 from "@/assets/prop-1.jpg";
 import prop2 from "@/assets/prop-2.jpg";
 import prop3 from "@/assets/prop-3.jpg";
@@ -199,7 +200,12 @@ function PropertyDetail() {
       <div className="container-page grid grid-cols-1 gap-10 pb-32 lg:pb-16 lg:grid-cols-[1.7fr_1fr]">
         <main className="space-y-10">
           <Summary property={property} />
-          {!isSale && <RentNowPayLaterBanner property={property} />}
+          {/* Rent Now Pay Later is a financing feature — Hide-Phase1 (see
+              docs/implementation/mymakan-phase1.md "Feature flags"); the
+              backend's /financing router is already unregistered by
+              default, so leaving this visible would just lead to a
+              broken call. */}
+          {!isSale && PHASE1_FLAGS.financing && <RentNowPayLaterBanner property={property} />}
           <PropertyFeatures property={property} />
           <DescriptionSection property={property} />
           <RentalIntelligence
@@ -217,7 +223,10 @@ function PropertyDetail() {
           ) : (
             <RentCalculator property={property} />
           )}
-          {!isSale && <ShortTermBooking property={property} />}
+          {/* Short-term/nightly booking is Hide-Phase1 (short_stay/booking) —
+              the backend's /bookings router is already unregistered by
+              default, so this would just hit a 404 if shown. */}
+          {!isSale && PHASE1_FLAGS.booking && <ShortTermBooking property={property} />}
           <RentPayments property={property} />
           <AreaSummary property={property} />
           <NearbyPlaces areaIntel={areaIntel} district={property.district} />
@@ -241,7 +250,9 @@ function PropertyDetail() {
             mediatorRating={property.mediatorRating}
             mediatorReviewCount={property.mediatorReviewCount}
           />
-          <RegisterLeaseBanner property={property} />
+          {/* Advertises the Ejar-equivalent digital rental contract feature
+              (Hide-Phase1, see frontend/src/lib/phase1-flags.ts). */}
+          {PHASE1_FLAGS.contracts && <RegisterLeaseBanner property={property} />}
         </aside>
       </div>
 
@@ -1868,93 +1879,100 @@ function PurchaseCostBreakdown({ property }: { property: Property }) {
         </p>
       </div>
 
-      {/* Financing estimate */}
-      <div>
-        <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {tProp("purchaseCost.financingEstimate")}
-        </div>
-        <div className="flex items-center justify-between rounded-xl bg-surface p-4">
+      {/* Financing estimate + the affordability check below it (both derive
+          from a mortgage monthlyPayment) are Hide-Phase1 — mortgage/financing
+          is out of scope for myMakan Phase-1. Kept as existing code, not
+          removed, per "do not invent new financing/mortgage UI" — this only
+          hides what's already there. */}
+      {PHASE1_FLAGS.financing && (
+        <>
           <div>
-            <div className="text-xs text-muted-foreground">
-              {tProp("purchaseCost.estMonthlyPayment")}
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {tProp("purchaseCost.financingEstimate")}
             </div>
-            <div className="mt-1 text-xl font-bold tracking-tight">
-              SAR {formatSAR(monthlyPayment)}
-            </div>
-          </div>
-          <PiggyBank className="size-6 text-muted-foreground" />
-        </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          {tProp("purchaseCost.financingNote", {
-            years: MORTGAGE_YEARS,
-            rate: (MORTGAGE_ANNUAL_RATE * 100).toFixed(0),
-          })}
-        </p>
-      </div>
-
-      {/* Affordability check */}
-      <div>
-        <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {tProp("rentCalculator.affordabilityCheck")}
-        </div>
-        <div className="flex items-center gap-3">
-          <label className="shrink-0 text-sm text-muted-foreground">
-            {tProp("rentCalculator.monthlySalary")}
-          </label>
-          <div className="relative flex-1">
-            <span className="absolute inset-y-0 start-3 flex items-center text-xs font-semibold text-muted-foreground">
-              SAR
-            </span>
-            <input
-              type="number"
-              min={0}
-              value={salaryInput}
-              onChange={(e) => setSalaryInput(e.target.value)}
-              placeholder={tProp("rentCalculator.salaryPlaceholder")}
-              className="h-9 w-full rounded-lg border border-border bg-background ps-10 pe-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-        </div>
-
-        {pct !== null ? (
-          <div
-            className={cn(
-              "mt-3 flex items-start gap-3 rounded-xl border p-4",
-              affordTone === "success" && "border-success/30 bg-success/8",
-              affordTone === "warning" && "border-warning/30 bg-warning/8",
-              affordTone === "danger" && "border-destructive/30 bg-destructive/8",
-            )}
-          >
-            <span
-              className={cn(
-                "mt-1 size-2.5 shrink-0 rounded-full",
-                affordTone === "success" && "bg-success",
-                affordTone === "warning" && "bg-warning",
-                affordTone === "danger" && "bg-destructive",
-              )}
-            />
-            <div>
-              <div className="text-sm font-bold">
-                {tProp("rentCalculator.pctOfIncome", { pct: pct.toFixed(1) })}
+            <div className="flex items-center justify-between rounded-xl bg-surface p-4">
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  {tProp("purchaseCost.estMonthlyPayment")}
+                </div>
+                <div className="mt-1 text-xl font-bold tracking-tight">
+                  SAR {formatSAR(monthlyPayment)}
+                </div>
               </div>
+              <PiggyBank className="size-6 text-muted-foreground" />
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {tProp("purchaseCost.financingNote", {
+                years: MORTGAGE_YEARS,
+                rate: (MORTGAGE_ANNUAL_RATE * 100).toFixed(0),
+              })}
+            </p>
+          </div>
+
+          <div>
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {tProp("rentCalculator.affordabilityCheck")}
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="shrink-0 text-sm text-muted-foreground">
+                {tProp("rentCalculator.monthlySalary")}
+              </label>
+              <div className="relative flex-1">
+                <span className="absolute inset-y-0 start-3 flex items-center text-xs font-semibold text-muted-foreground">
+                  SAR
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  value={salaryInput}
+                  onChange={(e) => setSalaryInput(e.target.value)}
+                  placeholder={tProp("rentCalculator.salaryPlaceholder")}
+                  className="h-9 w-full rounded-lg border border-border bg-background ps-10 pe-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+            </div>
+
+            {pct !== null ? (
               <div
                 className={cn(
-                  "mt-0.5 text-xs",
-                  affordTone === "success" && "text-success",
-                  affordTone === "warning" && "text-warning",
-                  affordTone === "danger" && "text-destructive",
+                  "mt-3 flex items-start gap-3 rounded-xl border p-4",
+                  affordTone === "success" && "border-success/30 bg-success/8",
+                  affordTone === "warning" && "border-warning/30 bg-warning/8",
+                  affordTone === "danger" && "border-destructive/30 bg-destructive/8",
                 )}
               >
-                {affordMsg}
+                <span
+                  className={cn(
+                    "mt-1 size-2.5 shrink-0 rounded-full",
+                    affordTone === "success" && "bg-success",
+                    affordTone === "warning" && "bg-warning",
+                    affordTone === "danger" && "bg-destructive",
+                  )}
+                />
+                <div>
+                  <div className="text-sm font-bold">
+                    {tProp("rentCalculator.pctOfIncome", { pct: pct.toFixed(1) })}
+                  </div>
+                  <div
+                    className={cn(
+                      "mt-0.5 text-xs",
+                      affordTone === "success" && "text-success",
+                      affordTone === "warning" && "text-warning",
+                      affordTone === "danger" && "text-destructive",
+                    )}
+                  >
+                    {affordMsg}
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {tProp("purchaseAffordability.enterSalaryPrompt")}
+              </p>
+            )}
           </div>
-        ) : (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {tProp("purchaseAffordability.enterSalaryPrompt")}
-          </p>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }
@@ -2223,7 +2241,7 @@ function ActionsCard({ property }: { property: Property }) {
               </Link>
             </Button>
           </div>
-          {!isSale && (
+          {!isSale && PHASE1_FLAGS.financing && (
             <Button variant="outline" className="w-full" onClick={() => setShowFinancing(true)}>
               <Landmark className="size-4" /> {tProp("actions.requestFinancing")}
             </Button>

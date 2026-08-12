@@ -619,7 +619,7 @@ export const en = {
     },
     purchaseCost: {
       title: "Purchase Cost Calculator",
-      subtitle: "Down payment, upfront costs & financing estimate",
+      subtitle: "Down payment and upfront costs",
       downPayment: "Down payment",
       downPaymentAmount: "Down payment amount",
       financedAmount: "SAR {{amount}} financed",
@@ -1910,6 +1910,11 @@ export const en = {
     desc: "Something went wrong on our end. You can try refreshing or head back home.",
     tryAgain: "Try again",
     goHome: "Go home",
+  },
+  phaseGate: {
+    heading: "Not available in this version",
+    desc: "This feature isn't part of myMakan yet. We're focused on rent and buy discovery for now — check back in a future update.",
+    backHome: "Back to home",
   },
   auth: {
     brand: "Maskan AI",

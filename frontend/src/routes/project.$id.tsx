@@ -10,6 +10,7 @@ import {
   Phone,
 } from "lucide-react";
 import { TopNav } from "@/components/maskan/TopNav";
+import { PhaseGate } from "@/components/maskan/PhaseGate";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/maskan/Badges";
@@ -19,6 +20,7 @@ import { fetchProject, fetchSimilarProjects, mapApiProject } from "@/lib/api/mas
 import { formatSAR, type Project } from "@/lib/maskan-data";
 import { useLanguage } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
+import { PHASE1_FLAGS } from "@/lib/phase1-flags";
 
 export const Route = createFileRoute("/project/$id")({
   head: () => ({
@@ -30,7 +32,9 @@ export const Route = createFileRoute("/project/$id")({
       },
     ],
   }),
-  component: ProjectDetail,
+  // Hide-Phase1 (off-plan projects) — see projects.tsx for why the gate is
+  // swapped here rather than inside the component.
+  component: PHASE1_FLAGS.projects ? ProjectDetail : PhaseGate,
 });
 
 function useProjT() {

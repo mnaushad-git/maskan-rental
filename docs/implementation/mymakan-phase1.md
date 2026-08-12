@@ -168,10 +168,102 @@ changed:
   `font-display` heading classes used site-wide — no new components, no
   layout system changes.
 
-All Hide-Phase1 route files (`projects.tsx`, `project.$id.tsx`,
-`contract.$leadId.tsx`, etc.) are untouched and still resolve normally if
-navigated to directly — only their nav entry points were removed (see
-"Navigation changed" below).
+As of Prompt 4, all Hide-Phase1 route files (`projects.tsx`, `project.$id.tsx`,
+`contract.$leadId.tsx`, etc.) were untouched and still resolved normally if
+navigated to directly — only their nav entry points were removed. Prompt 5
+(below) changed this for `projects.tsx`/`project.$id.tsx` specifically: they
+now render a gate instead of full content when reached by direct URL.
+
+**Prompt 5 — Customer property details + out-of-scope route guarding.**
+
+*Route guarding (`projects.tsx`, `project.$id.tsx`):*
+
+- Added `frontend/src/lib/phase1-flags.ts` — a local `PHASE1_FLAGS` constant
+  object mirroring the backend flags from Prompt 2
+  (`projects`/`booking`/`shortStay`/`financing`/`propertyManagement`/`externalTransaction`,
+  all `false`), plus one extra local-only flag, `contracts` (see "Feature
+  flags" below for why).
+- Added `frontend/src/components/maskan/PhaseGate.tsx` — a reusable "not
+  available in this version" screen (heading + description + back-home link,
+  reusing `TopNav` and the existing card/typography classes — no new design
+  system elements).
+- In `projects.tsx` and `project.$id.tsx`, the route's `component` is now
+  `PHASE1_FLAGS.projects ? <RealComponent> : PhaseGate` — decided once at
+  route-definition time (module scope), not inside the component body, so
+  this can never conditionally skip a hook. The route files themselves,
+  their data-fetching logic, and every other export are untouched; flipping
+  `PHASE1_FLAGS.projects` to `true` restores full behavior with no other
+  changes.
+- No dedicated frontend web route exists for bookings (Prompt 1's frontend
+  routes table has no `booking(s).tsx`) — short-term/nightly booking is
+  instead an embedded widget inside `property.$id.tsx`, gated there instead
+  (see below). Mobile's `bookings.tsx`/`my-bookings.tsx` are out of scope for
+  this prompt (its read list was frontend-web-only, matching Prompt 4's
+  scope split) — left as a gap for a future mobile-focused prompt.
+
+*Property detail branching (`property.$id.tsx`):*
+
+- Verified the existing `isSale` branching already does most of what the
+  prompt asks: `Summary`/`ActionsCard` show sale price vs. annual+monthly
+  rent; `RentalIntelligence` shows a rent-labeled "Rental Score" vs.
+  sale-labeled "Purchase Score" (same component, different copy via
+  `badgeSale`/`titleSale` i18n keys — this doubles as the Buy side's
+  "price/value intelligence" item); `FairRent` (rent) vs.
+  `PurchasePriceInsight` (sale) both already existed; `AreaSummary` +
+  `NearbyPlaces` (area intelligence), `LandlordCard` (agent), `ActionsCard`'s
+  contact/save/compare buttons, and `AiSummary` (AI advisor) were already
+  shared across both. No changes were needed for this part.
+- Task 1 also says "do not invent new financing/mortgage UI." Cross-checking
+  what already renders against the prompt's explicit Rent/Buy content lists
+  surfaced four existing pieces that are **not** in either list and are
+  Hide-Phase1 in spirit (financing, booking, and lease-contract features) —
+  and, concretely, the first two now call backend endpoints
+  (`/financing`, `/bookings`) that Prompt 2 already unregistered by default,
+  so leaving them visible would let a user hit a dead button. Gated all four
+  behind `PHASE1_FLAGS` (existing code kept, just conditionally rendered —
+  nothing new was built):
+  - `RentNowPayLaterBanner` (+ its `FinancingModal`) — rent-side financing
+    interest capture. Gated on `PHASE1_FLAGS.financing`.
+  - `ShortTermBooking` — the nightly-booking calendar widget. Gated on
+    `PHASE1_FLAGS.booking`.
+  - `RegisterLeaseBanner` (aside) — explicitly advertises "Maskan can help
+    you generate a digital rental contract," i.e. the Ejar-equivalent
+    contract feature (`contracts.py`/`contract.$leadId.tsx`, both
+    Hide-Phase1 per Prompt 1). Gated on the new `PHASE1_FLAGS.contracts`
+    (see "Feature flags" below).
+  - Inside `PurchaseCostBreakdown` (sale side): the "Financing estimate"
+    block and the mortgage-payment-based affordability check right after it
+    (both depend on `MORTGAGE_ANNUAL_RATE`/`MORTGAGE_YEARS` amortization
+    math). Gated on `PHASE1_FLAGS.financing`. The down-payment selector and
+    upfront-cost table (down payment + transfer tax + broker fee) directly
+    above it were **kept** — no bank/mortgage involved, reads as legitimate
+    "price/value intelligence" for a cash buyer, and matches the prompt's
+    "if already available" phrasing for that content item.
+  - `ActionsCard`'s "Request Financing" button (opens the same
+    `FinancingModal`) — gated on `PHASE1_FLAGS.financing`.
+  - Also updated the now-stale `purchaseCost.subtitle` copy ("Down payment,
+    upfront costs & financing estimate" → "Down payment and upfront costs")
+    in both `en.ts`/`ar.ts` so the calculator's own subtitle doesn't promise
+    a section that's now hidden.
+- **Known gap, left out of scope for this prompt:** `contract.$leadId.tsx`
+  itself (the actual digital-contract route) was not added to the
+  route-guarding list — the prompt's task 2 named only
+  `projects.tsx`/`project.$id.tsx`/booking routes. `RegisterLeaseBanner`
+  links to `/lead/new`, not to `/contract/...`, so no dead link is created by
+  leaving the route unguarded; but the route is still reachable by direct
+  URL with full content. Flagged for a future prompt alongside
+  `verification.router`/`subscriptions.router` (see "Feature flags").
+
+Verified: `npm run typecheck` and `npm run build` both clean; started the dev
+server + backend locally, fetched `/projects` and `/project/1` and confirmed
+the gate renders (`grep`'d for "Not available in this version" in the
+response HTML); found a real rent listing (id 1552, `is_bookable: true`) and
+a real sale listing (id 145) via the backend API and took full-page headless
+Chrome screenshots of both `/property/1552` and `/property/145` — confirmed
+by inspection that the Rent Now Pay Later banner, booking widget, register
+lease banner, and Request Financing button are absent from the rent page,
+and that the Financing Estimate/affordability section is absent from the
+sale page while the down-payment/upfront-cost breakdown still renders.
 
 ## Navigation changed
 
@@ -224,8 +316,14 @@ Implementation notes:
 
 Added by Prompt 2 to the existing env-var-backed registry in
 `backend/app/core/feature_flags.py` / `backend/app/core/config.py` — no new flag
-mechanism. Backend-only so far; frontend/mobile gating (via these same flags exposed
-to clients, or a separate nav-level gate) is still TODO for a later prompt.
+mechanism. Backend-only through Prompt 4. Prompt 5 added a **separate, local**
+frontend mirror — `frontend/src/lib/phase1-flags.ts`'s `PHASE1_FLAGS` — rather
+than fetching these from the backend, since no public config/flags endpoint
+exists yet (adding one felt like scope creep for a route-guarding/display
+task). The two are not wired together; keeping them in sync when a flag
+changes is a manual step until a later prompt adds a real client-side flag
+fetch. Mobile gating is still untouched — out of scope for Prompt 4 and
+Prompt 5, both of which read frontend-web files only.
 
 | Flag | Default | Env var | Router gated in `main.py`? |
 |---|---|---|---|
@@ -236,21 +334,27 @@ to clients, or a separate nav-level gate) is still TODO for a later prompt.
 | `saved_searches` | On | `FEATURE_SAVED_SEARCHES` | n/a (`saved_searches.router` always on) |
 | `notifications` | On | `FEATURE_NOTIFICATIONS` | n/a (`notifications.router` always on) |
 | `leads` | On | `FEATURE_LEADS` | n/a (`leads.router` always on) |
-| `projects` | Off | `FEATURE_PROJECTS` | Yes — `projects.router` |
-| `booking` | Off | `FEATURE_BOOKING` | Yes — `bookings.router` |
-| `short_stay` | Off | `FEATURE_SHORT_STAY` | No dedicated router — TODO Prompt 5 |
-| `financing` | Off | `FEATURE_FINANCING` | Yes — `financing.router` |
-| `property_management` | Off | `FEATURE_PROPERTY_MANAGEMENT` | No dedicated router exists in this codebase — TODO Prompt 5 |
-| `external_transaction` | Off | `FEATURE_EXTERNAL_TRANSACTION` | No dedicated router gated — `payments.router` stays registered because it also backs in-scope flows (mediator lead/subscription fees); revisit in Prompt 5 |
+| `projects` | Off | `FEATURE_PROJECTS` | Yes — `projects.router`. Frontend: `projects.tsx`/`project.$id.tsx` gated to `PhaseGate` (Prompt 5). |
+| `booking` | Off | `FEATURE_BOOKING` | Yes — `bookings.router`. Frontend: `property.$id.tsx`'s embedded `ShortTermBooking` widget gated (Prompt 5) — no separate booking route exists on web (see "Routes changed"). |
+| `short_stay` | Off | `FEATURE_SHORT_STAY` | No dedicated router or frontend usage — still unused on both sides, kept as a placeholder in `PHASE1_FLAGS` too |
+| `financing` | Off | `FEATURE_FINANCING` | Yes — `financing.router`. Frontend: `RentNowPayLaterBanner`/`FinancingModal`, `ActionsCard`'s "Request Financing" button, and `PurchaseCostBreakdown`'s financing-estimate/affordability sub-sections all gated (Prompt 5). |
+| `property_management` | Off | `FEATURE_PROPERTY_MANAGEMENT` | No dedicated router exists in this codebase — still open |
+| `external_transaction` | Off | `FEATURE_EXTERNAL_TRANSACTION` | No dedicated router gated — `payments.router` stays registered because it also backs in-scope flows (mediator lead/subscription fees) — still open |
 
-Not gated by a Phase-1 flag yet, left registered as-is: `contracts.router`,
+Not gated by a backend Phase-1 flag, left registered as-is: `contracts.router`,
 `verification.router`, `subscriptions.router` (Hide-Phase1 per the classification
-tables above, but no 1:1 flag was requested for them in Prompt 2 — TODO Prompt 5 to
-decide whether they need their own flag or a route-level gate on the frontend only).
+tables above, but no 1:1 flag was requested for them in Prompt 2). Prompt 5 partially
+addressed `contracts`: added a **frontend-only, local** `PHASE1_FLAGS.contracts` (not
+mirrored in the backend registry) and used it to hide `property.$id.tsx`'s
+"Register lease" banner, which explicitly advertised the digital-contract feature.
+`contract.$leadId.tsx` itself (the route) and `verification.router`/`subscriptions.router`
+remain fully reachable/registered — still open for a future prompt.
 
 Verified via `python -c "from app.core.feature_flags import is_enabled; ..."`: all 13
-flags read their correct default, and `app.main._ROUTERS` drops from 26 to 23 entries
-with defaults in place (projects/bookings/financing excluded).
+backend flags read their correct default, and `app.main._ROUTERS` drops from 26 to 23
+entries with defaults in place (projects/bookings/financing excluded). Frontend
+`PHASE1_FLAGS` verified by inspection + a headless-Chrome check (Prompt 5, see
+"Routes changed").
 
 ## Branding changes
 
@@ -304,7 +408,20 @@ migration-drift issue to flag separately, not fixed here.
 
 ## Known limitations
 
-TODO — filled in by a later prompt
+- **`contract.$leadId.tsx` is still fully reachable by direct URL** with full
+  content — only its advertising banner on `property.$id.tsx` was hidden
+  (Prompt 5). Same for `verification.router`/`subscriptions.router` on the
+  backend. None of these had an explicit gating instruction in Prompts 2 or 5.
+- **Frontend `PHASE1_FLAGS` and backend `FLAGS`/`Settings` are two separate,
+  manually-synced constants**, not a single source of truth — a flag flipped
+  in one place doesn't automatically flip in the other. Acceptable for a
+  Phase-1 cleanup; would need a real client-side flag fetch to fix properly.
+- **Mobile app (`mobile/app/`) has no Phase-1 gating at all** — Prompts 4 and
+  5 both scoped their reads to `frontend/src/routes/` only. Mobile's
+  `bookings.tsx`/`my-bookings.tsx`/`projects.tsx`/`project/[id].tsx`/etc. are
+  unaffected.
+- Nav active-state highlighting doesn't distinguish Rent/Buy/Map's shared
+  `/search` pathname (see "Navigation changed", Prompt 4).
 
 ## Validation results
 

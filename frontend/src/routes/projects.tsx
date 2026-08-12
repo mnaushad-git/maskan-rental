@@ -2,10 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Building2 } from "lucide-react";
 import { TopNav } from "@/components/maskan/TopNav";
+import { PhaseGate } from "@/components/maskan/PhaseGate";
 import { ProjectCard } from "@/components/maskan/ProjectCard";
 import { fetchProjects, mapApiProject } from "@/lib/api/maskan";
 import type { Project } from "@/lib/maskan-data";
 import { useLanguage } from "@/lib/i18n/context";
+import { PHASE1_FLAGS } from "@/lib/phase1-flags";
 
 export const Route = createFileRoute("/projects")({
   head: () => ({
@@ -17,7 +19,9 @@ export const Route = createFileRoute("/projects")({
       },
     ],
   }),
-  component: ProjectsPage,
+  // Hide-Phase1 (off-plan projects) — swapped at the route definition, not
+  // inside the component, so this never conditionally skips hooks.
+  component: PHASE1_FLAGS.projects ? ProjectsPage : PhaseGate,
 });
 
 function ProjectsPage() {
