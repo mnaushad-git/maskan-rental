@@ -457,7 +457,9 @@ export function createProperty(payload: {
   area: string;
   city: string;
   size_sq_m: number;
-  monthly_rent: number;
+  listing_type?: "rent" | "sale";
+  monthly_rent?: number;
+  sale_price?: number;
   bedrooms: number;
   bathrooms: number;
   owner_name: string;

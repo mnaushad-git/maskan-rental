@@ -463,12 +463,15 @@ function AdminPage() {
 
   async function saveListing(data: Listing, newImageUrls: string[]) {
     const numericId = Number(data.id);
+    const listingType = data.listingType ?? "rent";
     const payload = {
       title: data.title,
       area: data.district,
       city: data.city,
       size_sq_m: data.areaSqm ?? 200,
-      monthly_rent: data.rent,
+      listing_type: listingType,
+      monthly_rent: listingType === "rent" ? data.rent : undefined,
+      sale_price: listingType === "sale" ? data.rent : undefined,
       bedrooms: data.bedrooms ?? 3,
       bathrooms: data.bathrooms ?? 3,
       owner_name: data.owner,
@@ -2420,6 +2423,7 @@ function ListingFormDrawer({
     title: listing?.title ?? "",
     city: listing?.city ?? "Riyadh",
     district: listing?.district ?? "",
+    listingType: (listing?.listingType ?? "rent") as "rent" | "sale",
     rent: listing?.rent?.toString() ?? "",
     status: listing?.status ?? ("Draft" as ListingStatus),
     owner: listing?.owner ?? "",
@@ -2461,7 +2465,11 @@ function ListingFormDrawer({
       return;
     }
     if (!rentNum || rentNum <= 0) {
-      alert("Please enter a valid monthly rent.");
+      alert(
+        form.listingType === "sale"
+          ? "Please enter a valid sale price."
+          : "Please enter a valid monthly rent.",
+      );
       return;
     }
     void onSave(
@@ -2470,6 +2478,7 @@ function ListingFormDrawer({
         title: form.title || "Untitled listing",
         city: form.city,
         district: form.district,
+        listingType: form.listingType,
         rent: rentNum,
         status: nextStatus,
         owner: form.owner || "Unassigned",
@@ -2571,14 +2580,44 @@ function ListingFormDrawer({
                   />
                 )}
               </Field>
-              <Field label="Monthly rent (SAR)">
-                <Input
-                  type="number"
-                  value={form.rent}
-                  onChange={(e) => setForm({ ...form, rent: e.target.value })}
-                  placeholder="e.g. 8000"
-                />
+              <Field label="Transaction type">
+                <div className="grid grid-cols-2 gap-2">
+                  {(["rent", "sale"] as const).map((lt) => (
+                    <button
+                      key={lt}
+                      type="button"
+                      onClick={() => setForm({ ...form, listingType: lt })}
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                        form.listingType === lt
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-surface text-foreground hover:bg-surface-2",
+                      )}
+                    >
+                      {lt === "rent" ? "Rent" : "Sale"}
+                    </button>
+                  ))}
+                </div>
               </Field>
+              {form.listingType === "sale" ? (
+                <Field label="Sale price (SAR)">
+                  <Input
+                    type="number"
+                    value={form.rent}
+                    onChange={(e) => setForm({ ...form, rent: e.target.value })}
+                    placeholder="e.g. 950000"
+                  />
+                </Field>
+              ) : (
+                <Field label="Monthly rent (SAR)">
+                  <Input
+                    type="number"
+                    value={form.rent}
+                    onChange={(e) => setForm({ ...form, rent: e.target.value })}
+                    placeholder="e.g. 8000"
+                  />
+                </Field>
+              )}
               <Field label="Owner / agent">
                 <Input
                   value={form.owner}

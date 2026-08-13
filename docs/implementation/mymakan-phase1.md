@@ -804,7 +804,50 @@ clean before this prompt (verified independently by each of those prompts) and
 remained clean after adding the backend test fixes above, which don't touch
 either app.
 
+**Prompt 11 — Admin Rent/Sale selector on the create/edit listing form.**
+Implements the "Recommended next feature" below. No route files added,
+removed, or renamed — only `frontend/src/routes/admin.tsx`'s
+`ListingFormDrawer` (and its caller `saveListing`) changed, plus
+`frontend/src/lib/api/maskan.ts`'s `createProperty` payload type:
+
+- `ListingFormDrawer`'s form state gained a `listingType: "rent" | "sale"`
+  field (defaulting from `listing?.listingType ?? "rent"` when editing).
+  Added a segmented Rent/Sale control in the "Property details" section,
+  directly copying `PartnerListingForm`'s pattern from `partner.tsx`
+  (Prompt 6) — same two-button `grid-cols-2` layout and
+  `border-primary bg-primary text-primary-foreground` active state, just
+  without i18n (admin's form is English-only, matching the rest of
+  `ListingFormDrawer`).
+- The existing "Monthly rent (SAR)" field now conditionally renders as
+  "Sale price (SAR)" when `listingType === "sale"`, reusing the same
+  `form.rent` input state (mirrors how `Listing.rent`/`toListing` already
+  conflate rent and sale price into one field for the table — see the
+  `listingType` comment on the `Listing` type).
+  `submit()`'s validation message swaps accordingly ("Please enter a valid
+  sale price." vs. "...monthly rent.").
+- `saveListing` (in `AdminPage`) now sends `listing_type` plus
+  `monthly_rent`/`sale_price` (only one populated, the other `undefined`,
+  same as `PartnerListingForm`'s `submit()`) instead of always sending
+  `monthly_rent`. Backend already accepted this: `PropertyCreate`/
+  `PropertyUpdate` (`backend/app/schemas/property.py`) both extend/mirror
+  `PropertyBase`, which already has `listing_type`/`sale_price` — no backend
+  change needed.
+- `createProperty`'s payload type (`frontend/src/lib/api/maskan.ts`) was
+  widened to accept optional `listing_type`/`sale_price` and made
+  `monthly_rent` optional (was required) so a new Sale listing can be
+  created without a rent value. `patchProperty` needed no change — it
+  already types its payload as `Partial<Omit<ApiProperty, ...>>`, which
+  includes both fields.
+- Did not touch admin's Rent/Sale filters or table columns (`transactionTypeFilter`
+  etc.) — those were already done in Prompt 7 and were explicitly out of
+  scope for this prompt.
+- Verified with `npx tsc --noEmit` (clean) and `npx vite build` (clean,
+  `.output/` generated with no errors) in `frontend/`.
+
 ## Recommended next feature
+
+**Done as of Prompt 11 (see "Routes changed" above).** Kept the original
+rationale below for context.
 
 **Add a Rent/Sale transaction-type selector to the admin create/edit listing
 form (`ListingFormDrawer` in `frontend/src/routes/admin.tsx`).**
