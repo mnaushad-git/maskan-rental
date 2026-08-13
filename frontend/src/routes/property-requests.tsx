@@ -24,7 +24,7 @@ import { formatSAR } from "@/lib/maskan-data";
 export const Route = createFileRoute("/property-requests")({
   head: () => ({
     meta: [
-      { title: "My Property Requests — Maskan" },
+      { title: "My Property Requests — myMakan" },
       {
         name: "description",
         content: "Manage your property requests and see AI-matched listings.",

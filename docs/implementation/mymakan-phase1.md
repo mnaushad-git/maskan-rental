@@ -543,7 +543,105 @@ entries with defaults in place (projects/bookings/financing excluded). Frontend
 
 ## Branding changes
 
-TODO — filled in by a later prompt
+**Prompt 9 — Branding replacement (Maskan / myHome → myMakan).** Replaced every
+user-visible brand string across customer web, partner portal, admin portal, and
+mobile. Web (frontend) branded itself "Maskan"; mobile branded itself "myHome" —
+both became **myMakan**. Arabic copy used "مسكن" (web) / "ماي هوم" (mobile) — both
+became **"ماي مكان"** (a literal, mobile-style "My + Makan" transliteration,
+matching the existing "ماي هوم" pattern rather than introducing a new convention).
+
+Scope note: the prompt's grep list (`frontend/src`, `mobile/app`, `mobile/components`,
+`mobile/assets`) doesn't match this repo's actual mobile layout — mobile's real
+source (i18n, API client, theme, reusable components) lives under `mobile/src/`, and
+the app display name/splash config lives in `mobile/app.json` (repo root, outside
+`mobile/app/`). Followed the task's intent ("mobile app display name/splash", "no
+visible string remains anywhere") rather than the literal grep paths and searched
+`mobile/src` and `mobile/app.json` too — otherwise the entire mobile i18n copy (73
+`myHome` occurrences in `en.ts` alone) would have been missed.
+
+**Files touched:**
+
+*Frontend web (39 files):*
+- `frontend/src/lib/i18n/en.ts`, `frontend/src/lib/i18n/ar.ts` — bulk of the
+  copy (brand name, meta descriptions, AI Advisor/area-intelligence/compare/
+  estimate copy, partner-portal copy, notifications, property-request copy,
+  etc.)
+- `frontend/src/lib/api/maskan.ts` — one fallback display value
+  (`"Maskan Agent"` → `"myMakan Agent"`); the file's own name (an import-path
+  identifier) was left unchanged, per the task's exclusions
+- `frontend/src/components/maskan/AiChat.tsx` — chat header + input placeholder
+- `frontend/src/routes/__root.tsx` — site `<title>`/meta description/og tags
+- `frontend/src/routes/admin.tsx` — page title/meta, sidebar brand text, an
+  admin-copy string, and the login form's example-email placeholder
+  (`admin@maskan.sa` → `admin@mymakan.sa`)
+- 34 more `frontend/src/routes/*.tsx` files — each only had a `head()` meta
+  `title`/`description` string of the form `"... — Maskan"` (full list:
+  `admin_.notifications`, `admin_.property-requests`, `advisor`, `agent.$id`,
+  `analytics`, `areas`, `auth`, `compare`, `contract.$leadId`, `estimate`,
+  `import`, `index`, `lead.$leadId`, `lead.new`, `methodology`, `my-leads`,
+  `notification-settings`, `notifications`, `partner.leads.$leadId`,
+  `partner.register`, `partner.requests.$id`, `partner.requests`, `partner`,
+  `partners`, `project.$id`, `projects`, `property-requests.$id`,
+  `property-requests.new`, `property-requests`, `property.$id`,
+  `saved-searches`, `saved`, `search`)
+
+*Mobile (5 files):*
+- `mobile/app.json` — `expo.name` (app display name, shown under the icon and
+  during splash) `"myHome"` → `"myMakan"`; the location-permission prompt copy.
+  `slug`, `scheme`, iOS `bundleIdentifier`, and Android `package` were **not**
+  touched — same category as `package.json` "name"/bundle identifiers, out of
+  scope per the task
+- `mobile/src/lib/i18n/en.ts`, `mobile/src/lib/i18n/ar.ts` — same scale of
+  copy as the frontend's i18n files (brand name, AI Advisor, area
+  intelligence, compare, estimate, partner/premium copy, property-request
+  copy, etc.), including 4 Arabic-file lines that embedded the *Latin*
+  "myHome Premium" inline (not the transliterated "ماي هوم") that a first
+  pass targeting only the Arabic phrase missed
+- `mobile/src/lib/api/maskan.ts`, `mobile/src/lib/maskan-data.ts` — one
+  fallback display value each (`"myHome Agent"` → `"myMakan Agent"`); file
+  names (import-path identifiers) unchanged
+
+**Judgment calls / known gaps, flagged rather than silently made:**
+- **`leadDetail.messagesFromMaskan`** (frontend `en.ts`/`ar.ts`, referenced by
+  key in `lead.$leadId.tsx`) is a translation **key name**, not display text —
+  left unrenamed (its *value* now reads "Messages from myMakan" /
+  "رسائل من ماي مكان") since renaming it would be a code-identifier change the
+  task explicitly excludes, and would have silently broken the `t(...)` call
+  site. A first bulk-replace pass initially renamed this key by accident
+  (caught via `tsc --noEmit`, which failed until reverted) — worth remembering
+  if a future prompt does another blanket brand-string pass.
+- **`"Maskanai Admin"`** (frontend `en.ts`, partner-portal approval-gate copy,
+  3 occurrences) was a pre-existing typo (missing space, "Maskan" + "ai" run
+  together) predating this prompt. Left as a literal token swap it would have
+  become the equally-broken "myMakanai Admin"; cleaned it up to
+  "myMakan Admin" instead since the rebrand touched every one of these lines
+  anyway.
+- **Code comments** mentioning the old brand name (`frontend/src/styles.css`,
+  `frontend/src/lib/auth-storage.ts`, `frontend/src/lib/api/maskan.ts`,
+  `mobile/tailwind.config.js`, `mobile/src/lib/theme.ts` — 5 total) were left
+  untouched — not user-visible, and the task's scope is explicitly "visible
+  text/copy/config only."
+- **localStorage/storage keys** containing the old brand as a lowercase token
+  (`"maskan_lang"` in `frontend/src/lib/i18n/context.tsx`,
+  `"maskan_onboarding_done"` in `frontend/src/components/maskan/
+  LocationOnboarding.tsx`) were left unchanged — treated as the same category
+  as env var namespaces/DB names (internal config, not user-visible copy).
+- Not touched at all, consistent with the task's exclusions: every
+  `@/lib/api/maskan`, `@/lib/maskan-data`, `@/lib/maskan-search-data`,
+  `@/components/maskan/*` import path/module/directory name (both apps), and
+  `mobile/app.json`'s `slug`/`scheme`/`bundleIdentifier`/`package`.
+- **Backend** was out of this prompt's stated scope (customer web, partner
+  portal, admin portal, mobile) and was not searched — if backend-rendered
+  content (e.g. transactional email templates) mentions "Maskan," it's an
+  open gap for a future prompt.
+
+Verified: `npx tsc --noEmit` clean in both `frontend/` and `mobile/`;
+`npm run build` clean in `frontend/` (inspected the built SSR/client bundles —
+confirmed the only remaining "Maskan" substring anywhere in output is the
+`messagesFromMaskan` key name, whose rendered value already reads "Messages
+from myMakan"). Did not build the mobile Android app for this prompt (no UI
+changes beyond string values and one config field — `tsc` was judged
+sufficient, same bar Prompt 8 used).
 
 ## Database impact
 

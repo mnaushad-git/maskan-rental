@@ -35,7 +35,7 @@ import type { Property } from "@/lib/maskan-data";
 import { useLanguage, type Language } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/agent/$id")({
-  head: () => ({ meta: [{ title: "Agent Profile — Maskan" }] }),
+  head: () => ({ meta: [{ title: "Agent Profile — myMakan" }] }),
   component: AgentProfilePage,
 });
 

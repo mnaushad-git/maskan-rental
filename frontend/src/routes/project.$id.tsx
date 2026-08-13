@@ -25,7 +25,7 @@ import { PHASE1_FLAGS } from "@/lib/phase1-flags";
 export const Route = createFileRoute("/project/$id")({
   head: () => ({
     meta: [
-      { title: "Project Details — Maskan" },
+      { title: "Project Details — myMakan" },
       {
         name: "description",
         content: "Explore units, pricing, and developer details for this project.",

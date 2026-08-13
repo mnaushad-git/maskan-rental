@@ -96,10 +96,10 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Admin Console — Maskan" },
+      { title: "Admin Console — myMakan" },
       {
         name: "description",
-        content: "Manage property listings, approvals and publishing for the Maskan marketplace.",
+        content: "Manage property listings, approvals and publishing for the myMakan marketplace.",
       },
     ],
   }),
@@ -1491,7 +1491,7 @@ function AdminSidebar({ navItems }: { navItems: AdminNavItem[] }) {
           <Building2 className="size-4" />
         </span>
         <div className="leading-tight">
-          <div className="text-sm font-bold tracking-tight">Maskan</div>
+          <div className="text-sm font-bold tracking-tight">myMakan</div>
           <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Admin console
           </div>
@@ -2772,7 +2772,7 @@ function ListingFormDrawer({
               />
               <ToggleRow
                 label="Allow AI advisor recommendations"
-                description="Let Maskan AI suggest this listing to matching renters."
+                description="Let myMakan AI suggest this listing to matching renters."
                 defaultOn
               />
               <ToggleRow
@@ -4836,7 +4836,7 @@ function AdminLoginGate({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@maskan.sa"
+              placeholder="admin@mymakan.sa"
               className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>

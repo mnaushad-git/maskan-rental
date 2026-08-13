@@ -15,7 +15,7 @@ export const Route = createFileRoute("/lead/new")({
     area: (s.area as string) ?? "",
     city: (s.city as string) ?? "Riyadh",
   }),
-  head: () => ({ meta: [{ title: "Submit a Lead — Maskan" }] }),
+  head: () => ({ meta: [{ title: "Submit a Lead — myMakan" }] }),
   component: NewLeadPage,
 });
 

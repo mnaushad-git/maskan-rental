@@ -27,11 +27,11 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/import")({
   head: () => ({
     meta: [
-      { title: "Data Import Console — Maskan" },
+      { title: "Data Import Console — myMakan" },
       {
         name: "description",
         content:
-          "Upload CSV or Excel listings, validate records, review errors and track every import batch in Maskan's data console.",
+          "Upload CSV or Excel listings, validate records, review errors and track every import batch in myMakan's data console.",
       },
     ],
   }),
@@ -372,7 +372,7 @@ function ImportPage() {
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Bulk listing import</h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Upload a CSV file to onboard listings in bulk. Maskan validates each row against required
+            Upload a CSV file to onboard listings in bulk. myMakan validates each row against required
             fields and publishing rules before inserting into the database.
           </p>
         </section>

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "myHome",
+    "name": "myMakan",
     "slug": "myhome-rental",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -45,7 +45,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "myHome uses your location to show nearby rentals and sales on the map."
+          "locationWhenInUsePermission": "myMakan uses your location to show nearby rentals and sales on the map."
         }
       ],
       [

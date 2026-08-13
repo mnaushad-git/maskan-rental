@@ -43,7 +43,7 @@ import { useLanguage } from "@/lib/i18n/context";
 export const Route = createFileRoute("/compare")({
   head: () => ({
     meta: [
-      { title: "Compare Properties — Maskan" },
+      { title: "Compare Properties — myMakan" },
       {
         name: "description",
         content:

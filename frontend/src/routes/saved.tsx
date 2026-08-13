@@ -42,7 +42,7 @@ import { useLanguage } from "@/lib/i18n/context";
 export const Route = createFileRoute("/saved")({
   head: () => ({
     meta: [
-      { title: "Saved Properties — Maskan" },
+      { title: "Saved Properties — myMakan" },
       {
         name: "description",
         content:

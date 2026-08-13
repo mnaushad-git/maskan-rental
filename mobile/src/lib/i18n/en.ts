@@ -1,7 +1,7 @@
 // English source strings — the canonical copy every other locale is translated from.
 export const en = {
   common: {
-    brand: "myHome",
+    brand: "myMakan",
     loading: "Loading…",
     viewAll: "View all",
     signIn: "Sign in",
@@ -100,7 +100,7 @@ export const en = {
     heading: "Notifications",
     unread: "{{count}} unread",
     empty: "No new messages",
-    maskanTeam: "myHome Team",
+    maskanTeam: "myMakan Team",
     partner: "Partner",
     viewAllLeads: "View all leads →",
     justNow: "Just now",
@@ -301,7 +301,7 @@ export const en = {
   },
   footer: {
     tagline:
-      "myHome is the AI-powered rental intelligence platform for Saudi Arabia. Smarter search, fair pricing, better homes.",
+      "myMakan is the AI-powered rental intelligence platform for Saudi Arabia. Smarter search, fair pricing, better homes.",
     discover: "Discover",
     citiesHeading: "Cities",
     links: {
@@ -313,7 +313,7 @@ export const en = {
       compare: "Compare",
       scoreMethodology: "Score Methodology",
     },
-    copyright: "© {{year}} myHome. All rights reserved.",
+    copyright: "© {{year}} myMakan. All rights reserved.",
     madeFor: "Made for Saudi Arabia · Available in Arabic and English",
   },
   searchBar: {
@@ -381,7 +381,7 @@ export const en = {
       trustedByRenters: "Trusted by 38,000+ renters",
       aiScoring: "AI-powered fair-price scoring",
     },
-    exploreMore: "More ways myHome helps",
+    exploreMore: "More ways myMakan helps",
     viewFullMap: "View full map",
     truPartner: {
       badge: "TruPartner™",
@@ -390,10 +390,10 @@ export const en = {
       body: "Licensed real estate agents covering every district. Submit a lead and get matched within 24 hours.",
     },
     truAIAdvisor: {
-      badge: "myHome AI Advisor",
+      badge: "myMakan AI Advisor",
       new: "New",
       title: "Struggling to find the right property?",
-      body: "Ask myHome AI Advisor — get instant, data-backed answers about neighborhoods, fair pricing, and the best fit for your family.",
+      body: "Ask myMakan AI Advisor — get instant, data-backed answers about neighborhoods, fair pricing, and the best fit for your family.",
     },
     truEstimate: {
       badge: "TruEstimate™",
@@ -542,7 +542,7 @@ export const en = {
     },
     registerLease: {
       title: "Register your lease contract",
-      desc: "Once your lease is agreed, myHome can help you generate a digital rental contract — start with a lead request.",
+      desc: "Once your lease is agreed, myMakan can help you generate a digital rental contract — start with a lead request.",
       cta: "Get started",
     },
     listingDetails: {
@@ -557,7 +557,7 @@ export const en = {
       licenseExpiration: "License expiration date",
       lastUpdated: "Last updated",
       source: "Source",
-      sourceValue: "myHome Platform",
+      sourceValue: "myMakan Platform",
     },
     readMore: "Read more",
     readLess: "Read less",
@@ -578,14 +578,14 @@ export const en = {
       signIn: "Sign in",
     },
     rentalIntelligence: {
-      badge: "myHome AI Rental Intelligence",
+      badge: "myMakan AI Rental Intelligence",
       title: "Rental Score",
       subtitle:
-        "Composite of price fairness, area quality, amenities, commute, and family fit — from myHome platform intelligence.",
-      badgeSale: "myHome AI Purchase Intelligence",
+        "Composite of price fairness, area quality, amenities, commute, and family fit — from myMakan platform intelligence.",
+      badgeSale: "myMakan AI Purchase Intelligence",
       titleSale: "Purchase Score",
       subtitleSale:
-        "Composite of price positioning, area quality, amenities, commute, and family fit — from myHome platform intelligence.",
+        "Composite of price positioning, area quality, amenities, commute, and family fit — from myMakan platform intelligence.",
       priceFairness: "Price Fairness",
       areaQuality: "Area Quality",
       amenities: "Amenities",
@@ -595,7 +595,7 @@ export const en = {
       verdictStrong: "Strong value",
       verdictFair: "Fair value",
       verdictBelow: "Below average",
-      lastRefreshed: "myHome platform scores · Last refreshed {{date}}",
+      lastRefreshed: "myMakan platform scores · Last refreshed {{date}}",
     },
     fairRent: {
       title: "Fair Rent Analysis",
@@ -639,7 +639,7 @@ export const en = {
     },
     areaSummary: {
       titleSuffix: "— Area Insights",
-      scoresLoaded: "myHome platform scores · {{minutes}} min commute to city centre",
+      scoresLoaded: "myMakan platform scores · {{minutes}} min commute to city centre",
       scoresLoading: "How this district scores across the things renters care about most.",
       exploreArea: "Explore area",
       howScoresWork: "How scores work",
@@ -658,8 +658,8 @@ export const en = {
     },
     nearby: {
       title: "Nearby Places",
-      loading: "Loading nearby places from myHome…",
-      realDistances: "Real distances from {{district}} · via myHome area intelligence",
+      loading: "Loading nearby places from myMakan…",
+      realDistances: "Real distances from {{district}} · via myMakan area intelligence",
       schools: "Schools",
       hospitals: "Hospitals & Clinics",
       mosques: "Mosques",
@@ -677,7 +677,7 @@ export const en = {
       getDirections: "Get directions",
     },
     aiSummary: {
-      badge: "myHome AI Summary",
+      badge: "myMakan AI Summary",
       askAI: "Ask AI about this home",
       negotiationTips: "Negotiation tips",
       familyExcellent: "an excellent choice for families",
@@ -772,7 +772,7 @@ export const en = {
     },
     landlord: {
       listedBy: "Listed by",
-      verifiedAgent: "myHome Verified Agent",
+      verifiedAgent: "myMakan Verified Agent",
       profile: "Profile",
       callAgent: "Call agent",
       noPhone: "No phone number on file",
@@ -842,7 +842,7 @@ export const en = {
       yoy: "{{sign}}{{pct}}% YoY",
       noMatches: "No districts match the current filters.",
     },
-    footerNote: "District intelligence powers myHome AI Advisor area recommendations.",
+    footerNote: "District intelligence powers myMakan AI Advisor area recommendations.",
     detail: {
       closeDetail: "Close detail",
       tabOverview: "Overview",
@@ -875,13 +875,13 @@ export const en = {
     stop: "Stop generating",
     retry: "Retry",
     footerDisclaimer:
-      "myHome AI answers based on live platform data. You can also ask it to create a lead request.",
+      "myMakan AI answers based on live platform data. You can also ask it to create a lead request.",
     errorReachingAI: "Sorry, I couldn't reach the AI service. Please try again.",
-    chatCapReached: "You've reached today's free chat limit. Upgrade to myHome Premium for unlimited AI Advisor chats.",
+    chatCapReached: "You've reached today's free chat limit. Upgrade to myMakan Premium for unlimited AI Advisor chats.",
     upgradeCta: "Upgrade to Premium",
     emptyState: {
       askAboutProperty: "Ask about this property",
-      title: "myHome AI Advisor",
+      title: "myMakan AI Advisor",
       desc: "Ask anything about rental properties, neighborhoods, or fair pricing — or let me help you create a partner lead request.",
       getMatchedTitle: "Get matched with a partner",
       getMatchedDesc: "Tell me what you need — I'll find the right partner for you.",
@@ -929,7 +929,7 @@ export const en = {
   },
   partners: {
     badge: "Verified partners",
-    heading: "Find a myHome Partner",
+    heading: "Find a myMakan Partner",
     subtitle:
       "Licensed real estate partners covering every district across Saudi Arabia. Submit a lead and get matched with the right partner for your area within 24 hours.",
     searchPlaceholder: "Search by name, area, city…",
@@ -949,15 +949,15 @@ export const en = {
     noActivePartners: "No active partners are registered yet. Be the first!",
     becomeAPartner: "Become a partner",
     areYouLicensed: "Are you a licensed agent?",
-    joinDesc: "Join myHome as a partner and receive verified leads in your district for SAR 99/month.",
+    joinDesc: "Join myMakan as a partner and receive verified leads in your district for SAR 99/month.",
     registerAsPartner: "Register as a partner",
   },
   agent: {
     allPartners: "All partners",
-    defaultAgentName: "myHome Agent",
+    defaultAgentName: "myMakan Agent",
     loadingProfile: "Loading profile…",
     partnerNotFound: "Partner not found",
-    partnerNotFoundDesc: "This agent may no longer be active on myHome.",
+    partnerNotFoundDesc: "This agent may no longer be active on myMakan.",
     browseAllListings: "← Browse all listings",
     verified: "Verified",
     memberSince: "Member since {{date}}",
@@ -996,7 +996,7 @@ export const en = {
       submit: "Submit",
       submittedPendingTitle: "Review submitted — pending admin approval",
       submittedPendingDesc:
-        "Your review will appear publicly once a myHome admin approves it. This usually takes 24–48 hours.",
+        "Your review will appear publicly once a myMakan admin approves it. This usually takes 24–48 hours.",
       editReview: "Edit review",
       noReviewsBeFirst: "No reviews yet. Be the first to review {{name}}.",
       failedToSubmit: "Failed to submit review. Please try again.",
@@ -1018,13 +1018,13 @@ export const en = {
   },
   methodology: {
     badge: "Score methodology",
-    heading: "How myHome scores areas",
+    heading: "How myMakan scores areas",
     heroDesc:
       "Every score you see is calculated from live data collected and maintained by the {{engine}} engine. No editorial guesses. No sponsorships. Refreshed every night at midnight.",
-    heroEngine: "myHome platform intelligence",
+    heroEngine: "myMakan platform intelligence",
     dataFreshness: "Data freshness",
     dataFreshnessDesc:
-      "Scores are recalculated every night at {{time}} by refreshing myHome's area intelligence for each district. The \"Last refreshed\" date on every property and area page shows exactly when the data was last updated.",
+      "Scores are recalculated every night at {{time}} by refreshing myMakan's area intelligence for each district. The \"Last refreshed\" date on every property and area page shows exactly when the data was last updated.",
     dataFreshnessTime: "00:00 AST (Arabia Standard Time)",
     refreshedNightly: "Refreshed nightly",
     districtsCovered: "16 districts covered",
@@ -1056,7 +1056,7 @@ export const en = {
         w2: "Healthcare access",
         w3: "Commute to city centre",
         w4: "Amenities & lifestyle",
-        src1: "myHome area intelligence: schools, hospitals, restaurants, gyms, mosques, malls, parks",
+        src1: "myMakan area intelligence: schools, hospitals, restaurants, gyms, mosques, malls, parks",
       },
       school: {
         label: "School Score",
@@ -1066,7 +1066,7 @@ export const en = {
         w1: "Average community rating of nearby schools (rescaled from 3–5 → 45–95)",
         w2: "Number of schools within 3 km (up to +18 pts)",
         w3: "Presence of international / bilingual schools (bonus up to +10 pts)",
-        src1: "myHome platform data: schools",
+        src1: "myMakan platform data: schools",
         src2: "Keyword detection for: International, American, British, French, German, Pakistani, Indian",
         radius: "3 km radius",
       },
@@ -1078,7 +1078,7 @@ export const en = {
         w1: "Average community rating of nearby hospitals/clinics (rescaled)",
         w2: "Number of hospitals/clinics within 3 km (up to +15 pts)",
         w3: "Specialty / named hospital bonus (King Fahad, Saudi German, etc.)",
-        src1: "myHome platform data: hospitals & clinics",
+        src1: "myMakan platform data: hospitals & clinics",
         src2: "Keyword detection for: Specialist, Medical Center, King, National, Saudi German",
         radius: "3 km radius",
       },
@@ -1087,7 +1087,7 @@ export const en = {
         tagline: "Commute ease to city centre",
         description:
           "Measures estimated peak-hour driving time from the district centre to the main business hub (KAFD / Olaya for Riyadh, Al Corniche for Jeddah, Al Khobar road for Dammam). Riyadh-tuned thresholds acknowledge the city's car-centric layout.",
-        src1: "myHome commute intelligence (peak-hour estimates, updated nightly)",
+        src1: "myMakan commute intelligence (peak-hour estimates, updated nightly)",
         radius: "Point-to-point to city centre",
       },
       family: {
@@ -1105,7 +1105,7 @@ export const en = {
     lifestyle: {
       heading: "Lifestyle score — what's included",
       desc:
-        "The lifestyle score feeds into both Area Score (20%) and Family Score (20%). It is built from five place categories tracked by myHome's area intelligence, each capped to prevent a single factor from dominating. Mosque count is intentionally capped low — mosques are present in every Riyadh block, so count is not a differentiator.",
+        "The lifestyle score feeds into both Area Score (20%) and Family Score (20%). It is built from five place categories tracked by myMakan's area intelligence, each capped to prevent a single factor from dominating. Mosque count is intentionally capped low — mosques are present in every Riyadh block, so count is not a differentiator.",
       max: "max {{cap}}",
       restaurants: "Restaurants",
       restaurantsNote: "2 km, up to 22 pts",
@@ -1144,7 +1144,7 @@ export const en = {
       vat: "VAT",
       vatBasis: "Residential rentals in Saudi Arabia are VAT-exempt under ZATCA regulations. The calculator does not add VAT.",
       affordabilityCheck: "Affordability check",
-      affordabilityDesc: "Based on the widely used {{rule}}: housing costs should not exceed 30% of gross monthly income. myHome refines this into three bands.",
+      affordabilityDesc: "Based on the widely used {{rule}}: housing costs should not exceed 30% of gross monthly income. myMakan refines this into three bands.",
       thirtyPercentRule: "30% rule",
       pctFormula: "% of income  =  ",
       pctFormulaCalc: "(annual rent ÷ 12) ÷ monthly salary × 100",
@@ -1233,7 +1233,7 @@ export const en = {
   compare: {
     badge: "Side-by-side comparison",
     heading: "Compare properties",
-    desc: "Compare up to 3 listings across financials, area quality, amenities, and AI rental intelligence — then let myHome AI pick the strongest match.",
+    desc: "Compare up to 3 listings across financials, area quality, amenities, and AI rental intelligence — then let myMakan AI pick the strongest match.",
     selectedCount: "{{count}}/3 selected",
     picker: {
       selectTitle: "Select a property",
@@ -1294,7 +1294,7 @@ export const en = {
     rentalLabel: "Rental",
     propertyScoreLabel: "Property Score",
     aiReco: {
-      badge: "myHome AI Recommendation",
+      badge: "myMakan AI Recommendation",
       strongestMatch: "{{title}} is the strongest match",
       description:
         "Weighing rental value, area quality, family suitability and AI match, {{district}} scores {{score}}/100 — balancing competitive rent of SAR {{price}}/yr with a {{family}}/100 family score and {{area}}/100 area quality.",
@@ -1338,7 +1338,7 @@ export const en = {
     property: "Property",
     propertySummary: "{{bedrooms}}BR {{type}}",
     propertySummaryWithSize: "{{bedrooms}}BR {{type}} · {{size}} m²",
-    disclaimer: "Estimate only, based on live myHome listings and area averages. Actual rent depends on condition, amenities, and negotiation.",
+    disclaimer: "Estimate only, based on live myMakan listings and area averages. Actual rent depends on condition, amenities, and negotiation.",
     viewSimilarListings: "View similar listings",
     submitLeadRequest: "Submit a lead",
   },
@@ -1502,34 +1502,34 @@ export const en = {
     bedroomsPrefix: "{{count}} BR · ",
     perMonth: "SAR {{amount}}/mo",
     chatWithPartner: "Chat with your partner",
-    messagesFromMyHome: "Messages from myHome",
+    messagesFromMyHome: "Messages from myMakan",
     availableOncePartnerAssigned: "Available once partner is assigned",
     partnerWillMessage: "Your partner will message you here. You can also start the conversation.",
     teamMayMessage: "Our team may send you questions here before matching you with a partner.",
     chatOpensOnceAccepted: "Chat will open once a partner accepts your lead.",
     partnerLabel: "Partner",
-    maskanTeamLabel: "myHome Team",
+    maskanTeamLabel: "myMakan Team",
     messagePlaceholderPartner: "Type a message to your partner…",
-    messagePlaceholderTeam: "Reply to myHome team…",
+    messagePlaceholderTeam: "Reply to myMakan team…",
     messagePlaceholderWaiting: "Waiting for partner assignment…",
     browseProperties: "Browse properties",
     submitAnotherLead: "Submit another lead",
   },
   partnerDashboard: {
     becomePartner: {
-      heading: "Become a myHome Partner",
+      heading: "Become a myMakan Partner",
       desc: "Connect tenants with properties in your area and earn per accepted lead.",
       cta: "Register as a partner",
     },
     approvalGate: {
       pendingHeading: "Approval in progress",
       rejectedHeading: "Access rejected",
-      pendingDesc: "Your partner account is awaiting review. Please wait for myHome Admin approval — you'll get full access once your account is approved.",
-      rejectedDesc: "Your partner account access has been rejected. Please contact myHome Admin for assistance.",
+      pendingDesc: "Your partner account is awaiting review. Please wait for myMakan Admin approval — you'll get full access once your account is approved.",
+      rejectedDesc: "Your partner account access has been rejected. Please contact myMakan Admin for assistance.",
       signOut: "Sign out",
     },
     sidebar: {
-      brand: "myHome Partner",
+      brand: "myMakan Partner",
       navLeads: "Leads",
       navListings: "My Listings",
       signOut: "Sign out",
@@ -1623,7 +1623,7 @@ export const en = {
       description: "Description",
       descriptionPlaceholder: "Describe the property — highlight key features, nearby amenities, access, finishing quality…",
       editNote: "Saving will re-submit this listing for admin review. It will be hidden from the portal until re-approved.",
-      newNote: "Your listing will be submitted for admin review. Once approved, it will appear on the myHome portal.",
+      newNote: "Your listing will be submitted for admin review. Once approved, it will appear on the myMakan portal.",
       cancel: "Cancel",
       submitting: "Submitting…",
       saveResubmit: "Save & resubmit for approval",
@@ -1656,11 +1656,11 @@ export const en = {
     registrationFailed: "Registration failed",
     paymentFailed: "Payment failed. Please try again.",
     steps: { profile: "Profile", subscribe: "Subscribe", active: "Active" },
-    heading: "Become a myHome Partner",
+    heading: "Become a myMakan Partner",
     subtitle: "Connect tenants with the right properties and earn from every closed deal.",
     form: {
       heading: "Your partner profile",
-      createAccount: "Create your myHome account",
+      createAccount: "Create your myMakan account",
       alreadyHaveOne: "Already have one?",
       signIn: "Sign in →",
       fullName: "Full name",
@@ -1706,7 +1706,7 @@ export const en = {
     done: {
       heading: "Registration submitted!",
       desc: "Your partner account is now",
-      pendingApproval: "pending myHome Admin approval",
+      pendingApproval: "pending myMakan Admin approval",
       descSuffix: ". You'll get full access to your dashboard and leads once an admin approves your account.",
       checkStatus: "Check approval status",
     },
@@ -1776,7 +1776,7 @@ export const en = {
     goHome: "Go home",
   },
   auth: {
-    brand: "myHome AI",
+    brand: "myMakan AI",
     headingSmarter: "Smarter rentals,",
     headingMadeFor: "made for Saudi.",
     marketingDesc:
@@ -1791,7 +1791,7 @@ export const en = {
     welcomeBack: "Welcome back",
     createAccount: "Create your account",
     signInDesc: "Sign in to continue your home search and access saved listings.",
-    signUpDesc: "Join myHome to save homes, compare areas and unlock AI insights.",
+    signUpDesc: "Join myMakan to save homes, compare areas and unlock AI insights.",
     orContinueWithEmail: "or continue with email",
     fullName: "Full name",
     emailAddress: "Email address",
@@ -1809,7 +1809,7 @@ export const en = {
     createAccountBtn: "Create account",
     dontHaveAccount: "Don't have an account? ",
     alreadyMember: "Already a member? ",
-    footerCopyright: "© {{year}} myHome · Riyadh, KSA",
+    footerCopyright: "© {{year}} myMakan · Riyadh, KSA",
     comingSoon: "Coming soon",
     google: "Google",
     apple: "Apple",
@@ -1822,9 +1822,9 @@ export const en = {
     },
   },
   premium: {
-    heading: "myHome Premium",
-    profileRowLabel: "myHome Premium",
-    signInToView: "Sign in to manage your myHome Premium subscription.",
+    heading: "myMakan Premium",
+    profileRowLabel: "myMakan Premium",
+    signInToView: "Sign in to manage your myMakan Premium subscription.",
     title: "AI Alert Plus",
     subtitle: "Instant, AI-summarized saved search alerts and unlimited AI Advisor chat.",
     currentPlan: "Current plan",
@@ -1895,10 +1895,10 @@ export const en = {
   propertyRequest: {
     navTitle: "My Property Requests",
     entryPoint: {
-      cta: "Tell myHome what you need",
+      cta: "Tell myMakan what you need",
       homeTitle: "Let AI find your next home",
-      homeDesc: "Describe what you're looking for once — myHome will keep matching new listings against it and notify you.",
-      advisorBannerTitle: "Want myHome to keep searching for you?",
+      homeDesc: "Describe what you're looking for once — myMakan will keep matching new listings against it and notify you.",
+      advisorBannerTitle: "Want myMakan to keep searching for you?",
       advisorBannerDesc: "Turn this into a property request — get matched automatically as new listings come in.",
       advisorBannerCta: "Create a property request",
       profileLink: "My property requests",
@@ -1928,7 +1928,7 @@ export const en = {
       newRequest: "New request",
       empty: {
         heading: "No property requests yet",
-        desc: "Tell myHome what you're looking for and we'll keep matching new listings against it automatically.",
+        desc: "Tell myMakan what you're looking for and we'll keep matching new listings against it automatically.",
         cta: "Create your first request",
       },
       emptyGroup: "No requests in this group.",
@@ -1955,7 +1955,7 @@ export const en = {
       budgetMax: "up to SAR {{max}}",
     },
     new: {
-      heading: "Tell myHome what you need",
+      heading: "Tell myMakan what you need",
       subtitle: "Describe it in your own words, or fill in a structured form — either way we'll keep matching new listings against it.",
       modeDescribe: "Describe it",
       modeForm: "Fill a form",
@@ -1964,7 +1964,7 @@ export const en = {
         placeholder: "e.g. A 3-bedroom furnished apartment for rent in North Riyadh, budget around SAR 90,000/year, close to international schools…",
         submit: "Continue",
         submitting: "Analyzing…",
-        resultHeading: "Here's what myHome understood",
+        resultHeading: "Here's what myMakan understood",
         confidence: "AI confidence: {{pct}}%",
         missingFieldsHeading: "A few things are still missing:",
         clarifyingQuestionsHeading: "Quick questions before we continue:",
@@ -2030,7 +2030,7 @@ export const en = {
         maxCommute: "Max commute (minutes)",
         commuteDestination: "Commute destination",
         commuteDestinationPlaceholder: "e.g. King Fahd Road office, Al Olaya…",
-        commuteNote: "A destination name is enough — myHome will estimate commute even without exact coordinates.",
+        commuteNote: "A destination name is enough — myMakan will estimate commute even without exact coordinates.",
         schoolPreference: "Near good schools",
         hospitalPreference: "Near healthcare facilities",
         lifestylePreferences: "Lifestyle preferences",
@@ -2043,8 +2043,8 @@ export const en = {
         petPreference: "Pet preference",
         petPreferencePlaceholder: "e.g. pet-friendly required…",
         notes: "Anything else?",
-        notesPlaceholder: "Additional notes for myHome and partners…",
-        priorityIntro: "Tag each field so myHome knows what matters most. Anything not tagged is treated as a normal preference.",
+        notesPlaceholder: "Additional notes for myMakan and partners…",
+        priorityIntro: "Tag each field so myMakan knows what matters most. Anything not tagged is treated as a normal preference.",
         mustHave: "Must-have",
         niceToHave: "Nice-to-have",
         flexible: "Flexible",
@@ -2064,7 +2064,7 @@ export const en = {
         subtitle: "Here's a preview of matching listings and areas before we go live.",
         loadingPreview: "Finding a preview of matching listings…",
         previewMatchesHeading: "Preview matches",
-        previewMatchesEmpty: "No matching listings yet — you can still activate, myHome will keep searching.",
+        previewMatchesEmpty: "No matching listings yet — you can still activate, myMakan will keep searching.",
         areaSuggestionsHeading: "Suggested areas",
         areaSuggestionsEmpty: "Not enough data yet to suggest areas.",
         mustHaveHeading: "Must-have",
@@ -2078,7 +2078,7 @@ export const en = {
         saveChanges: "Save changes",
         savingChanges: "Saving…",
         updated: "Your changes have been saved.",
-        activated: "Your request is live — myHome will keep matching listings against it.",
+        activated: "Your request is live — myMakan will keep matching listings against it.",
         failedToCreate: "Couldn't save your request. Please check your details and try again.",
         failedToActivate: "Couldn't activate your request. Please check the required fields (looking to rent/buy and city).",
         missingRequiredFields: "Please set what you're looking to do (rent/buy) and a city before activating.",
@@ -2107,7 +2107,7 @@ export const en = {
       matches: {
         heading: "Matches",
         viewAll: "View all matches",
-        empty: "No matches yet — myHome is still searching.",
+        empty: "No matches yet — myMakan is still searching.",
         save: "Save",
         saved: "Saved",
         dismiss: "Dismiss",
@@ -2125,11 +2125,11 @@ export const en = {
         empty: "No activity yet.",
       },
       aiAgent: {
-        heading: "Ask myHome AI about this request",
+        heading: "Ask myMakan AI about this request",
         placeholder: "Ask about your matches, or how to improve results…",
         send: "Send",
         thinking: "Thinking…",
-        disclaimer: "myHome AI answers based on this request's live matches — nothing you say here changes your saved criteria.",
+        disclaimer: "myMakan AI answers based on this request's live matches — nothing you say here changes your saved criteria.",
         errorReaching: "Sorry, I couldn't reach the AI service. Please try again.",
         suggested1: "Why don't I have more matches?",
         suggested2: "How can I improve my results?",
@@ -2148,7 +2148,7 @@ export const en = {
         close: "Close",
         cancel: "Cancel request",
         fulfilled: "Mark as fulfilled",
-        pauseConfirm: "Pause this request? myHome will stop matching new listings until you resume.",
+        pauseConfirm: "Pause this request? myMakan will stop matching new listings until you resume.",
         closeConfirm: "Close this request? This can't be undone.",
         cancelConfirm: "Cancel this request? This can't be undone.",
         fulfillConfirm: "Mark this request as fulfilled — found what you needed?",
@@ -2226,7 +2226,7 @@ export const en = {
   },
 } as const;
 
-// Deep-widen the `as const` literal types (e.g. "myHome") back to `string` so
+// Deep-widen the `as const` literal types (e.g. "myMakan") back to `string` so
 // other locales can supply their own translations instead of being forced to
 // match the English text verbatim.
 type DeepWiden<T> = T extends string

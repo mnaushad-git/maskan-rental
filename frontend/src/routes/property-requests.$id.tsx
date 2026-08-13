@@ -62,7 +62,7 @@ import {
 } from "@/lib/propertyRequestDisplay";
 
 export const Route = createFileRoute("/property-requests/$id")({
-  head: () => ({ meta: [{ title: "Property Request — Maskan" }] }),
+  head: () => ({ meta: [{ title: "Property Request — myMakan" }] }),
   component: PropertyRequestDetailPage,
 });
 

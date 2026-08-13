@@ -215,7 +215,7 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     badges,
     status: property.status === "Published" ? "Available" : property.status === "Suspended" ? "Reserved" : "Available",
     pricePerSqm: estimatedArea > 0 ? Math.round(displayPrice / estimatedArea) : 0,
-    agent: property.mediator_agent_name ?? property.owner_name ?? "myHome Agent",
+    agent: property.mediator_agent_name ?? property.owner_name ?? "myMakan Agent",
     agentPhone: property.call_phone ?? property.mediator_phone ?? null,
     agentWhatsapp: property.whatsapp_number ?? property.mediator_phone ?? null,
     agentProfileImage: property.mediator_profile_image_url ?? null,

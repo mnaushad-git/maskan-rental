@@ -84,7 +84,7 @@ export function toCardProperty(p: SearchProperty): Property {
     badges: p.isVerified ? ["Verified"] : [],
     status: "Available",
     pricePerSqm: p.area > 0 ? Math.round(p.price / p.area) : 0,
-    agent: "myHome Agent",
+    agent: "myMakan Agent",
     agentPhone: p.agentPhone,
     agentWhatsapp: p.agentWhatsapp,
     agentProfileImage: null,

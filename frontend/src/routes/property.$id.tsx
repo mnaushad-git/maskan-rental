@@ -76,7 +76,7 @@ import heroImg from "@/assets/hero-villa.jpg";
 export const Route = createFileRoute("/property/$id")({
   head: () => ({
     meta: [
-      { title: "Property Details — Maskan" },
+      { title: "Property Details — myMakan" },
       {
         name: "description",
         content: "Rental intelligence, area scores, fair rent and AI insights for this property.",
@@ -1978,7 +1978,7 @@ function PurchaseCostBreakdown({ property }: { property: Property }) {
 }
 
 // ── Short-Term Stay Booking ─────────────────────────────────────────────────
-// No per-listing nightly rate exists in the data model yet (Maskan only
+// No per-listing nightly rate exists in the data model yet (myMakan only
 // tracks long-term monthly_rent) — the nightly rate shown here is an
 // indicative estimate derived from it, using the same short-term premium
 // heuristic as the AI pricing suggestion shown to landlords (see

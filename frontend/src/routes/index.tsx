@@ -40,13 +40,13 @@ import { useLanguage } from "@/lib/i18n/context";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Maskan — Find the Right Home with AI Rental Intelligence" },
+      { title: "myMakan — Find the Right Home with AI Rental Intelligence" },
       {
         name: "description",
         content:
-          "Discover rental properties across Saudi Arabia. Compare areas, evaluate rental value, and find homes that match your lifestyle with Maskan's AI advisor.",
+          "Discover rental properties across Saudi Arabia. Compare areas, evaluate rental value, and find homes that match your lifestyle with myMakan's AI advisor.",
       },
-      { property: "og:title", content: "Maskan — AI Rental Intelligence" },
+      { property: "og:title", content: "myMakan — AI Rental Intelligence" },
       {
         property: "og:description",
         content:

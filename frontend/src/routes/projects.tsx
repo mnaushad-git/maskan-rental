@@ -12,7 +12,7 @@ import { PHASE1_FLAGS } from "@/lib/phase1-flags";
 export const Route = createFileRoute("/projects")({
   head: () => ({
     meta: [
-      { title: "Projects — Maskan" },
+      { title: "Projects — myMakan" },
       {
         name: "description",
         content: "Browse new developments and off-plan projects from trusted developers across Saudi Arabia.",

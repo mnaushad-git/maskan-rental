@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/partner/register")({
-  head: () => ({ meta: [{ title: "Become a Partner — Maskan" }] }),
+  head: () => ({ meta: [{ title: "Become a Partner — myMakan" }] }),
   component: PartnerRegisterPage,
 });
 

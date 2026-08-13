@@ -12,7 +12,7 @@ import { formatSAR } from "@/lib/maskan-data";
 import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/partner/leads/$leadId")({
-  head: () => ({ meta: [{ title: "Lead Detail — Maskan Partner" }] }),
+  head: () => ({ meta: [{ title: "Lead Detail — myMakan Partner" }] }),
   component: MediatorLeadDetail,
 });
 

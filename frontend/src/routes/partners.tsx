@@ -24,11 +24,11 @@ import { useLanguage } from "@/lib/i18n/context";
 export const Route = createFileRoute("/partners")({
   head: () => ({
     meta: [
-      { title: "Find a Partner — Maskan" },
+      { title: "Find a Partner — myMakan" },
       {
         name: "description",
         content:
-          "Browse verified Maskan partners covering every district across Saudi Arabia. Submit a lead and get matched instantly.",
+          "Browse verified myMakan partners covering every district across Saudi Arabia. Submit a lead and get matched instantly.",
       },
     ],
   }),
