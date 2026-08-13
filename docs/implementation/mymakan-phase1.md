@@ -460,6 +460,43 @@ panel open (all 5 dropdowns present), Rentals, Sales (confirmed the
 render real seeded data with the nav in the exact spec order and no
 console/render errors.
 
+**Prompt 8 — Mobile navigation cleanup.** `mobile/app/(tabs)/_layout.tsx`'s bottom
+tab bar was reduced from 5 items (Home, Projects, Bookings, AI Advisor, Profile) to
+exactly the requested 5: **Home, Search, AI, Saved, Profile**.
+
+- **Projects** and **Bookings** tabs removed from the tab bar via
+  `<Tabs.Screen name="projects" options={{ href: null }} />` /
+  `name="bookings"` — `href: null` is Expo Router's documented way to keep a
+  route registered (so its screen file still resolves/renders if navigated to
+  directly) while hiding it from the tab bar's auto-generated button. Simply
+  deleting the `<Tabs.Screen>` entries would not have worked: Expo Router's
+  `Tabs` navigator auto-creates a tab bar button for every file in the
+  `(tabs)/` directory that isn't explicitly hidden this way. `projects.tsx`
+  and `bookings.tsx` themselves are untouched.
+- **Search** and **Saved** tabs added, following the exact pattern the
+  existing **AI Advisor** tab already used: a no-op placeholder screen
+  (`(tabs)/search-shortcut.tsx`, `(tabs)/saved-shortcut.tsx`, mirroring
+  `advisor-shortcut.tsx`) backs the `<Tabs.Screen>` registration, and a
+  `tabPress` listener calls `e.preventDefault()` then `router.push("/search")`
+  / `router.push("/saved")` — pushing the real, already-existing root-level
+  Stack screens (`app/search.tsx`, `app/saved.tsx`, both already registered
+  with `headerShown: true` in `app/_layout.tsx`) instead of switching tabs.
+  No new screens were built; this only wires up existing ones.
+- **Rent/Buy** is represented via the segmented Rent/Sale toggle already
+  present on both destination screens — `HomeSearchHeader`'s
+  `SegmentedControl` on Home (`(tabs)/index.tsx`) and the Rent/Sale pill pair
+  in `SearchBar` on Search (`app/search.tsx`) — neither needed any change;
+  the prompt's "not separate tabs" requirement was already satisfied by the
+  existing design.
+- Icons: `Search` (lucide) for the Search tab, `Heart` (lucide, matching the
+  icon `saved.tsx` already uses in its own empty-state) for the Saved tab —
+  both already-available lucide-react-native exports, no new icon package.
+- i18n: reused existing `nav.search` / `nav.saved` keys (already present in
+  both `en.ts` and `ar.ts`, previously unused by mobile) — no new strings
+  added.
+
+Verified: `npx tsc --noEmit` in `mobile/` is clean with no errors.
+
 ## Feature flags
 
 Added by Prompt 2 to the existing env-var-backed registry in
