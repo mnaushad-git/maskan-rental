@@ -1,4 +1,20 @@
+"""myMakan Phase-1 (see docs/implementation/mymakan-phase1.md) hides
+off-plan projects by default (`FEATURE_PROJECTS=False`,
+backend/app/core/config.py) and `projects.router` is only registered in
+app.main when that flag is on — so with the default local .env, every
+endpoint this file hits 404s. Skipped whole-module rather than deleted since
+the feature and its tests are meant to come back if a later phase re-enables
+the flag.
+"""
+import pytest
+
+from app.core.config import settings
 from app.models.project import Project, ProjectImage, ProjectUnit
+
+pytestmark = pytest.mark.skipif(
+    not settings.FEATURE_PROJECTS,
+    reason="projects.router isn't registered when FEATURE_PROJECTS is off (myMakan Phase-1 default)",
+)
 
 
 def _make_project(db, **overrides) -> Project:

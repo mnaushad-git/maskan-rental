@@ -705,10 +705,81 @@ migration-drift issue to flag separately, not fixed here.
   unaffected.
 - Nav active-state highlighting doesn't distinguish Rent/Buy/Map's shared
   `/search` pathname (see "Navigation changed", Prompt 4).
+- **`test_list_properties_date_range_filter_excludes_conflicting_booking`
+  (backend) still fails** — test-DB schema drift (`bookings.guest_name` column
+  missing), first found in Prompt 3, confirmed still present and still
+  unrelated to Prompts 2–9 as of Prompt 10. Needs a test-DB migration fix, not
+  an application-code fix.
+- **No dedicated `leads.py` API test file** — `leads` only gets incidental
+  coverage via notification/outbox/redis tests, not a direct CRUD/permissions
+  suite of its own. Pre-existing gap, not introduced by this branch; flagged in
+  Prompt 10 while auditing test coverage per router.
+- **Backend was not in scope for Prompt 9's branding sweep** (customer web,
+  partner portal, admin portal, mobile only) — if any backend-rendered content
+  (e.g. transactional email templates) still says "Maskan," that's an open gap.
 
 ## Validation results
 
-TODO — filled in by a later prompt
+**Prompt 10 — Tests & build validation.**
+
+*Backend (`backend/venv/Scripts/python.exe -m pytest -q`, full suite, 22 files):*
+**210 passed, 23 skipped, 1 failed.**
+
+- The 1 failure (`test_properties.py::test_list_properties_date_range_filter_excludes_conflicting_booking`,
+  `bookings.guest_name` column missing in the test DB) is the same pre-existing,
+  unrelated test-DB migration-drift issue Prompt 3 already found and documented —
+  reproduces identically outside this branch's changes. Not fixed here, per this
+  prompt's "don't fix unrelated pre-existing failures" instruction.
+- The 23 skips are **new, and are the fix** for breakage Prompt 2 caused (in scope
+  for this prompt, unlike the item above): Prompt 2 made `projects.router`/
+  `bookings.router`/`financing.router` register only when
+  `FEATURE_PROJECTS`/`FEATURE_BOOKING`/`FEATURE_FINANCING` are on (all default
+  `False`), so `test_projects.py` (6 tests), `test_bookings.py` (11 tests), and 6
+  of `test_financing.py`'s 12 tests (the HTTP-level ones — its 6 pure-function
+  tests for the AI affordability note don't touch the router and were already
+  passing) were failing with 404s where they expected real responses. Fix: added
+  `pytest.mark.skipif`/`pytestmark` guards keyed to the same settings flags, with
+  a reason string explaining why, rather than changing the intentional
+  default-off gating. One of those tests
+  (`test_submit_financing_interest_404_for_missing_property`) was quietly
+  "passing" for the wrong reason before the fix — it asserts 404 and got a
+  router-not-registered 404 instead of the property-not-found 404 it's meant to
+  verify — so skipping it is a correctness improvement, not just a bookkeeping
+  one.
+- Added minimal focused coverage per the original Phase-1 brief (not a new test
+  suite — 8 new test functions total):
+  - `test_search_provider.py::test_search_properties_filters_by_listing_type` —
+    "rent search works, sale search works": confirms `listing_type=rent` /
+    `listing_type=sale` actually partition search results, not just that both
+    counts appear in facets (which the pre-existing facets test already covered).
+  - New `tests/test_phase1_feature_flags.py` (7 tests) — "feature flags work" +
+    "an out-of-scope route/category is hidden or gated": asserts the 7
+    default-on and 6 default-off Phase-1 flags from the "Feature flags" table
+    above via `is_enabled()`, asserts `is_enabled()`'s settings-lookup and
+    unknown-flag behavior directly (independent of whatever the local `.env`
+    happens to set), and asserts `GET /api/projects/`, `GET
+    /api/bookings/availability`, and `POST /api/financing/` all 404 by default
+    — the actual gate, not just "the tests for it are skipped elsewhere."
+- No dedicated `leads.py` CRUD test file exists in this suite (pre-existing gap,
+  predates this branch — `leads` only appears incidentally inside
+  notification/outbox/redis tests). Not built here, since Prompt 10's brief
+  scopes new tests to the specific rent/sale/gating/flags items above and warns
+  against a large new test suite.
+
+*Frontend (`frontend/`):* `npm run typecheck` clean, `npm run build` clean
+(Vite + Nitro SSR build, `.output/` generated with no errors).
+
+*Mobile (`mobile/`):* `npm run typecheck` clean. No build script exists in
+`mobile/package.json` (`expo run:android`/`expo run:ios` are the closest
+equivalents and require a device/emulator) — `tsc --noEmit` was judged
+sufficient, same bar Prompts 8 and 9 used; not run here since nothing in
+Prompts 8–9 touched native build config beyond `app.json`'s `name` field
+(already covered by Prompt 9's manual verification).
+
+No breakage found in frontend or mobile from Prompts 4–9 — both were already
+clean before this prompt (verified independently by each of those prompts) and
+remained clean after adding the backend test fixes above, which don't touch
+either app.
 
 ## Recommended next feature
 

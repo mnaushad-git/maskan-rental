@@ -66,6 +66,27 @@ def test_search_properties_facets_include_city_and_listing_type(db_session, uniq
     assert listing_type_facet.get("sale") == 1
 
 
+def test_search_properties_filters_by_listing_type(db_session, unique_area):
+    """myMakan Phase-1 brief: "rent search works, sale search works" — confirms
+    the listing_type filter actually partitions results, not just that both
+    counts show up in facets (see the facets test above)."""
+    db_session.add_all([
+        _make_property(unique_area, listing_type="rent", title="Rent Listing"),
+        _make_property(unique_area, listing_type="sale", title="Sale Listing", monthly_rent=None, sale_price=500000),
+    ])
+    db_session.commit()
+
+    provider = PostgresSearchProvider(db_session)
+
+    rent_result = provider.search_properties(SearchQuery(area=unique_area, listing_type="rent"))
+    assert rent_result.total == 1
+    assert rent_result.items[0]["title"] == "Rent Listing"
+
+    sale_result = provider.search_properties(SearchQuery(area=unique_area, listing_type="sale"))
+    assert sale_result.total == 1
+    assert sale_result.items[0]["title"] == "Sale Listing"
+
+
 def test_autocomplete_locations_matches_prefix(db_session, unique_area):
     db_session.add(_make_property(unique_area))
     db_session.commit()
