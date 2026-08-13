@@ -17,9 +17,10 @@ tiers — these are out of scope for Phase-1 but preserved in code for later pha
 ## Existing functionality reused
 
 Nearly all Keep-Phase1 routes below are reused as-is from the existing Maskan
-codebase with no code changes in this session — classification only. See the
-per-surface tables under "Routes changed" is TODO; this section just lists what's in
-scope for reuse (same tables, Keep-Phase1 rows).
+codebase with no code changes in this session — classification only. This
+section just lists what's in scope for reuse (the Keep-Phase1 rows in the
+tables below); see "Routes changed" further down for the handful of routes
+that did get code changes (nav trims, gating, transaction-type support, etc.).
 
 ## Features hidden
 
@@ -147,7 +148,29 @@ mobile app has an equivalent screen under a different name.
 
 ## Features preserved for future
 
-TODO — filled in by a later prompt
+Every Hide-Phase1 feature is hidden by nav removal and/or a feature flag, not
+deleted — the code, models, and (mostly) routers are all still in the
+codebase and can be brought back by flipping a flag or restoring a nav
+entry, no rebuild required. Summary, cross-referencing "Feature flags" above:
+
+| Feature | Flag(s) | Backend router | Frontend | Mobile |
+|---|---|---|---|---|
+| Off-plan projects | `projects` (`FEATURE_PROJECTS`) | `projects.router` — gated | `projects.tsx`/`project.$id.tsx` → `PhaseGate`; partner/admin nav items gated | `(tabs)/projects.tsx`, `project/[id].tsx` — files untouched, just deregistered from the tab bar (Prompt 8); no `PHASE1_FLAGS`-equivalent gating on mobile yet |
+| Short-stay bookings | `booking` (`FEATURE_BOOKING`) | `bookings.router` — gated | `ShortTermBooking` widget on `property.$id.tsx`, partner listing form's AI short-stay pricing widget — both gated | `(tabs)/bookings.tsx`, `my-bookings.tsx` — deregistered from the tab bar (Prompt 8), otherwise ungated |
+| Digital rental contracts (Ejar-equivalent) | local-only `PHASE1_FLAGS.contracts` (frontend), no backend flag | `contracts.router` — **not gated**, still registered | `RegisterLeaseBanner` gated; `contract.$leadId.tsx` route itself **not** gated | no known mobile equivalent (see the Prompt 1 note in "Features hidden") |
+| Financing/mortgage | `financing` (`FEATURE_FINANCING`) | `financing.router` — gated | `RentNowPayLaterBanner`/`FinancingModal`, "Request Financing" button, `PurchaseCostBreakdown`'s financing sub-sections — all gated | ungated |
+| Renter identity verification (Nafath-style) | none | `verification.router` — **not gated**, still registered | no known frontend entry point found | `verification.tsx` — ungated |
+| External payment-transaction flows | `external_transaction` (`FEATURE_EXTERNAL_TRANSACTION`, not wired to a router) | `payments.router` — **not gated** (also backs in-scope mediator lead/subscription fees, so can't be gated wholesale) | n/a | n/a |
+| Renter-facing premium/subscription tier | none | `subscriptions.router` — **not gated**, still registered | no known frontend entry point found | `premium.tsx` — ungated |
+
+To re-enable any flagged item: set its env var (e.g. `FEATURE_PROJECTS=true`)
+and restart the backend; frontend needs `PHASE1_FLAGS` in
+`frontend/src/lib/phase1-flags.ts` flipped to match by hand (see "Known
+limitations" — the two aren't wired together yet). The **not-gated** rows
+(contracts, verification, subscriptions routers) need no backend change at
+all since they were never disabled — only their frontend advertising/nav
+entry points would need restoring, and mobile needs Phase-1 gating built
+from scratch (see "Known limitations").
 
 ## Routes changed
 
@@ -783,4 +806,18 @@ either app.
 
 ## Recommended next feature
 
-TODO — filled in by a later prompt
+**Add a Rent/Sale transaction-type selector to the admin create/edit listing
+form (`ListingFormDrawer` in `frontend/src/routes/admin.tsx`).**
+
+Why this one: Prompt 6 already added exactly this control to the partner
+portal's listing form (`PartnerListingForm` — a segmented Rent/Sale control
+that swaps "Monthly rent" for "Sale price"), and Prompt 7 gave admin the
+matching Rent/Sale *filters* and table columns — but explicitly left the
+admin *create/edit form* out of scope (see "Routes changed", Prompt 7's
+"Explicitly out of scope" note). The backend schema
+(`PartnerPropertyCreate`/`PartnerPropertyUpdate`) already supports
+`listing_type`/`sale_price` for both portals, so this is a frontend-only
+change with a working reference implementation to copy from in the same
+codebase — small, concrete, and closes a real gap (admin can currently see
+and filter sale listings partners create, but can't create one directly)
+without touching scope, flags, or anything else Phase-1 already decided.
