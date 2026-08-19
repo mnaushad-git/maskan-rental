@@ -34,6 +34,10 @@ from app.models.property_request_mediator_response import (
 )
 from app.models.property_request_scoring_config import PropertyRequestScoringConfig
 from app.models.project import Project, ProjectUnit, ProjectImage
+from app.models.home_finder_search import HomeFinderSearch
+from app.models.property_report import PropertyReport
+from app.models.property_viewing import PropertyViewing
+from app.models.property_negotiation import PropertyNegotiation, NegotiationOffer
 
 __all__ = [
     "User",
@@ -65,4 +69,9 @@ __all__ = [
     "Project",
     "ProjectUnit",
     "ProjectImage",
+    "HomeFinderSearch",
+    "PropertyReport",
+    "PropertyViewing",
+    "PropertyNegotiation",
+    "NegotiationOffer",
 ]

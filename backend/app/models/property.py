@@ -67,9 +67,18 @@ class Property(Base):
     contact_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     whatsapp_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
+    # Property Verification & Trust Center (Prompt 2) — set by the partner
+    # portal's "Confirm Availability" action (Prompt 3's
+    # POST /partner/properties/{id}/confirm-availability). Feeds Listing
+    # Freshness's "Recently Confirmed" category — see
+    # app/services/listing_freshness.py, which already reads this via
+    # getattr(..., None) so it was safe to add after that service shipped.
+    availability_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     mediator = relationship("Mediator", foreign_keys=[mediator_id], lazy="joined")
     saved_properties = relationship("SavedProperty", back_populates="property", cascade="all, delete-orphan")
     listing_images = relationship("ListingImage", back_populates="property", cascade="all, delete-orphan", order_by="ListingImage.display_order")
+    reports = relationship("PropertyReport", back_populates="property", cascade="all, delete-orphan")
 
     @property
     def mediator_phone(self) -> str | None:

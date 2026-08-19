@@ -135,10 +135,15 @@ function getHtmlMarkerClass(): HtmlMarkerCtor {
 export function PropertyMapView({
   properties,
   heightClassName = "h-[calc(100vh-220px)] min-h-[520px]",
+  showMatchInfo = false,
 }: {
   properties: SearchProperty[];
   /** Overrides the default full-height map — e.g. a shorter responsive preview on the homepage. */
   heightClassName?: string;
+  /** AI Home Finder only: shows `matchScore`/`reasons[0]` in the pin preview
+   * card when set — off by default so every other page's plain listing pins
+   * (which don't carry real match reasoning) render exactly as before. */
+  showMatchInfo?: boolean;
 }) {
   const { t } = useLanguage();
   const mapRef = useRef<HTMLDivElement>(null);
@@ -259,6 +264,11 @@ export function PropertyMapView({
           <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-elevated">
             <div className="relative aspect-[16/7] overflow-hidden bg-surface-2">
               <img src={selected.image} alt={selected.title} className="size-full object-cover" />
+              {showMatchInfo && selected.matchScore != null && (
+                <div className="absolute start-2 top-2 rounded-full bg-ai px-2.5 py-1 text-xs font-bold text-ai-foreground shadow-card">
+                  {selected.matchScore}% Match
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => setSelected(null)}
@@ -272,6 +282,9 @@ export function PropertyMapView({
               <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                 <MapPin className="size-3" /> {selected.district}, {selected.city}
               </p>
+              {showMatchInfo && selected.reasons?.[0] && (
+                <p className="mt-1 text-xs text-muted-foreground">{selected.reasons[0]}</p>
+              )}
               <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <BedDouble className="size-3.5" />

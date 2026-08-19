@@ -1,13 +1,17 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
+  AlertTriangle,
   Briefcase,
   Building2,
+  CalendarClock,
   CheckCircle,
+  CheckCircle2,
   Clock,
   CreditCard,
   Eye,
   EyeOff,
+  Handshake,
   History,
   Home,
   LayoutDashboard,
@@ -28,6 +32,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/maskan/Badges";
 import { ListingStatusBadge } from "@/components/maskan/ListingStatusBadge";
+import { ScoreBar } from "@/components/maskan/ScoreIndicator";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { cities as CITY_LIST } from "@/lib/maskan-data";
@@ -46,6 +51,10 @@ import {
   patchPartnerListing,
   addPartnerPropertyImage,
   deletePartnerPropertyImage,
+  fetchPartnerListingQuality,
+  confirmPartnerListingAvailability,
+  improvePartnerListingWithAi,
+  fetchDuplicateCheck,
   fetchPricingSuggestion,
   fetchPartnerProjects,
   createPartnerProject,
@@ -63,6 +72,9 @@ import {
   type ApiPricingSuggestion,
   type ApiReview,
   type ApiReviewSummary,
+  type ApiPartnerListingQuality,
+  type ApiPartnerImproveWithAi,
+  type ApiDuplicateCheck,
   type PartnerPropertyPayload,
   type PartnerProjectPayload,
 } from "@/lib/api/maskan";
@@ -206,11 +218,16 @@ function PartnerDashboard() {
     setPartner((m) => (m ? { ...m, areas: m.areas.filter((a) => a.id !== area_id) } : m));
   }
 
+  // Returns the saved property (with its id) — PartnerListingForm needs it
+  // after save to run the duplicate-awareness check (Prompt 2's
+  // GET /duplicate-check only works against an already-saved property id;
+  // see the form's own submit() for the post-save flow) and to refresh its
+  // Listing Quality panel.
   async function handleSaveListing(
     payload: PartnerPropertyPayload,
     imageUrls: string[],
     editId?: number,
-  ) {
+  ): Promise<ApiProperty> {
     let saved: ApiProperty;
     if (editId) {
       saved = await patchPartnerListing(editId, payload);
@@ -234,6 +251,7 @@ function PartnerDashboard() {
     // Re-fetch to get updated images
     const fresh = await fetchPartnerListings();
     setListings(fresh);
+    return saved;
   }
 
   async function handleSaveProject(payload: PartnerProjectPayload, editId?: number) {
@@ -343,6 +361,26 @@ function PartnerDashboard() {
       label: t("partnerDashboard.sidebar.navLeads"),
       active: view === "leads",
       onClick: () => setView("leads"),
+    },
+    {
+      // Separate route (/partner/viewings), not a `view` switch within this
+      // SPA-style dashboard — same reasoning as the "messages" entry above
+      // but navigates instead of setting local state.
+      key: "viewings",
+      icon: CalendarClock,
+      label: t("partnerViewings.heading"),
+      active: false,
+      onClick: () => navigate({ to: "/partner/viewings" }),
+    },
+    {
+      // Separate route (/partner/negotiations), mirrors the "viewings" entry
+      // above exactly — see docs/implementation/mymakan-negotiations.md
+      // "Screens changed" (Prompt 10).
+      key: "negotiations",
+      icon: Handshake,
+      label: t("partnerNegotiations.heading"),
+      active: false,
+      onClick: () => navigate({ to: "/partner/negotiations" }),
     },
     {
       key: "messages",
@@ -778,11 +816,9 @@ function PartnerDashboard() {
                     setListingFormOpen(false);
                     setEditingListing(null);
                   }}
-                  onSave={async (payload, imageUrls) => {
-                    await handleSaveListing(payload, imageUrls, editingListing?.id);
-                    setListingFormOpen(false);
-                    setEditingListing(null);
-                  }}
+                  onSave={(payload, imageUrls) =>
+                    handleSaveListing(payload, imageUrls, editingListing?.id)
+                  }
                 />
               ) : (
                 <PartnerListingsView
@@ -1044,6 +1080,45 @@ type ListingFormState = {
   whatsappSameAsCall: boolean;
 };
 
+// Client-side completeness estimate for a listing that hasn't been saved
+// yet, so there's no property id to call the real
+// GET /partner/properties/{id}/quality endpoint against (Prompt 3's
+// completeness score reads a persisted `Property` row). Mirrors
+// trust_config.py's COMPLETENESS_TIER_WEIGHTS (required=3, important=2,
+// optional=1), limited to just the fields this form actually collects —
+// map coordinates, living rooms, property age, deed area, and license
+// number aren't editable here, so they're excluded rather than counted as
+// permanently missing. NOT the authoritative score; the same "clearly a
+// client approximation, never the real /trust-backed number" precedent
+// PropertyCard.tsx's estimateCompletenessPercent already set in Prompt 7.
+// Live-updates on every keystroke since it only reads local form state.
+function estimateFormCompleteness(form: ListingFormState, mediaCount: number): number {
+  const price = form.listingType === "sale" ? form.salePrice : form.rent;
+  const required = [
+    !!form.title.trim(),
+    !!form.district.trim(),
+    !!form.city.trim(),
+    !!price && parseFloat(price) > 0,
+    !!form.property_type,
+    !!form.bedrooms,
+    !!form.bathrooms,
+    !!form.size,
+    mediaCount >= 1,
+    !!form.description.trim(),
+  ];
+  const important = [!!form.furnished, !!form.contact_phone.trim(), mediaCount >= 3];
+  const optional = [form.whatsappSameAsCall || !!form.whatsapp_phone.trim()];
+  const tier = (flags: boolean[], weight: number) => ({
+    present: flags.filter(Boolean).length * weight,
+    total: flags.length * weight,
+  });
+  const r = tier(required, 3);
+  const i = tier(important, 2);
+  const o = tier(optional, 1);
+  const total = r.total + i.total + o.total;
+  return total > 0 ? Math.round(((r.present + i.present + o.present) / total) * 100) : 0;
+}
+
 function PartnerListingForm({
   areas,
   editing,
@@ -1053,9 +1128,9 @@ function PartnerListingForm({
   areas: ApiAreaSummary[];
   editing: ApiProperty | null;
   onClose: () => void;
-  onSave: (p: PartnerPropertyPayload, imageUrls: string[]) => Promise<void>;
+  onSave: (p: PartnerPropertyPayload, imageUrls: string[]) => Promise<ApiProperty>;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [form, setForm] = useState<ListingFormState>({
     title: editing?.title ?? "",
     city: editing?.city ?? "",
@@ -1085,6 +1160,79 @@ function PartnerListingForm({
   const [pricing, setPricing] = useState<ApiPricingSuggestion | null>(null);
   const [pricingLoading, setPricingLoading] = useState(false);
   const [pricingError, setPricingError] = useState<string | null>(null);
+
+  // ── Listing Quality panel state (Trust Center, Prompt 8) ──────────────────
+  // `quality` is only fetchable for an already-saved listing (Prompt 3's
+  // GET /partner/properties/{id}/quality reads a persisted Property row) —
+  // see PartnerListingQualityPanel below for the client-side estimate shown
+  // instead while creating a brand-new (not-yet-saved) listing.
+  const [quality, setQuality] = useState<ApiPartnerListingQuality | null>(null);
+  const [qualityLoading, setQualityLoading] = useState(false);
+  const [confirmingAvailability, setConfirmingAvailability] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<ApiPartnerImproveWithAi | null>(null);
+  const [aiLoading, setAiLoading] = useState<"title" | "description" | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [duplicateCheck, setDuplicateCheck] = useState<ApiDuplicateCheck | null>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    let cancelled = false;
+    setQualityLoading(true);
+    fetchPartnerListingQuality(editing.id)
+      .then((q) => {
+        if (!cancelled) setQuality(q);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setQualityLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editing]);
+
+  async function handleConfirmAvailability() {
+    if (!editing) return;
+    setConfirmingAvailability(true);
+    try {
+      const result = await confirmPartnerListingAvailability(editing.id);
+      setQuality((q) => (q ? { ...q, availability_confirmed_at: result.availability_confirmed_at } : q));
+    } catch {
+      // Non-fatal — the panel simply keeps showing the prior confirmation state.
+    } finally {
+      setConfirmingAvailability(false);
+    }
+  }
+
+  async function handleImproveWithAi(focus: "title" | "description") {
+    if (!editing) return;
+    setAiLoading(focus);
+    setAiError(null);
+    setAiSuggestion(null);
+    try {
+      const result = await improvePartnerListingWithAi(editing.id, { focus, language: lang });
+      setAiSuggestion(result);
+    } catch (err) {
+      setAiError(
+        err instanceof Error ? err.message : t("partnerDashboard.listingForm.quality.ai.failed"),
+      );
+    } finally {
+      setAiLoading(null);
+    }
+  }
+
+  // The partner must explicitly approve before an AI suggestion touches the
+  // form — this only fills the (still unsaved) form fields; nothing is
+  // persisted until the partner presses the normal Save button below.
+  function applyAiSuggestion() {
+    if (!aiSuggestion) return;
+    setForm((f) => ({
+      ...f,
+      title: aiSuggestion.suggested_title ?? f.title,
+      description: aiSuggestion.suggested_description ?? f.description,
+    }));
+    setAiSuggestion(null);
+  }
 
   async function handleGetPricing() {
     const rent = parseFloat(form.rent);
@@ -1149,7 +1297,7 @@ function PartnerListingForm({
     setSaving(true);
     setError(null);
     try {
-      await onSave(
+      const saved = await onSave(
         {
           title: form.title.trim() || "Untitled listing",
           city: form.city.trim(),
@@ -1169,6 +1317,29 @@ function PartnerListingForm({
         },
         media,
       );
+      // Listing Quality panel now has a real, saved property id — refresh it
+      // (edit mode only; a freshly-created listing closes the form below
+      // before the panel would ever be shown again for it).
+      if (editing) {
+        fetchPartnerListingQuality(saved.id).then(setQuality).catch(() => {});
+      }
+      // Duplicate awareness (spec section 17) — the listing is already saved
+      // at this point either way (still subject to admin approval), so this
+      // can only ever warn, never block. GET /duplicate-check only works
+      // against a saved property id, so this has to run after save, not
+      // before — see docs/implementation/mymakan-trust-center.md Prompt 2's
+      // "Known limitations" for that backend constraint.
+      try {
+        const dup = await fetchDuplicateCheck(saved.id);
+        if (dup.is_possible_duplicate) {
+          setDuplicateCheck(dup);
+          setSaving(false);
+          return; // keep the form open so the warning is visible
+        }
+      } catch {
+        // A failed duplicate-check must never block an already-saved listing.
+      }
+      onClose();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : t("partnerDashboard.listingForm.errors.failedToSave"),
@@ -1178,9 +1349,14 @@ function PartnerListingForm({
   }
 
   const isEdit = !!editing;
+  const estimatedCompleteness = estimateFormCompleteness(form, media.length);
 
   return (
     <div>
+      {duplicateCheck && (
+        <DuplicateWarningModal result={duplicateCheck} onDismiss={() => { setDuplicateCheck(null); onClose(); }} />
+      )}
+
       {/* Header */}
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
@@ -1204,7 +1380,23 @@ function PartnerListingForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <PartnerListingQualityPanel
+        isEdit={isEdit}
+        estimatedCompleteness={estimatedCompleteness}
+        quality={quality}
+        qualityLoading={qualityLoading}
+        confirmingAvailability={confirmingAvailability}
+        onConfirmAvailability={handleConfirmAvailability}
+        aiSuggestion={aiSuggestion}
+        aiLoading={aiLoading}
+        aiError={aiError}
+        onImproveWithAi={handleImproveWithAi}
+        onApplyAiSuggestion={applyAiSuggestion}
+        onDismissAiSuggestion={() => setAiSuggestion(null)}
+        lang={lang}
+      />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mt-6">
         {/* Left column */}
         <div className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-card">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1529,6 +1721,8 @@ function PartnerListingForm({
             {t("partnerDashboard.listingForm.firstPhotoNote")}
           </p>
 
+          <ImageQualityNotes isEdit={isEdit} quality={quality} mediaCount={media.length} />
+
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground pt-2">
             {t("partnerDashboard.listingForm.description")}
           </h2>
@@ -1561,6 +1755,310 @@ function PartnerListingForm({
                   : t("partnerDashboard.listingForm.submitForApproval")}
             </Button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Listing Quality panel (Trust Center, Prompt 8) ───────────────────────────
+// Wraps Prompt 3's GET /partner/properties/{id}/quality (completeness %,
+// missing-field suggestions, image quality), the Confirm Availability
+// action, and the "Improve with AI" flow (suggestion only — the partner
+// must explicitly press Apply before it touches the form; nothing is
+// auto-saved). Before the listing has an id (new-listing draft), falls
+// back to a live client-side completeness estimate and hides the
+// backend-only actions behind an explanatory note, per this prompt's own
+// "no draft entry point" backend constraint (see
+// docs/implementation/mymakan-trust-center.md Prompt 3's known limitations).
+function PartnerListingQualityPanel({
+  isEdit,
+  estimatedCompleteness,
+  quality,
+  qualityLoading,
+  confirmingAvailability,
+  onConfirmAvailability,
+  aiSuggestion,
+  aiLoading,
+  aiError,
+  onImproveWithAi,
+  onApplyAiSuggestion,
+  onDismissAiSuggestion,
+  lang,
+}: {
+  isEdit: boolean;
+  estimatedCompleteness: number;
+  quality: ApiPartnerListingQuality | null;
+  qualityLoading: boolean;
+  confirmingAvailability: boolean;
+  onConfirmAvailability: () => void;
+  aiSuggestion: ApiPartnerImproveWithAi | null;
+  aiLoading: "title" | "description" | null;
+  aiError: string | null;
+  onImproveWithAi: (focus: "title" | "description") => void;
+  onApplyAiSuggestion: () => void;
+  onDismissAiSuggestion: () => void;
+  lang: string;
+}) {
+  const { t } = useLanguage();
+  // Real, backend-authoritative once the listing has been saved (isEdit);
+  // otherwise the live client-side estimate — see estimateFormCompleteness's
+  // own comment for why the two numbers can differ slightly.
+  const score = quality ? quality.completeness.score : estimatedCompleteness;
+  const suggestions = quality?.missing_field_suggestions ?? [];
+
+  return (
+    <div className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-card space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          {t("partnerDashboard.listingForm.quality.heading")}
+        </h2>
+        {!isEdit && (
+          <span className="text-[11px] text-muted-foreground">
+            {t("partnerDashboard.listingForm.quality.estimatedLabel")}
+          </span>
+        )}
+      </div>
+
+      <ScoreBar label={t("partnerDashboard.listingForm.quality.completenessLabel")} value={score} />
+
+      {!isEdit && (
+        <p className="text-xs text-muted-foreground">{t("partnerDashboard.listingForm.quality.estimatedNote")}</p>
+      )}
+
+      {isEdit && qualityLoading && (
+        <p className="text-xs text-muted-foreground">{t("partnerDashboard.listingForm.quality.loading")}</p>
+      )}
+
+      {isEdit && !qualityLoading && quality && (
+        <>
+          {suggestions.length > 0 ? (
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground">
+                {t("partnerDashboard.listingForm.quality.suggestionsHeading")}
+              </p>
+              <ul className="space-y-1">
+                {suggestions.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" />
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="flex items-center gap-2 text-sm text-success">
+              <CheckCircle2 className="size-4" /> {t("partnerDashboard.listingForm.quality.noSuggestions")}
+            </p>
+          )}
+
+          {/* Availability */}
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                {t("partnerDashboard.listingForm.quality.availability.heading")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {quality.availability_confirmed_at
+                  ? t("partnerDashboard.listingForm.quality.availability.confirmedOn", {
+                      date: new Date(quality.availability_confirmed_at).toLocaleDateString(
+                        lang === "ar" ? "ar-SA" : "en-SA",
+                        { day: "numeric", month: "short", year: "numeric" },
+                      ),
+                    })
+                  : t("partnerDashboard.listingForm.quality.availability.neverConfirmed")}
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onConfirmAvailability}
+              disabled={confirmingAvailability}
+            >
+              <CheckCircle className="size-3.5" />
+              {confirmingAvailability
+                ? t("partnerDashboard.listingForm.quality.availability.confirming")
+                : t("partnerDashboard.listingForm.quality.availability.confirmCta")}
+            </Button>
+          </div>
+
+          {/* Improve with AI — same ai-soft styling as the pricing-suggestion
+              box above, for a consistent "this is AI" visual language. */}
+          <div className="rounded-xl border border-ai/20 bg-ai-soft p-4 space-y-3">
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-ai">
+              <Sparkles className="size-4" /> {t("partnerDashboard.listingForm.quality.ai.heading")}
+            </div>
+            <p className="text-xs text-muted-foreground">{t("partnerDashboard.listingForm.quality.ai.desc")}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={aiLoading !== null}
+                onClick={() => onImproveWithAi("title")}
+              >
+                {aiLoading === "title"
+                  ? t("partnerDashboard.listingForm.quality.ai.thinking")
+                  : t("partnerDashboard.listingForm.quality.ai.improveTitle")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={aiLoading !== null}
+                onClick={() => onImproveWithAi("description")}
+              >
+                {aiLoading === "description"
+                  ? t("partnerDashboard.listingForm.quality.ai.thinking")
+                  : t("partnerDashboard.listingForm.quality.ai.improveDescription")}
+              </Button>
+            </div>
+            {aiError && <p className="text-xs text-destructive">{aiError}</p>}
+            {aiSuggestion && (
+              <div className="space-y-2 rounded-lg border border-ai/30 bg-background p-3">
+                {aiSuggestion.generated_by === "fallback" && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {t("partnerDashboard.listingForm.quality.ai.fallbackNote")}
+                  </p>
+                )}
+                {aiSuggestion.suggested_title && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-muted-foreground">
+                      {t("partnerDashboard.listingForm.quality.ai.suggestedTitle")}
+                    </p>
+                    <p className="text-sm">{aiSuggestion.suggested_title}</p>
+                  </div>
+                )}
+                {aiSuggestion.suggested_description && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-muted-foreground">
+                      {t("partnerDashboard.listingForm.quality.ai.suggestedDescription")}
+                    </p>
+                    <p className="whitespace-pre-line text-sm">{aiSuggestion.suggested_description}</p>
+                  </div>
+                )}
+                <div className="flex gap-2 pt-1">
+                  <Button type="button" size="sm" onClick={onApplyAiSuggestion}>
+                    {t("partnerDashboard.listingForm.quality.ai.apply")}
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={onDismissAiSuggestion}>
+                    {t("partnerDashboard.listingForm.quality.ai.dismiss")}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {!isEdit && (
+        <p className="text-xs text-muted-foreground">
+          {t("partnerDashboard.listingForm.quality.availability.saveFirst")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Image-quality suggestions, surfaced right next to the photo upload UI.
+// In edit mode, uses the real deterministic signals from Prompt 3's
+// image_quality.py (via the already-fetched `quality`); for a brand-new
+// draft (no id yet), mirrors the same no-computer-vision, presence-only
+// checks client-side so the partner still sees feedback while adding
+// photos — duplicate-URL / missing-primary-image / low-resolution checks
+// are skipped client-side (the latter two are inert server-side today too,
+// see docs/implementation/mymakan-trust-center.md Prompt 3).
+function ImageQualityNotes({
+  isEdit,
+  quality,
+  mediaCount,
+}: {
+  isEdit: boolean;
+  quality: ApiPartnerListingQuality | null;
+  mediaCount: number;
+}) {
+  const { t } = useLanguage();
+  const messages: string[] =
+    isEdit && quality
+      ? quality.image_quality.issues.map((issue) => issue.message)
+      : mediaCount === 0
+        ? [t("partnerDashboard.listingForm.quality.imageQuality.noImages")]
+        : mediaCount < 3
+          ? [t("partnerDashboard.listingForm.quality.imageQuality.tooFewImages")]
+          : [];
+
+  if (messages.length === 0) return null;
+
+  return (
+    <ul className="space-y-1">
+      {messages.map((m, i) => (
+        <li key={i} className="flex items-start gap-1.5 text-[11px] text-warning">
+          <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+          <span>{m}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// Duplicate-awareness warning (spec section 17) — never auto-blocks. Shown
+// after the listing has already been saved (GET /duplicate-check needs a
+// real property id), so both actions below are non-destructive: the
+// listing exists in either case, this is purely informational with an
+// optional "go compare it yourself" escape hatch.
+function DuplicateWarningModal({ result, onDismiss }: { result: ApiDuplicateCheck; onDismiss: () => void }) {
+  const { t } = useLanguage();
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onDismiss();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onDismiss]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4" onClick={onDismiss}>
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 text-warning">
+          <AlertTriangle className="size-5" />
+          <h3 className="text-base font-bold text-foreground">
+            {t("partnerDashboard.listingForm.duplicateWarning.title")}
+          </h3>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t("partnerDashboard.listingForm.duplicateWarning.desc")}
+        </p>
+        {result.matches.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {result.matches.slice(0, 3).map((m) => (
+              <div key={m.property_id} className="rounded-lg border border-border bg-surface px-3 py-2">
+                <p className="truncate text-sm font-medium">{m.title}</p>
+                {m.reasons.length > 0 && <p className="text-xs text-muted-foreground">{m.reasons.join(" · ")}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-4 flex gap-2">
+          {result.matches[0] && (
+            <a
+              href={`/property/${result.matches[0].property_id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1"
+            >
+              <Button type="button" variant="outline" className="w-full">
+                {t("partnerDashboard.listingForm.duplicateWarning.compare")}
+              </Button>
+            </a>
+          )}
+          <Button type="button" onClick={onDismiss} className="flex-1">
+            {t("partnerDashboard.listingForm.duplicateWarning.continueAnyway")}
+          </Button>
         </div>
       </div>
     </div>

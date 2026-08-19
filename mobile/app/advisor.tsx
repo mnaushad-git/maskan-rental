@@ -10,7 +10,7 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { Send, Sparkles, Plus, Square, RotateCcw, SearchCheck, ChevronRight } from "lucide-react-native";
 import Markdown from "react-native-markdown-display";
 import { streamAdvisorChat } from "@/lib/api/maskan";
@@ -47,6 +47,12 @@ export default function AdvisorScreen() {
   const { t } = useLanguage();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
+  // Optional deep-link question (Property Intelligence's "Ask myMakan" quick
+  // questions, see app/property/[id].tsx) — auto-sent once on mount. The
+  // question text itself already carries any property context (e.g.
+  // "Tell me about the Al Yasmin area."), so no separate property-context
+  // param is needed here.
+  const { q } = useLocalSearchParams<{ q?: string }>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -55,6 +61,11 @@ export default function AdvisorScreen() {
   // The cancel fn streamAdvisorChat returns — captured so Stop and unmount
   // cleanup can abort an in-flight request instead of leaking it.
   const abortRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (q) send(String(q));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     return () => abortRef.current?.();

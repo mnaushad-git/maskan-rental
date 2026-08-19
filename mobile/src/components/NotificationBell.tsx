@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import * as Notifications from "expo-notifications";
 import { Bell } from "lucide-react-native";
 import { fetchUnreadNotificationCount } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { colors } from "@/lib/colors";
+import { addPushReceivedListener } from "@/lib/push";
 
 const POLL_MS = 60_000;
 
@@ -42,7 +42,7 @@ export function NotificationBell({ size = 20, color, className = "" }: { size?: 
 
   useEffect(() => {
     if (!user) return;
-    const sub = Notifications.addNotificationReceivedListener(load);
+    const sub = addPushReceivedListener(load);
     return () => sub.remove();
   }, [user, load]);
 

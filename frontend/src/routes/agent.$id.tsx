@@ -2,18 +2,23 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { TopNav } from "@/components/maskan/TopNav";
 import { useEffect, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   BadgeCheck,
   Building2,
+  CheckCircle2,
   Home,
   MapPin,
   MessageCircle,
   Phone,
   Send,
+  ShieldCheck,
+  Sparkles,
   Star,
 } from "lucide-react";
 import { PropertyCard } from "@/components/maskan/PropertyCard";
 import { Badge } from "@/components/maskan/Badges";
+import { VerificationBlock } from "@/components/maskan/VerificationBlock";
 import { WhatsAppIcon, whatsappLink } from "@/components/maskan/ContactButtons";
 import { EmptyState } from "@/components/maskan/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,12 +29,14 @@ import {
   fetchPropertiesByMediator,
   fetchMediatorReviews,
   fetchMediatorReviewSummary,
+  fetchMediatorAiReviewSummary,
   fetchMyReview,
   submitReview,
   mapApiProperty,
   type ApiPartnerPublic,
   type ApiReview,
   type ApiReviewSummary,
+  type ApiMediatorAiReviewSummary,
 } from "@/lib/api/maskan";
 import type { Property } from "@/lib/maskan-data";
 import { useLanguage, type Language } from "@/lib/i18n/context";
@@ -174,6 +181,198 @@ function ReviewCard({ review }: { review: ApiReview }) {
           <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{review.comment}</p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Mediator "Trust & Activity" (Prompt 9 — Property Verification & Trust
+// Center, spec section 11) ──────────────────────────────────────────────────
+// Sourced entirely from GET /mediators/{id}/public's Prompt-4 extension
+// (verification_label, listing-type splits, response info) — a dedicated
+// summary card, distinct from (and not a replacement for) the pre-existing
+// profile-card header above, which predates this feature and stays
+// untouched. Reuses VerificationBlock (Prompt 7) with showExplainer=true,
+// which is the "What does myMakan Verified mean?" explainer the global
+// constraint requires — explicit that this is NOT a government/REGA/Ejar/
+// Nafath verification.
+function MediatorTrustSection({ partner }: { partner: ApiPartnerPublic }) {
+  const { t, lang } = useLanguage();
+
+  const memberSinceDate = partner.member_since ?? partner.created_at;
+  const responseText =
+    partner.response_rate == null
+      ? t("agent.trust.noResponseData")
+      : partner.avg_response_time_hours != null
+        ? t("agent.trust.responseRateAndTime", {
+            percent: Math.round(partner.response_rate * 100),
+            hours: Math.round(partner.avg_response_time_hours),
+          })
+        : t("agent.trust.responseRateOnly", { percent: Math.round(partner.response_rate * 100) });
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-4">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="size-4 text-primary" />
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {t("agent.trust.heading")}
+        </div>
+      </div>
+
+      <VerificationBlock
+        showExplainer
+        providers={[
+          {
+            key: "mymakan",
+            name: t("verification.mymakan"),
+            status: partner.verification_label ? "verified" : "not_connected",
+            label: partner.verification_label ?? t("verification.notVerifiedLabel"),
+          },
+        ]}
+      />
+
+      <div className="flex items-center gap-2 text-sm">
+        {partner.avg_rating != null ? (
+          <>
+            <StarDisplay score={partner.avg_rating} size={3} />
+            <span className="font-semibold">{partner.avg_rating.toFixed(1)}</span>
+            <span className="text-xs text-muted-foreground">
+              ·{" "}
+              {t(partner.review_count === 1 ? "agent.reviewCountSingular" : "agent.reviewCountPlural", {
+                count: partner.review_count,
+              })}
+            </span>
+          </>
+        ) : (
+          <span className="text-xs text-muted-foreground">{t("agent.trust.ratingNone")}</span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-3 text-xs">
+        <div>
+          <div className="text-muted-foreground">{t("agent.listingsLabel")}</div>
+          <div className="mt-0.5 font-semibold text-foreground">
+            {t("agent.trust.listingsBreakdown", {
+              rental: partner.rental_listing_count,
+              sale: partner.sale_listing_count,
+            })}
+          </div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">{t("agent.areasLabel")}</div>
+          <div className="mt-0.5 font-semibold text-foreground">
+            {t("agent.trust.areasCovered", { count: partner.areas.length })}
+          </div>
+        </div>
+        <div className="col-span-2 font-semibold text-foreground">
+          {t("agent.trust.memberSince", { date: memberSince(memberSinceDate, lang) })}
+        </div>
+        <div className="col-span-2 text-muted-foreground">{responseText}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Review Summary (Prompt 4/9 — AI-generated positive themes/considerations
+// from approved reviews, gated behind a minimum review count) ─────────────
+function ReviewSummarySection({ mediatorId }: { mediatorId: number }) {
+  const { t, lang } = useLanguage();
+  const [summary, setSummary] = useState<ApiMediatorAiReviewSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchMediatorAiReviewSummary(mediatorId, lang === "ar" ? "ar" : "en")
+      .then((data) => {
+        if (!cancelled) setSummary(data);
+      })
+      .catch(() => {
+        if (!cancelled) setSummary(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mediatorId, lang]);
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Sparkles className="size-3.5 animate-pulse text-ai" /> {t("agent.reviewSummary.loading")}
+        </div>
+      </div>
+    );
+  }
+  // Never blocks the rest of the page on a failed call — same "return null,
+  // don't error the page" contract PropertyTrustSection already uses.
+  if (!summary || summary.review_count === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6 shadow-card space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold">{t("agent.reviewSummary.heading")}</h3>
+        {summary.generated_by === "ai" && (
+          <Badge tone="ai">
+            <Sparkles className="size-3.5" /> {t("agent.reviewSummary.aiLabel")}
+          </Badge>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 text-sm">
+        <StarDisplay score={summary.avg_rating ?? 0} size={4} />
+        <span className="font-bold">{summary.avg_rating?.toFixed(1) ?? "—"}</span>
+        <span className="text-xs text-muted-foreground">
+          ·{" "}
+          {t(summary.review_count === 1 ? "agent.reviewCountSingular" : "agent.reviewCountPlural", {
+            count: summary.review_count,
+          })}
+        </span>
+      </div>
+
+      {summary.generated_by === "ai" ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {summary.positive_themes.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {t("agent.reviewSummary.positiveThemes")}
+              </div>
+              <ul className="mt-2 space-y-1.5">
+                {summary.positive_themes.map((th) => (
+                  <li key={th} className="flex items-start gap-1.5 text-sm">
+                    <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
+                    <span className="text-muted-foreground">{th}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {summary.considerations.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {t("agent.reviewSummary.considerations")}
+              </div>
+              <ul className="mt-2 space-y-1.5">
+                {summary.considerations.map((c) => (
+                  <li key={c} className="flex items-start gap-1.5 text-sm">
+                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" />
+                    <span className="text-muted-foreground">{c}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      ) : (
+        // Deterministic fallback below the minimum review count — the
+        // backend's own free-text `note` explains why, rendered as-is in
+        // both locales (same "un-localized deterministic backend text"
+        // precedent Prompt 7 documented for /trust's positive_signals /
+        // things_to_verify; only the AI path above is actually localized).
+        summary.note && <p className="text-sm text-muted-foreground">{summary.note}</p>
+      )}
     </div>
   );
 }
@@ -490,6 +689,9 @@ function AgentProfilePage() {
               </div>
             </div>
 
+            {/* Trust & Activity (Prompt 9) */}
+            <MediatorTrustSection partner={partner} />
+
             {/* Contact */}
             <div className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-3">
               <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("agent.contactAgent")}</div>
@@ -572,6 +774,11 @@ function AgentProfilePage() {
                 {listings.map((p) => <PropertyCard key={p.id} p={p} />)}
               </div>
             )}
+
+            {/* Review Summary (Prompt 4/9 — AI-generated, visibly labeled) */}
+            <div className="mt-10">
+              <ReviewSummarySection mediatorId={agentId} />
+            </div>
 
             {/* Reviews */}
             <ReviewsSection mediatorId={agentId} displayName={displayName} />

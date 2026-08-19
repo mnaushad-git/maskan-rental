@@ -150,7 +150,9 @@ class Settings(BaseSettings):
     FEATURE_RENT: bool = True
     FEATURE_BUY: bool = True
     FEATURE_AI_ADVISOR: bool = True
+    FEATURE_AI_HOME_FINDER: bool = True
     FEATURE_AREA_INTELLIGENCE: bool = True
+    FEATURE_PROPERTY_INTELLIGENCE: bool = True
     FEATURE_SAVED_SEARCHES: bool = True
     FEATURE_NOTIFICATIONS: bool = True
     FEATURE_LEADS: bool = True
@@ -161,6 +163,16 @@ class Settings(BaseSettings):
     FEATURE_FINANCING: bool = False
     FEATURE_PROPERTY_MANAGEMENT: bool = False
     FEATURE_EXTERNAL_TRANSACTION: bool = False
+
+    # ── Visit & Viewing Management ─────────────────────────────────────────────
+    # See docs/implementation/mymakan-viewings.md. On by default — this is the
+    # one feature-first investor-demo surface the whole session builds.
+    FEATURE_VISIT_MANAGEMENT: bool = True
+
+    # ── AI Negotiation & Offer Management ──────────────────────────────────────
+    # See docs/implementation/mymakan-negotiations.md. On by default — same
+    # feature-first investor-demo posture as FEATURE_VISIT_MANAGEMENT above.
+    FEATURE_NEGOTIATIONS: bool = True
 
     @model_validator(mode="after")
     def _warn_insecure_defaults(self) -> "Settings":

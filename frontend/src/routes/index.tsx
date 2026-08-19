@@ -207,6 +207,38 @@ function HomeSearchSection({
           </Link>
         </div>
 
+        {/* AI Home Finder — a second, equally prominent path alongside the
+            search bar above: describe what you want in plain language
+            instead of using filters. Example prompts deep-link straight into
+            /home-finder?q=... so the AI interpretation kicks off immediately. */}
+        <div className="mt-4 rounded-2xl border border-ai/25 bg-ai-soft p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="inline-flex items-center gap-1.5 text-sm font-bold text-ai">
+                <Sparkles className="size-4" /> {t("homeFinder.entryTitle")}
+              </p>
+              <p className="mt-1 max-w-md text-xs text-muted-foreground">{t("homeFinder.entrySubtitle")}</p>
+            </div>
+            <Button variant="ai" size="sm" asChild>
+              <Link to="/home-finder">
+                <Sparkles className="size-3.5" /> {t("home.quickLinks.aiHomeFinder")}
+              </Link>
+            </Button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[t("homeFinder.examples.rent1"), t("homeFinder.examples.sale1")].map((ex) => (
+              <Link
+                key={ex}
+                to="/home-finder"
+                search={{ q: ex }}
+                className="rounded-full border border-ai/30 bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-card transition-colors hover:bg-surface"
+              >
+                {ex}
+              </Link>
+            ))}
+          </div>
+        </div>
+
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <Home className="size-4 text-primary" />

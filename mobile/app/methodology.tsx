@@ -1,28 +1,36 @@
+import { useEffect, useRef } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack } from "expo-router";
+import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { Sparkles, Clock, ArrowRight } from "lucide-react-native";
 import { useLanguage } from "@/lib/i18n/context";
 import { colors } from "@/lib/colors";
+import { SCORE_BANDS } from "@/lib/scoreBands";
 
 const SCORE_KEYS = ["area", "school", "healthcare", "traffic", "family"] as const;
-const BANDS = [
-  { key: "excellent", range: "85–100", color: colors.success },
-  { key: "strong", range: "70–84", color: "#65A30D" },
-  { key: "good", range: "55–69", color: "#B45309" },
-  { key: "belowAverage", range: "40–54", color: colors.destructive },
-  { key: "limitedData", range: "—", color: colors.neutral400 },
-] as const;
+const BANDS = [...SCORE_BANDS, { key: "limitedData", range: "—", color: colors.neutral400 }] as const;
 const LIFESTYLE = ["restaurants", "gyms", "mosques", "malls", "parks"] as const;
+const PROPERTY_SCORE_DIMENSIONS = ["price_value", "location_fit", "property_fit", "amenities", "area", "listing_confidence"] as const;
 
 export default function MethodologyScreen() {
   const { t } = useLanguage();
   const router = useRouter();
+  const { section } = useLocalSearchParams<{ section?: string }>();
+  const scrollRef = useRef<ScrollView>(null);
+  const propertyScoreY = useRef(0);
+
+  useEffect(() => {
+    if (section !== "propertyScore") return;
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, propertyScoreY.current - 12), animated: true });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [section]);
 
   return (
     <SafeAreaView edges={["bottom"]} className="flex-1 bg-background">
       <Stack.Screen options={{ title: t("methodology.badge") }} />
-      <ScrollView contentContainerClassName="gap-6 p-4">
+      <ScrollView ref={scrollRef} contentContainerClassName="gap-6 p-4">
         {/* Hero */}
         <View className="gap-2">
           <View className="flex-row items-center gap-1.5 self-start rounded-full bg-primary/10 px-3 py-1">
@@ -88,6 +96,24 @@ export default function MethodologyScreen() {
               </View>
             </View>
           ))}
+        </View>
+
+        {/* Property Score vs Area Score */}
+        <View
+          className="gap-2 rounded-xl border border-border bg-card p-4"
+          onLayout={(e) => { propertyScoreY.current = e.nativeEvent.layout.y; }}
+        >
+          <Text className="text-sm font-semibold text-foreground">{t("methodology.propertyScore.heading")}</Text>
+          <Text className="text-sm leading-5 text-muted-foreground">{t("methodology.propertyScore.desc")}</Text>
+          <View className="mt-1 gap-1.5">
+            {PROPERTY_SCORE_DIMENSIONS.map((key) => (
+              <View key={key} className="flex-row items-center justify-between">
+                <Text className="text-sm text-foreground">{t(`methodology.propertyScore.dims.${key}`)}</Text>
+                <Text className="text-xs text-muted-foreground">{t(`methodology.propertyScore.dims.${key}Note`)}</Text>
+              </View>
+            ))}
+          </View>
+          <Text className="mt-1 text-sm leading-5 text-muted-foreground">{t("methodology.propertyScore.note")}</Text>
         </View>
 
         {/* Lifestyle */}

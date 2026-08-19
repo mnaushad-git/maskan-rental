@@ -37,16 +37,26 @@ export function iconFor(type: string): LucideIcon {
 }
 
 /**
- * Resolves a notification's `myhome://…` deep link to an in-app path.
+ * Resolves a notification's deep link to an in-app path.
  *
  * `scope` is the viewer's active portal (customer vs partner/mediator) —
  * `lead/*` deep links resolve to different lead-detail routes depending on
  * who's looking: customers own leads via /lead/$leadId, mediators work leads
  * via /partner/leads/$leadId. Pass `useAuth().scope` from the caller.
+ *
+ * **Two schemes in the wild (Prompt 12 fix):** older notification types
+ * (leads, saved searches, property requests — app/tasks/lead_notifications.py,
+ * notifications.py) emit `myhome://…`; viewing and negotiation notifications
+ * (app/tasks/viewing_notifications.py, negotiation_notifications.py) emit
+ * `mymakan://…` — a scheme that was never added here, so tapping/clicking a
+ * viewing or negotiation notification silently did nothing (deepLinkToPath
+ * returned null for every one of them). Both schemes are accepted below
+ * rather than touching five already-shipped backend notification renderers
+ * for a cosmetic scheme-name mismatch.
  */
 export function deepLinkToPath(deepLink: string | null, scope: PortalScope): string | null {
   if (!deepLink) return null;
-  const match = deepLink.match(/^myhome:\/\/(.+)$/);
+  const match = deepLink.match(/^(?:myhome|mymakan):\/\/(.+)$/);
   if (!match) return null;
   const path = match[1];
   if (path.startsWith("property/")) return `/${path}`;
@@ -55,6 +65,20 @@ export function deepLinkToPath(deepLink: string | null, scope: PortalScope): str
     const leadId = path.slice("lead/".length);
     if (!leadId) return null;
     return scope === "partner" ? `/partner/leads/${leadId}` : `/lead/${leadId}`;
+  }
+  // Viewing/negotiation notifications always carry the partner-prefixed
+  // deep link string, regardless of which side (customer or mediator) is
+  // the actual recipient (see viewing_notifications.py/
+  // negotiation_notifications.py's own "left as-is" note) — resolved here
+  // per-viewer scope, same idiom as lead/ above, rather than teaching the
+  // backend event payload which recipient it's rendering for.
+  const viewingMatch = path.match(/^(?:partner\/)?viewings\/(\d+)$/);
+  if (viewingMatch) {
+    return scope === "partner" ? `/partner/viewings/${viewingMatch[1]}` : `/viewings/${viewingMatch[1]}`;
+  }
+  const negotiationMatch = path.match(/^(?:partner\/)?negotiations\/(\d+)$/);
+  if (negotiationMatch) {
+    return scope === "partner" ? `/partner/negotiations/${negotiationMatch[1]}` : `/negotiations/${negotiationMatch[1]}`;
   }
   return null;
 }

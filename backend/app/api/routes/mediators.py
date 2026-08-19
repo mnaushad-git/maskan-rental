@@ -1,21 +1,27 @@
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from passlib.context import CryptContext
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 _pwd = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 from app.api.deps import get_admin_user, get_current_user, get_db, get_mediator_user
+from app.api.routes.reviews import get_mediator_summary
 from app.core.cache import CacheService
 from app.core.config import settings
 from app.core.moyasar import get_payment_gateway_provider
 from app.core.outbox import EventType, record_event
+from app.models.lead import LeadAssignment
 from app.models.mediator import Mediator, MediatorArea
 from app.models.payment import Payment
+from app.models.property import Property
+from app.models.review import Review
 from app.models.user import User
 from app.schemas.mediator import (
+    MEDIATOR_VERIFIED_LABEL,
     AdminPartnerCreate,
     MediatorAdminUpdate,
     MediatorAreaCreate,
@@ -25,6 +31,8 @@ from app.schemas.mediator import (
     MediatorPublicOut,
     MediatorUpdate,
 )
+from app.schemas.review_summary import ReviewSummaryOut
+from app.services import review_summary as review_summary_service
 
 router = APIRouter()
 
@@ -275,6 +283,111 @@ def remove_area(
 
 
 # ── Public directory ──────────────────────────────────────────────────────────
+# Trust & Activity fields (Prompt 4 — Property Verification & Trust Center,
+# spec section 11): verification status, rating, review count, listing
+# counts by transaction type, areas covered (already `MediatorPublicOut.
+# areas`), member-since, and response info if available. Every value below
+# is deterministic — computed from mediator.py/review.py/property.py/lead.py
+# data that already exists, no new tracking infrastructure, no LLM.
+
+
+def _bulk_mediator_trust_activity_fields(db: Session, mediator_ids: list[int]) -> dict[int, dict]:
+    """One grouped query per data source across ALL given mediator ids (never
+    a per-mediator query) so the `/public` list endpoint stays N+1-free —
+    same "load once, reuse everywhere" discipline Prompt 2's `/trust`
+    endpoint and Prompt 3's `/quality` endpoint already follow. Safe to call
+    with a single-element list from `get_public_mediator` too."""
+    fields: dict[int, dict] = {
+        mid: {
+            "avg_rating": None,
+            "review_count": 0,
+            "active_listing_count": 0,
+            "rental_listing_count": 0,
+            "sale_listing_count": 0,
+            "response_rate": None,
+            "avg_response_time_hours": None,
+        }
+        for mid in mediator_ids
+    }
+    if not mediator_ids:
+        return fields
+
+    # Reviews — approved only, the same visibility rule
+    # `reviews.py`'s public endpoints already enforce.
+    review_rows = db.execute(
+        select(Review.mediator_id, Review.rating).where(
+            Review.mediator_id.in_(mediator_ids), Review.status == "approved"
+        )
+    ).all()
+    ratings_by_mediator: dict[int, list[int]] = defaultdict(list)
+    for mediator_id, rating in review_rows:
+        ratings_by_mediator[mediator_id].append(rating)
+    for mediator_id, ratings in ratings_by_mediator.items():
+        fields[mediator_id]["review_count"] = len(ratings)
+        fields[mediator_id]["avg_rating"] = round(sum(ratings) / len(ratings), 1) if ratings else None
+
+    # Listings — Published ("active") only, split by rent/sale.
+    listing_rows = db.execute(
+        select(Property.mediator_id, Property.listing_type, func.count(Property.id))
+        .where(Property.mediator_id.in_(mediator_ids), Property.status == "Published")
+        .group_by(Property.mediator_id, Property.listing_type)
+    ).all()
+    for mediator_id, listing_type, count in listing_rows:
+        if listing_type == "sale":
+            fields[mediator_id]["sale_listing_count"] += count
+        else:
+            fields[mediator_id]["rental_listing_count"] += count
+        fields[mediator_id]["active_listing_count"] += count
+
+    # Response info "if available" — how reliably/quickly this mediator
+    # responds to platform-assigned leads (`LeadAssignment.assigned_at` /
+    # `accepted_at` already exist; nothing new tracked). Computed in Python,
+    # not a DB-side date-diff expression, to stay simple and portable —
+    # demo-scale assignment volume makes this fine.
+    assignment_rows = db.execute(
+        select(LeadAssignment.mediator_id, LeadAssignment.status, LeadAssignment.assigned_at, LeadAssignment.accepted_at)
+        .where(LeadAssignment.mediator_id.in_(mediator_ids))
+    ).all()
+    totals: dict[int, int] = defaultdict(int)
+    accepted: dict[int, int] = defaultdict(int)
+    response_hours: dict[int, list[float]] = defaultdict(list)
+    for mediator_id, a_status, assigned_at, accepted_at in assignment_rows:
+        totals[mediator_id] += 1
+        if a_status == "accepted":
+            accepted[mediator_id] += 1
+        if accepted_at is not None and assigned_at is not None:
+            response_hours[mediator_id].append((accepted_at - assigned_at).total_seconds() / 3600)
+    for mediator_id, total in totals.items():
+        if total > 0:
+            fields[mediator_id]["response_rate"] = round(accepted.get(mediator_id, 0) / total, 2)
+        hours = response_hours.get(mediator_id)
+        if hours:
+            fields[mediator_id]["avg_response_time_hours"] = round(sum(hours) / len(hours), 1)
+
+    return fields
+
+
+def _mediator_public_out(mediator: Mediator, trust_fields: dict[int, dict]) -> MediatorPublicOut:
+    base = MediatorPublicOut.model_validate(mediator, from_attributes=True)
+    computed = trust_fields.get(mediator.id, {})
+    return base.model_copy(
+        update={
+            # The one allowed verification phrase, or None — never a
+            # different/stronger verification claim (no
+            # "Government Verified" / "REGA Verified" / "Ejar Verified" /
+            # "Nafath Verified").
+            "verification_label": MEDIATOR_VERIFIED_LABEL if mediator.is_verified else None,
+            "member_since": mediator.created_at,
+            "avg_rating": computed.get("avg_rating"),
+            "review_count": computed.get("review_count", 0),
+            "active_listing_count": computed.get("active_listing_count", 0),
+            "rental_listing_count": computed.get("rental_listing_count", 0),
+            "sale_listing_count": computed.get("sale_listing_count", 0),
+            "response_rate": computed.get("response_rate"),
+            "avg_response_time_hours": computed.get("avg_response_time_hours"),
+        }
+    )
+
 
 @router.get("/public", response_model=list[MediatorPublicOut])
 def list_public_mediators(
@@ -289,27 +402,76 @@ def list_public_mediators(
             .filter(MediatorArea.city.ilike(city))
             .distinct()
         )
-    return (
-        q.order_by(Mediator.is_verified.desc(), Mediator.total_leads_accepted.desc())
-        .all()
-    )
+    mediators = q.order_by(Mediator.is_verified.desc(), Mediator.total_leads_accepted.desc()).all()
+    trust_fields = _bulk_mediator_trust_activity_fields(db, [m.id for m in mediators])
+    return [_mediator_public_out(m, trust_fields) for m in mediators]
 
 
 @router.get("/{mediator_id}/public", response_model=MediatorPublicOut)
 def get_public_mediator(mediator_id: int, db: Session = Depends(get_db)):
-    """Return a single partner's public profile. No auth required."""
+    """Return a single partner's public profile (including Trust & Activity
+    fields — Prompt 4). No auth required. Cached for
+    `_PUBLIC_PROFILE_TTL_SECONDS`, same as before this prompt — rating/
+    listing-count/response-info staleness within that window is an accepted
+    trade-off already implicit in this endpoint's existing caching policy."""
     cache = CacheService()
 
     def _load():
         mediator = db.get(Mediator, mediator_id)
         if not mediator or mediator.subscription_status != "active":
             return None
-        return MediatorPublicOut.model_validate(mediator, from_attributes=True).model_dump(mode="json")
+        trust_fields = _bulk_mediator_trust_activity_fields(db, [mediator.id])
+        return _mediator_public_out(mediator, trust_fields).model_dump(mode="json")
 
     cached = cache.get_or_set(_PUBLIC_PROFILE_NAMESPACE, str(mediator_id), _PUBLIC_PROFILE_TTL_SECONDS, _load)
     if cached is None:
         raise HTTPException(status_code=404, detail="Partner not found.")
     return cached
+
+
+@router.get("/{mediator_id}/review-summary", response_model=ReviewSummaryOut)
+def get_mediator_review_summary(
+    mediator_id: int,
+    language: str = "en",
+    db: Session = Depends(get_db),
+):
+    """AI-summarized positive themes/considerations from this mediator's
+    APPROVED reviews (Prompt 4, spec section 12). No auth required — same
+    public visibility as `/public` and the existing `reviews.py` public
+    endpoints. Deliberately a SEPARATE endpoint from `/public` (not embedded
+    in it): the AI call is slower than a deterministic lookup, so `/public`'s
+    Trust & Activity fields stay instant while this loads async — mirrors
+    the existing `/intelligence` vs `/ai-summary` split for Property
+    Intelligence. Below the minimum review count (or with no written review
+    text yet), returns the deterministic {avg_rating, review_count} fallback
+    — never blocks on or requires the AI call to succeed."""
+    mediator = db.get(Mediator, mediator_id)
+    if not mediator or mediator.subscription_status != "active":
+        raise HTTPException(status_code=404, detail="Partner not found.")
+
+    summary = get_mediator_summary(mediator_id, db)
+    approved_reviews = db.scalars(
+        select(Review)
+        .where(Review.mediator_id == mediator_id, Review.status == "approved")
+        .order_by(Review.created_at.desc())
+        .limit(review_summary_service.MAX_REVIEWS_FOR_AI_SUMMARY)
+    ).all()
+
+    result = review_summary_service.summarize_reviews(
+        approved_reviews,
+        avg_rating=summary.avg_rating,
+        review_count=summary.review_count,
+        language=language,
+    )
+    return ReviewSummaryOut(
+        mediator_id=mediator_id,
+        avg_rating=result.avg_rating,
+        review_count=result.review_count,
+        positive_themes=result.positive_themes,
+        considerations=result.considerations,
+        generated_by=result.generated_by,
+        note=result.note,
+    )
 
 
 # ── Admin endpoints ───────────────────────────────────────────────────────────

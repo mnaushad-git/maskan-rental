@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import * as Notifications from "expo-notifications";
 import { Bell, BellOff, Home, Megaphone, MessageSquare, Sparkles, TrendingDown, TrendingUp, UserRoundCheck } from "lucide-react-native";
 import {
   deleteNotification,
@@ -12,6 +11,7 @@ import {
   type ApiNotificationRecord,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
+import { addPushReceivedListener } from "@/lib/push";
 import { useLanguage } from "@/lib/i18n/context";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
@@ -160,7 +160,7 @@ export default function NotificationsScreen() {
   // same listener wired to just the unread badge).
   useEffect(() => {
     if (!user) return;
-    const sub = Notifications.addNotificationReceivedListener(() => load(false));
+    const sub = addPushReceivedListener(() => load(false));
     return () => sub.remove();
   }, [user, load]);
 

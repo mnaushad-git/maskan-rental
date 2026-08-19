@@ -12,6 +12,33 @@ import { ScoreRing } from "./ScoreIndicator";
 import { colors } from "@/lib/colors";
 import { whatsappLink } from "@/lib/whatsapp";
 
+// Client-side approximation for the card's trust signal row (Property
+// Verification & Trust Center, Prompt 10) — NOT a per-card GET
+// /properties/{id}/trust fetch. A search-results grid can render dozens of
+// cards; calling the real Trust endpoint once per card would mean dozens of
+// extra requests just to decorate a list. Mirrors
+// frontend/src/components/maskan/PropertyCard.tsx's identical
+// estimateCompletenessPercent()/isRecentlyUpdated() judgment call: base 60%
+// (fields every saved listing already has: title/district/city/price/
+// bedrooms/bathrooms) plus up to 40% scaled by how many of six already-
+// available "extra detail" fields are present on the already-mapped
+// `Property` object — never a network call, never LLM-based, and explicitly
+// NOT the authoritative score (that's PropertyTrustBadge's real
+// /trust-backed Listing Confidence section).
+function estimateCompletenessPercent(p: Property): number {
+  const extras = [p.description, p.furnished, p.livingRooms, p.propertyAgeYears, p.deedArea, p.licenseNumber];
+  const presentCount = extras.filter((v) => v != null && v !== "").length;
+  return Math.round(60 + (presentCount / extras.length) * 40);
+}
+
+// Mirrors trust_config.py's FRESHNESS_RECENTLY_UPDATED_DAYS = 14 threshold
+// client-side against the already-loaded updatedAt field — same "no extra
+// fetch" reasoning as the completeness estimate above.
+function isRecentlyUpdated(p: Property): boolean {
+  const ms = Date.parse(p.updatedAt);
+  return !Number.isNaN(ms) && Date.now() - ms < 14 * 24 * 60 * 60 * 1000;
+}
+
 export function PropertyCard({
   p,
   initialSavedId,
@@ -103,6 +130,26 @@ export function PropertyCard({
                 </View>
               </View>
               <ScoreRing score={p.matchScore} />
+            </View>
+
+            {/* Trust signal row (Property Verification & Trust Center,
+                Prompt 10) — keep minimal, don't clutter the card. */}
+            <View className="flex-row flex-wrap items-center gap-1.5">
+              {p.badges.includes("Verified") ? (
+                <Text className="text-[11px] font-semibold text-success">{t("propertyCard.trust.verified")}</Text>
+              ) : (
+                <Text className="text-[11px] font-medium text-muted-foreground">
+                  {t("propertyCard.trust.complete", { percent: estimateCompletenessPercent(p) })}
+                </Text>
+              )}
+              {isRecentlyUpdated(p) && (
+                <>
+                  <Text className="text-[11px] text-muted-foreground">·</Text>
+                  <Text className="text-[11px] font-medium text-muted-foreground">
+                    {t("propertyCard.trust.recentlyUpdated")}
+                  </Text>
+                </>
+              )}
             </View>
 
             <View className="flex-row items-center gap-4">

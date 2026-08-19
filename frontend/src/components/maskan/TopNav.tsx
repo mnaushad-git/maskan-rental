@@ -26,7 +26,11 @@ function useNavLinks() {
   // Only relevant once a lead can exist for the account, so it's shown in the
   // persistent nav (not just buried in the account dropdown) when signed in.
   const MY_LEADS_LINK = { label: t("nav.myLeads"), to: "/my-leads", search: undefined } as const;
-  return { NAV_LINKS, MY_LEADS_LINK };
+  // Same rationale, same sibling placement as MY_LEADS_LINK (AI Negotiation &
+  // Offer Management, Prompt 9) — reachable from the persistent nav once
+  // signed in, not just buried in the account dropdown.
+  const MY_NEGOTIATIONS_LINK = { label: t("nav.myNegotiations"), to: "/negotiations", search: undefined } as const;
+  return { NAV_LINKS, MY_LEADS_LINK, MY_NEGOTIATIONS_LINK };
 }
 
 export function Logo() {
@@ -98,8 +102,8 @@ export function LanguageSwitcher({ className }: { className?: string }) {
 
 export function TopNav() {
   const { user } = useAuth();
-  const { NAV_LINKS, MY_LEADS_LINK } = useNavLinks();
-  const navLinks = user ? [...NAV_LINKS, MY_LEADS_LINK] : NAV_LINKS;
+  const { NAV_LINKS, MY_LEADS_LINK, MY_NEGOTIATIONS_LINK } = useNavLinks();
+  const navLinks = user ? [...NAV_LINKS, MY_LEADS_LINK, MY_NEGOTIATIONS_LINK] : NAV_LINKS;
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">

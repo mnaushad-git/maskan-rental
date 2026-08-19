@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Bell, ClipboardList, ListChecks, LogOut, Settings, User } from "lucide-react";
+import { Bell, ClipboardList, Handshake, ListChecks, LogOut, Settings, User } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -86,6 +86,16 @@ export function NavAuthButton({ className }: { className?: string }) {
                 className="flex w-full items-center gap-2 px-3 py-2 hover:bg-surface-2"
               >
                 <ClipboardList className="size-3.5 text-muted-foreground" /> {t("navAuth.myLeads")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  navigate({ to: "/negotiations" });
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 hover:bg-surface-2"
+              >
+                <Handshake className="size-3.5 text-muted-foreground" /> {t("navAuth.myNegotiations")}
               </button>
               <button
                 type="button"
