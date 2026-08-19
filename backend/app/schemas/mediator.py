@@ -74,6 +74,16 @@ class AdminPartnerCreate(BaseModel):
     subscription_status: str = "active"
 
 
+# Property Verification & Trust Center (Prompt 4) — the ONLY verification
+# phrase this platform is allowed to show today (never "Government Verified"
+# / "REGA Verified" / "Ejar Verified" / "Nafath Verified"), mirroring
+# `app.services.mediator_trust`'s identical wording constraint for the
+# property-level Trust Model. Centralized here so every caller that needs to
+# render a verification badge from `MediatorPublicOut.verification_label`
+# uses this exact string rather than composing its own.
+MEDIATOR_VERIFIED_LABEL = "✓ Verified by myMakan"
+
+
 class MediatorPublicOut(BaseModel):
     id: int
     agency_name: str | None
@@ -84,5 +94,22 @@ class MediatorPublicOut(BaseModel):
     total_leads_accepted: int
     created_at: datetime
     areas: list[MediatorAreaOut] = []
+
+    # Trust & Activity (Prompt 4 — Property Verification & Trust Center,
+    # spec section 11). All deterministic, computed by the route from
+    # existing mediator.py/review.py/property.py/lead.py data — no new
+    # tracking infrastructure. `verification_label` is either the single
+    # allowed phrase above or None; never invent a different verification
+    # claim. `response_rate`/`avg_response_time_hours` are None when the
+    # mediator has no lead assignments yet ("if available" per the spec).
+    verification_label: str | None = None
+    avg_rating: float | None = None
+    review_count: int = 0
+    active_listing_count: int = 0
+    rental_listing_count: int = 0
+    sale_listing_count: int = 0
+    member_since: datetime | None = None
+    response_rate: float | None = None
+    avg_response_time_hours: float | None = None
 
     model_config = {"from_attributes": True}

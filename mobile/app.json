@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "myHome",
+    "name": "myMakan",
     "slug": "myhome-rental",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -22,7 +22,7 @@
       "predictiveBackGestureEnabled": false,
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyCs6CmxbPuxb8lemZvxZW5-gA1p9PP6HvE"
+          "apiKey": "AIzaSyB-qSnoPSDm1vb6gnLfVz761veohNYVryk"
         }
       }
     },
@@ -45,7 +45,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "myHome uses your location to show nearby rentals and sales on the map."
+          "locationWhenInUsePermission": "myMakan uses your location to show nearby rentals and sales on the map."
         }
       ],
       [
@@ -55,7 +55,10 @@
           "color": "#2563EB",
           "defaultChannel": "default"
         }
-      ]
+      ],
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

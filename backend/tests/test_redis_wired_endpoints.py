@@ -4,11 +4,15 @@ endpoints). These hit the actual routes through the FastAPI TestClient
 against the real dev DB (rolled back per test, see conftest.py) with a
 fakeredis client injected in place of the real Redis connection.
 """
+from datetime import datetime, timedelta, timezone
+
 import fakeredis
 import pytest
 
 from app.models.lead import Lead
 from app.models.mediator import Mediator
+from app.models.property import Property
+from app.models.property_viewing import PropertyViewing
 from app.models.user import User
 
 
@@ -127,3 +131,31 @@ def test_area_intelligence_list_is_cached(client, fake_redis):
     from app.core.cache import CacheService
     cache = CacheService(client=fake_redis)
     assert cache.get("area-intel", "list") is not None  # populated by the request above
+
+
+def test_viewing_creation_replays_response_for_same_idempotency_key(client, fake_redis, unique_email, db_session):
+    prop = Property(title="Idempotency Test Property", area="Al Yasmin", city="Riyadh", listing_type="rent", status="Published")
+    db_session.add(prop)
+    db_session.commit()
+    db_session.refresh(prop)
+
+    token = _signup_and_login(client, unique_email)
+    headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "viewing-key-abc-123"}
+    start = datetime.now(timezone.utc) + timedelta(hours=48)
+    payload = {
+        "property_id": prop.id,
+        "requested_start_at": start.isoformat(),
+        "requested_end_at": (start + timedelta(minutes=30)).isoformat(),
+        "timezone": "Asia/Riyadh",
+    }
+
+    first = client.post("/api/v1/viewings", json=payload, headers=headers)
+    assert first.status_code == 201, first.text
+    first_id = first.json()["id"]
+
+    second = client.post("/api/v1/viewings", json=payload, headers=headers)
+    assert second.status_code == 201, second.text
+    assert second.json()["id"] == first_id
+
+    count = db_session.query(PropertyViewing).filter(PropertyViewing.property_id == prop.id).count()
+    assert count == 1  # the replay did not create a second viewing

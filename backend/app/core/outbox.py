@@ -60,6 +60,18 @@ class EventType:
     PROPERTY_REQUEST_FULFILLED = "property_request.fulfilled"
     PROPERTY_REQUEST_EXPIRED = "property_request.expired"
     PROPERTY_REQUEST_MEDIATOR_RESPONSE_SUBMITTED = "property_request.mediator_response_submitted"
+    # ── Visit & Viewing Management ──────────────────────────────────────────
+    VIEWING_REQUESTED = "viewing.requested"
+    VIEWING_CONFIRMED = "viewing.confirmed"
+    VIEWING_RESCHEDULE_PROPOSED = "viewing.reschedule_proposed"
+    VIEWING_CANCELLED = "viewing.cancelled"
+    VIEWING_COMPLETED = "viewing.completed"
+    # ── Negotiation & Offer Management ──────────────────────────────────────
+    NEGOTIATION_SUBMITTED = "negotiation.offer_submitted"
+    NEGOTIATION_COUNTERED = "negotiation.counter_received"
+    NEGOTIATION_ACCEPTED = "negotiation.accepted"
+    NEGOTIATION_REJECTED = "negotiation.rejected"
+    NEGOTIATION_WITHDRAWN = "negotiation.withdrawn"
 
 
 def record_event(

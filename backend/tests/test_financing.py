@@ -4,13 +4,33 @@ deterministic fallback note. This environment's .env has a real
 ANTHROPIC_API_KEY configured, so every submission test explicitly forces it
 off (empty string) to avoid live paid API calls — same convention as
 test_ai_platform.py's test_pricing_suggestion_fallback_without_api_key.
+
+myMakan Phase-1 (see docs/implementation/mymakan-phase1.md) hides financing
+by default (`FEATURE_FINANCING=False`, backend/app/core/config.py) and
+`financing.router` is only registered in app.main when that flag is on — so
+with the default local .env, every `/api/financing/...` call 404s. The
+"── API ──" tests below are marked skip for that reason (one of them,
+test_submit_financing_interest_404_for_missing_property, would otherwise
+"pass" while actually just hitting the router-not-registered 404 instead of
+the property-not-found 404 it claims to test — silently wrong, not green by
+accident). The pure functions above that section
+(_deterministic_affordability_note/generate_affordability_note) don't go
+through the router at all and are unaffected, so they keep running.
 """
 from dataclasses import dataclass
 
+import pytest
+
 from app.api.routes.ai import _deterministic_affordability_note, generate_affordability_note
 from app.core.ai import gateway
+from app.core.config import settings
 from app.models.property import Property
 from app.models.user import User
+
+_skip_if_financing_disabled = pytest.mark.skipif(
+    not settings.FEATURE_FINANCING,
+    reason="financing.router isn't registered when FEATURE_FINANCING is off (myMakan Phase-1 default)",
+)
 
 
 @dataclass
@@ -92,6 +112,7 @@ def test_generate_affordability_note_falls_back_on_ai_error(monkeypatch):
 
 # ── API ───────────────────────────────────────────────────────────────────
 
+@_skip_if_financing_disabled
 def test_submit_financing_interest_requires_auth(client, db_session):
     prop = _make_property(db_session)
     db_session.commit()
@@ -100,6 +121,7 @@ def test_submit_financing_interest_requires_auth(client, db_session):
     assert resp.status_code == 401
 
 
+@_skip_if_financing_disabled
 def test_submit_financing_interest_404_for_missing_property(client, unique_email, monkeypatch):
     _no_ai_key(monkeypatch)
     token = _signup(client, unique_email)
@@ -107,6 +129,7 @@ def test_submit_financing_interest_404_for_missing_property(client, unique_email
     assert resp.status_code == 404
 
 
+@_skip_if_financing_disabled
 def test_submit_financing_interest_rejects_non_positive_budget(client, db_session, unique_email, monkeypatch):
     _no_ai_key(monkeypatch)
     prop = _make_property(db_session)
@@ -117,6 +140,7 @@ def test_submit_financing_interest_rejects_non_positive_budget(client, db_sessio
     assert resp.status_code == 422
 
 
+@_skip_if_financing_disabled
 def test_submit_and_fetch_my_financing_interest(client, db_session, unique_email, monkeypatch):
     _no_ai_key(monkeypatch)
     prop = _make_property(db_session)
@@ -138,6 +162,7 @@ def test_submit_and_fetch_my_financing_interest(client, db_session, unique_email
     assert mine.json()[0]["id"] == body["id"]
 
 
+@_skip_if_financing_disabled
 def test_financing_admin_listing_requires_admin(client, db_session, unique_email, monkeypatch):
     _no_ai_key(monkeypatch)
     prop = _make_property(db_session)
@@ -149,6 +174,7 @@ def test_financing_admin_listing_requires_admin(client, db_session, unique_email
     assert forbidden.status_code == 403
 
 
+@_skip_if_financing_disabled
 def test_admin_can_list_all_financing_interests(client, db_session, unique_email, monkeypatch):
     _no_ai_key(monkeypatch)
     prop = _make_property(db_session)

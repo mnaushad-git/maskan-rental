@@ -28,8 +28,8 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/notification-settings")({
   head: () => ({
     meta: [
-      { title: "Notification Settings — Maskan" },
-      { name: "description", content: "Manage how and when Maskan sends you notifications." },
+      { title: "Notification Settings — myMakan" },
+      { name: "description", content: "Manage how and when myMakan sends you notifications." },
     ],
   }),
   component: NotificationSettingsPage,

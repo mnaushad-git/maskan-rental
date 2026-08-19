@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import { View, Text, Pressable, Modal, ActivityIndicator } from "react-native";
 import { BellRing, X } from "lucide-react-native";
-import * as Notifications from "expo-notifications";
 import { registerForPushNotificationsAsync, getPushPermissionStatusAsync } from "@/lib/push";
 import { hasSeenPushPrompt, markPushPromptSeen } from "@/lib/push-prompt-storage";
 import { useLanguage } from "@/lib/i18n/context";
@@ -26,7 +25,7 @@ export function usePushPermissionPrompt() {
     const seen = await hasSeenPushPrompt();
     if (seen) return;
     const status = await getPushPermissionStatusAsync();
-    if (status !== Notifications.PermissionStatus.UNDETERMINED) {
+    if (status !== "undetermined") {
       // Already granted, or already permanently denied at the OS level —
       // this custom explainer has nothing useful to add in either case
       // (Notification Settings' toggle handles the "denied" recovery path

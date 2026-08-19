@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Linking, ScrollView, Switch, Text, View, Modal, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useRouter } from "expo-router";
-import * as Notifications from "expo-notifications";
 import { Clock, Moon, RotateCcw, Send, X } from "lucide-react-native";
 import {
   fetchNotificationPreferences,
@@ -18,6 +17,7 @@ import {
   type NotificationFrequency,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
+import { getPushPermissionDetailsAsync } from "@/lib/push";
 import { useLanguage, type Language } from "@/lib/i18n/context";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
@@ -262,7 +262,7 @@ export default function NotificationSettingsScreen() {
       patch({ push_enabled: false });
       return;
     }
-    const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+    const { status, canAskAgain } = await getPushPermissionDetailsAsync();
     if (status === "granted") {
       patch({ push_enabled: true });
       return;

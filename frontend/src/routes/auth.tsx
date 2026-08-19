@@ -24,11 +24,11 @@ import { useLanguage } from "@/lib/i18n/context";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in or create your Maskan account" },
+      { title: "Sign in or create your myMakan account" },
       {
         name: "description",
         content:
-          "Access your saved homes, AI Advisor and area insights. Sign in or create a free Maskan account.",
+          "Access your saved homes, AI Advisor and area insights. Sign in or create a free myMakan account.",
       },
     ],
   }),

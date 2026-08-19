@@ -28,6 +28,16 @@ NOTIFICATION_TYPES = (
     "property_request_expired",
     "property_request_no_match_suggestion",
     "property_request_fulfilled",
+    "viewing_requested",
+    "viewing_confirmed",
+    "viewing_reschedule_proposed",
+    "viewing_cancelled",
+    "viewing_completed",
+    "negotiation_offer_submitted",
+    "negotiation_counter_received",
+    "negotiation_accepted",
+    "negotiation_rejected",
+    "negotiation_withdrawn",
 )
 
 

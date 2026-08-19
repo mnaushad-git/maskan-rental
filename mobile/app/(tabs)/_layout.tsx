@@ -1,5 +1,5 @@
 import { Tabs, useRouter } from "expo-router";
-import { Home, Building2, CalendarCheck, User, Sparkles } from "lucide-react-native";
+import { Home, Search, Heart, User, Sparkles } from "lucide-react-native";
 import { useLanguage } from "@/lib/i18n/context";
 import { colors } from "@/lib/colors";
 
@@ -19,19 +19,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="projects"
+        name="search-shortcut"
         options={{
-          title: t("nav.projects"),
-          tabBarLabel: t("nav.projects"),
-          tabBarIcon: ({ color, size }) => <Building2 color={color} size={size} />,
+          title: t("nav.search"),
+          tabBarLabel: t("nav.search"),
+          tabBarIcon: ({ color, size }) => <Search color={color} size={size} />,
         }}
-      />
-      <Tabs.Screen
-        name="bookings"
-        options={{
-          title: t("nav.bookings"),
-          tabBarLabel: t("nav.bookings"),
-          tabBarIcon: ({ color, size }) => <CalendarCheck color={color} size={size} />,
+        listeners={{
+          // This route never actually renders — tapping it pushes the real
+          // Search screen (app/search.tsx) as a Stack screen instead of
+          // switching tabs, matching the AI Advisor shortcut below.
+          tabPress: (e) => {
+            e.preventDefault();
+            router.push("/search");
+          },
         }}
       />
       <Tabs.Screen
@@ -53,6 +54,23 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="saved-shortcut"
+        options={{
+          title: t("nav.saved"),
+          tabBarLabel: t("nav.saved"),
+          tabBarIcon: ({ color, size }) => <Heart color={color} size={size} />,
+        }}
+        listeners={{
+          // This route never actually renders — tapping it pushes the real
+          // Saved screen (app/saved.tsx) as a Stack screen instead of
+          // switching tabs, matching the AI Advisor shortcut above.
+          tabPress: (e) => {
+            e.preventDefault();
+            router.push("/saved");
+          },
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: t("navAuth.account"),
@@ -60,6 +78,8 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       />
+      <Tabs.Screen name="projects" options={{ href: null }} />
+      <Tabs.Screen name="bookings" options={{ href: null }} />
     </Tabs>
   );
 }

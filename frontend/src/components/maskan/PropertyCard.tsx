@@ -1,4 +1,4 @@
-import { Bath, BedDouble, Heart, MapPin, Maximize } from "lucide-react";
+import { Bath, BedDouble, Clock, Heart, MapPin, Maximize, ShieldCheck } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Property } from "@/lib/maskan-data";
@@ -8,6 +8,41 @@ import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { RecommendationBadge, StatusBadge } from "./Badges";
 import { ContactButtons } from "./ContactButtons";
+
+// Trust Center (Prompt 7) — a lightweight, approximate client-side
+// completeness estimate for list cards only. NOT the authoritative Trust
+// Model score (that's the real deterministic `/properties/{id}/trust`
+// endpoint, rendered on Property Detail's Trust Center — see
+// PropertyTrustCenter.tsx). Fetching `/trust` per card in a search-results
+// grid would mean dozens of extra requests just to decorate a card, so this
+// mirrors the same "required fields are always filled, extra detail fields
+// vary" shape as the backend's completeness tiers using only fields already
+// present on the mapped `Property` — never a network call, never LLM-based.
+// Documented judgment call: see docs/implementation/mymakan-trust-center.md
+// "Prompt 7".
+const RECENTLY_UPDATED_DAYS = 14; // matches trust_config.py's FRESHNESS_RECENTLY_UPDATED_DAYS
+
+function estimateCompletenessPercent(p: Property): number {
+  const optionalFieldsPresent = [
+    !!(p.description && p.description.trim()),
+    !!p.furnished,
+    p.livingRooms != null,
+    p.propertyAgeYears != null,
+    p.deedArea != null,
+    !!p.licenseNumber,
+  ].filter(Boolean).length;
+  // Base 60 represents the fields every saved listing already has (title,
+  // district, city, price, bedrooms, bathrooms) — the remaining 40 scales
+  // with how many of the six "extra detail" fields above are filled in.
+  return 60 + Math.round((optionalFieldsPresent / 6) * 40);
+}
+
+function isRecentlyUpdated(p: Property): boolean {
+  const updatedMs = Date.parse(p.updatedAt);
+  return (
+    !Number.isNaN(updatedMs) && Date.now() - updatedMs < RECENTLY_UPDATED_DAYS * 24 * 60 * 60 * 1000
+  );
+}
 
 export function PropertyCard({
   p,
@@ -61,6 +96,20 @@ export function PropertyCard({
 
   const hasPhone = !!p.agentPhone;
 
+  // Small trust signals (Prompt 7, spec section 19) — kept to at most two
+  // short items so the card never feels cluttered: verified mediators lead
+  // with "✓ Verified by myMakan" (the one allowed verification phrase, kept
+  // un-translated to match the backend's own un-localized constant),
+  // unverified listings show the completeness estimate instead so the row
+  // never looks empty, and "Recently Updated" appends when applicable.
+  const isVerified = p.badges.includes("Verified");
+  const recentlyUpdated = isRecentlyUpdated(p);
+  const trustChips: string[] = [];
+  if (isVerified) trustChips.push(t("propertyCard.trust.verified"));
+  else
+    trustChips.push(t("propertyCard.trust.complete", { percent: estimateCompletenessPercent(p) }));
+  if (recentlyUpdated) trustChips.push(t("propertyCard.trust.recentlyUpdated"));
+
   return (
     <div className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card transition-all hover:-translate-y-1 hover:shadow-elevated">
       <Link to="/property/$id" params={{ id: p.id }} className="flex flex-col">
@@ -86,7 +135,11 @@ export function PropertyCard({
               disabled={saving}
               className="grid size-9 place-items-center rounded-full bg-background/95 shadow-card backdrop-blur transition-colors hover:bg-background disabled:opacity-60"
             >
-              <Heart className={saved ? "size-4 fill-destructive text-destructive" : "size-4 text-foreground"} />
+              <Heart
+                className={
+                  saved ? "size-4 fill-destructive text-destructive" : "size-4 text-foreground"
+                }
+              />
             </button>
           </div>
           <div className="absolute bottom-3 start-3">
@@ -117,10 +170,25 @@ export function PropertyCard({
             </span>
           </div>
 
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {trustChips.map((chip, i) => (
+              <span key={chip} className="inline-flex items-center gap-1">
+                {i === 0 && isVerified ? (
+                  <ShieldCheck className="size-3.5" />
+                ) : i === trustChips.length - 1 && recentlyUpdated ? (
+                  <Clock className="size-3.5" />
+                ) : null}
+                {chip}
+              </span>
+            ))}
+          </div>
+
           <div className="mt-auto flex items-end justify-between border-t border-border pt-4">
             <div>
               <div className="text-xs text-muted-foreground">
-                {p.listingType === "sale" ? t("propertyCard.salePrice") : t("propertyCard.annualRent")}
+                {p.listingType === "sale"
+                  ? t("propertyCard.salePrice")
+                  : t("propertyCard.annualRent")}
               </div>
               <div className="text-xl font-bold tracking-tight">
                 SAR {formatSAR(p.price)}

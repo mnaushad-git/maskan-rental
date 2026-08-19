@@ -24,7 +24,7 @@ import {
 import { fieldKeyLabel, matchReasonLabel } from "@/lib/propertyRequestDisplay";
 
 export const Route = createFileRoute("/partner/requests/$id")({
-  head: () => ({ meta: [{ title: "Respond to Property Request — Maskan Partner" }] }),
+  head: () => ({ meta: [{ title: "Respond to Property Request — myMakan Partner" }] }),
   component: PartnerRequestDetailPage,
 });
 

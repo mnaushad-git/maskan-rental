@@ -73,8 +73,16 @@ export default function RootLayout() {
               <Stack.Screen name="auth/login" options={{ presentation: "modal", headerShown: true, title: "" }} />
               <Stack.Screen name="auth/signup" options={{ presentation: "modal", headerShown: true, title: "" }} />
               <Stack.Screen name="lead/new" options={{ headerShown: true, title: "" }} />
+              <Stack.Screen name="viewing/new" options={{ headerShown: true, title: "" }} />
+              <Stack.Screen name="viewings/index" options={{ headerShown: true, title: "" }} />
+              <Stack.Screen name="viewings/[id]" options={{ headerShown: true, title: "" }} />
+              <Stack.Screen name="negotiation/new" options={{ headerShown: true, title: "" }} />
+              <Stack.Screen name="negotiations/index" options={{ headerShown: true, title: "" }} />
+              <Stack.Screen name="negotiations/[id]" options={{ headerShown: true, title: "" }} />
+              <Stack.Screen name="transaction/[id]" options={{ headerShown: true, title: "" }} />
               {/* Consumer feature screens — give them native headers with a back button */}
               <Stack.Screen name="advisor" options={{ headerShown: true }} />
+              <Stack.Screen name="home-finder" options={{ headerShown: true, title: "AI Home Finder" }} />
               <Stack.Screen name="areas/index" options={{ headerShown: true }} />
               <Stack.Screen name="areas/[name]" options={{ headerShown: true }} />
               <Stack.Screen name="methodology" options={{ headerShown: true }} />

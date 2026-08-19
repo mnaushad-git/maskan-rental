@@ -18,6 +18,7 @@ import {
   FileText,
   GitCompare,
   GraduationCap,
+  Handshake,
   Heart,
   Hospital,
   Landmark,
@@ -34,6 +35,7 @@ import {
   Sparkles,
   Star,
   Trees,
+  TrendingDown,
   TrendingUp,
   Wallet,
   X,
@@ -44,6 +46,7 @@ import { Badge, RecommendationBadge, StatusBadge } from "@/components/maskan/Bad
 import { ScoreRing, ScoreBar } from "@/components/maskan/ScoreIndicator";
 import { PropertyCard } from "@/components/maskan/PropertyCard";
 import { WhatsAppIcon, whatsappLink } from "@/components/maskan/ContactButtons";
+import { PropertyTrustSection } from "@/components/maskan/PropertyTrustCenter";
 import {
   fetchProperty,
   fetchSimilarProperties,
@@ -59,13 +62,26 @@ import {
   createBooking,
   submitFinancingInterest,
   fetchRentalScore,
+  fetchPropertyIntelligence,
+  fetchPropertyAiSummary,
+  createViewing,
+  fetchMyViewings,
+  VIEWING_INACTIVE_STATUSES,
+  createNegotiation,
+  fetchActiveNegotiation,
   type ApiAreaIntelligence,
   type ApiAvailabilityInsight,
   type ApiFinancingInterest,
+  type ApiPropertyIntelligence,
+  type ApiPropertyNegotiation,
+  type ApiPropertyViewing,
+  type ApiRentTrendPoint,
+  type PropertyIntelligenceCriteria,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { formatSAR, type Property } from "@/lib/maskan-data";
+import { PHASE1_FLAGS } from "@/lib/phase1-flags";
 import prop1 from "@/assets/prop-1.jpg";
 import prop2 from "@/assets/prop-2.jpg";
 import prop3 from "@/assets/prop-3.jpg";
@@ -75,7 +91,7 @@ import heroImg from "@/assets/hero-villa.jpg";
 export const Route = createFileRoute("/property/$id")({
   head: () => ({
     meta: [
-      { title: "Property Details — Maskan" },
+      { title: "Property Details — myMakan" },
       {
         name: "description",
         content: "Rental intelligence, area scores, fair rent and AI insights for this property.",
@@ -103,6 +119,47 @@ function PropertyDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // myMakan Property Intelligence — fetched separately, after the core
+  // property data has already rendered, so a slow/failed call never blocks
+  // the rest of the page (Prompt 7).
+  const [intelligence, setIntelligence] = useState<ApiPropertyIntelligence | null>(null);
+  const [intelligenceLoading, setIntelligenceLoading] = useState(true);
+  const [intelligenceError, setIntelligenceError] = useState(false);
+
+  // Contact modal + saved state, lifted here (rather than kept local to
+  // ActionsCard) so the new Intelligence hero's "Contact Agent" button, and
+  // Smart Questions' "Send to Agent" action, can trigger the same
+  // modal/saved-record flow instead of duplicating it.
+  const { user } = useAuth();
+  const [savedRecordId, setSavedRecordId] = useState<number | null>(null);
+  const [showContact, setShowContact] = useState(false);
+  const [contactPrefillMessage, setContactPrefillMessage] = useState<string | null>(null);
+  const [showDecisionSheet, setShowDecisionSheet] = useState(false);
+
+  // Visit & Viewing Management (Prompt 7) — the logged-in customer's own
+  // active (non-cancelled/completed) viewing for this exact property, if
+  // any. Drives the Schedule Viewing CTA (disabled/redirected when one
+  // already exists, per brief §18) and the status banner below the gallery.
+  const [showScheduleViewing, setShowScheduleViewing] = useState(false);
+  const [myActiveViewing, setMyActiveViewing] = useState<ApiPropertyViewing | null>(null);
+
+  // AI Negotiation & Offer Management (Prompt 7) — "Make an Offer" vs "View
+  // Negotiation" entry point. `isPublished` tracks the RAW backend status
+  // ("Published") rather than the mapped UI Property.status (which already
+  // collapses everything else to "Available"/"Reserved" and has no
+  // "Published" literal at all — see mapApiProperty in lib/api/maskan.ts),
+  // captured straight off the ApiProperty response in loadAll() below, per
+  // brief §3's "do not show for inactive/unavailable properties".
+  const [isPublished, setIsPublished] = useState(true);
+  const [activeNegotiation, setActiveNegotiation] = useState<ApiPropertyNegotiation | null>(null);
+  const [showMakeOffer, setShowMakeOffer] = useState(false);
+  const [offerPrefillViewingId, setOfferPrefillViewingId] = useState<number | undefined>(undefined);
+
+  function openContact(prefill?: string) {
+    setContactPrefillMessage(prefill ?? null);
+    setShowContact(true);
+  }
+
   const isSale = property?.listingType === "sale";
   // District rent averages don't mean anything against a one-time sale price —
   // only feed them into the score/comparison logic for rent listings.
@@ -125,6 +182,7 @@ function PropertyDetail() {
         if (cancelled) return;
         const mapped = mapApiProperty(propertyData);
         setProperty(mapped);
+        setIsPublished(propertyData.status === "Published");
 
         // Now load area-specific data in parallel (non-blocking)
         Promise.all([
@@ -150,6 +208,96 @@ function PropertyDetail() {
     // tProp intentionally omitted — switching language shouldn't re-fetch the property.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Property Intelligence — fetched only once the core property is loaded,
+  // in its own effect/loading state so a slow or failing call never blocks
+  // the rest of the page.
+  useEffect(() => {
+    let cancelled = false;
+    if (!property) return;
+    setIntelligenceLoading(true);
+    setIntelligenceError(false);
+    fetchPropertyIntelligence(Number(property.id), consumeHomeFinderCriteria())
+      .then((data) => {
+        if (cancelled) return;
+        setIntelligence(data);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setIntelligence(null);
+        setIntelligenceError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setIntelligenceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [property?.id]);
+
+  useEffect(() => {
+    if (!user || !property) return;
+    fetchSavedProperties(user.id)
+      .then((list) => {
+        const match = list.find((s) => String(s.property_id) === String(property.id));
+        setSavedRecordId(match ? match.id : null);
+      })
+      .catch(() => {});
+  }, [user, property?.id]);
+
+  useEffect(() => {
+    if (!user || !property) return;
+    let cancelled = false;
+    fetchMyViewings()
+      .then((list) => {
+        if (cancelled) return;
+        const active = list.find(
+          (v) =>
+            String(v.property_id) === String(property.id) &&
+            !(VIEWING_INACTIVE_STATUSES as readonly string[]).includes(v.status),
+        );
+        setMyActiveViewing(active ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, property?.id]);
+
+  // The caller's own active (non-terminal) negotiation for this property, if
+  // any — drives the "Make an Offer" vs "View Negotiation" CTA (brief §3).
+  // A 404 (no active negotiation) is the expected/common case, not an
+  // error — same soft-fail idiom fetchAreaIntelligence/fetchMyViewings use.
+  useEffect(() => {
+    if (!user || !property) return;
+    let cancelled = false;
+    fetchActiveNegotiation(Number(property.id))
+      .then((negotiation) => {
+        if (!cancelled) setActiveNegotiation(negotiation);
+      })
+      .catch(() => {
+        if (!cancelled) setActiveNegotiation(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, property?.id]);
+
+  // Retargeted "Ask AI about negotiation" hook from a completed viewing's
+  // detail screen (viewings.$id.tsx) — opens the Make an Offer flow
+  // pre-filled with viewing_id instead of deep-linking to /advisor. Uses the
+  // same sessionStorage handoff idiom as storeAdvisorCtx/
+  // consumeHomeFinderCriteria above (write-once-before-navigating,
+  // read-once-and-clear here).
+  useEffect(() => {
+    if (!property) return;
+    const viewingId = consumeOfferHandoff();
+    if (viewingId != null) {
+      setOfferPrefillViewingId(viewingId);
+      setShowMakeOffer(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [property?.id]);
 
   if (loading) {
     return (
@@ -182,6 +330,32 @@ function PropertyDetail() {
     );
   }
 
+  // Lifted here (rather than kept local to ActionsCard) so the Prompt 10
+  // mobile sticky action bar's "Save" button can reuse the exact same
+  // save/unsave logic instead of duplicating it. A function expression
+  // (not a hoisted function declaration) so TS keeps `property` narrowed
+  // to non-null from the guard above.
+  const handleToggleSave = async () => {
+    if (!user) return;
+    if (savedRecordId !== null) {
+      const prev = savedRecordId;
+      setSavedRecordId(null);
+      try {
+        await deleteSavedProperty(prev);
+      } catch {
+        setSavedRecordId(prev);
+      }
+    } else {
+      setSavedRecordId(-1);
+      try {
+        const record = await saveProperty(user.id, Number(property.id));
+        setSavedRecordId(record.id);
+      } catch {
+        setSavedRecordId(null);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <TopNav />
@@ -196,10 +370,44 @@ function PropertyDetail() {
 
       <Gallery title={property.title} images={property.images} />
 
+      {myActiveViewing && (
+        <div className="container-page pt-6">
+          <ViewingStatusBanner viewing={myActiveViewing} onMessageMediator={() => openContact()} />
+        </div>
+      )}
+
       <div className="container-page grid grid-cols-1 gap-10 pb-32 lg:pb-16 lg:grid-cols-[1.7fr_1fr]">
         <main className="space-y-10">
           <Summary property={property} />
-          {!isSale && <RentNowPayLaterBanner property={property} />}
+          <PropertyTrustSection
+            propertyId={Number(property.id)}
+            intelligence={intelligence}
+            mediatorId={property.mediatorId}
+            mediatorName={property.agent}
+          />
+          <IntelligenceHero
+            property={property}
+            intelligence={intelligence}
+            loading={intelligenceLoading}
+            error={intelligenceError}
+            onOpenContact={() => openContact()}
+            onOpenWhyThisProperty={() => setShowDecisionSheet(true)}
+          />
+          <PersonalizedFitSection intelligence={intelligence} />
+          <DecisionScoreCard intelligence={intelligence} />
+          <PriceIntelligenceCard intelligence={intelligence} isSale={isSale} />
+          <AtAGlanceCard intelligence={intelligence} />
+          <SimilarPropertiesSection intelligence={intelligence} currentId={property.id} />
+          <AreaIntelligenceEmbed areaIntel={areaIntel} intelligence={intelligence} district={property.district} />
+          <SmartQuestionsSection intelligence={intelligence} onSendToAgent={openContact} />
+          <NegotiationInsightCard property={property} intelligence={intelligence} onUseInContact={openContact} />
+          <AskMyMakanQuickQuestions property={property} isSale={isSale} />
+          {/* Rent Now Pay Later is a financing feature — Hide-Phase1 (see
+              docs/implementation/mymakan-phase1.md "Feature flags"); the
+              backend's /financing router is already unregistered by
+              default, so leaving this visible would just lead to a
+              broken call. */}
+          {!isSale && PHASE1_FLAGS.financing && <RentNowPayLaterBanner property={property} />}
           <PropertyFeatures property={property} />
           <DescriptionSection property={property} />
           <RentalIntelligence
@@ -217,7 +425,10 @@ function PropertyDetail() {
           ) : (
             <RentCalculator property={property} />
           )}
-          {!isSale && <ShortTermBooking property={property} />}
+          {/* Short-term/nightly booking is Hide-Phase1 (short_stay/booking) —
+              the backend's /bookings router is already unregistered by
+              default, so this would just hit a 404 if shown. */}
+          {!isSale && PHASE1_FLAGS.booking && <ShortTermBooking property={property} />}
           <RentPayments property={property} />
           <AreaSummary property={property} />
           <NearbyPlaces areaIntel={areaIntel} district={property.district} />
@@ -231,7 +442,26 @@ function PropertyDetail() {
         </main>
 
         <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-          <ActionsCard property={property} />
+          <ActionsCard
+            property={property}
+            savedRecordId={savedRecordId}
+            setSavedRecordId={setSavedRecordId}
+            showContact={showContact}
+            setShowContact={(show) => {
+              setShowContact(show);
+              if (!show) setContactPrefillMessage(null);
+            }}
+            contactPrefillMessage={contactPrefillMessage}
+            onToggleSave={() => void handleToggleSave()}
+            activeViewing={myActiveViewing}
+            onScheduleViewing={() => setShowScheduleViewing(true)}
+            isPublished={isPublished}
+            activeNegotiation={activeNegotiation}
+            onMakeOffer={() => {
+              setOfferPrefillViewingId(undefined);
+              setShowMakeOffer(true);
+            }}
+          />
           <LandlordCard
             agentName={property.agent}
             agentPhone={property.agentPhone}
@@ -241,54 +471,81 @@ function PropertyDetail() {
             mediatorRating={property.mediatorRating}
             mediatorReviewCount={property.mediatorReviewCount}
           />
-          <RegisterLeaseBanner property={property} />
+          {/* Advertises the Ejar-equivalent digital rental contract feature
+              (Hide-Phase1, see frontend/src/lib/phase1-flags.ts). */}
+          {PHASE1_FLAGS.contracts && <RegisterLeaseBanner property={property} />}
         </aside>
       </div>
 
-      {/* Mobile sticky contact bar — fixed at bottom, hidden on desktop */}
+      {showDecisionSheet && (
+        <DecisionSheet
+          intelligence={intelligence}
+          onAskAI={() => {
+            storeAdvisorCtx(property);
+          }}
+          propertyId={Number(property.id)}
+          onClose={() => setShowDecisionSheet(false)}
+        />
+      )}
+
+      {showScheduleViewing && !myActiveViewing && (
+        <ScheduleViewingModal
+          property={property}
+          onClose={() => setShowScheduleViewing(false)}
+          onSuccess={(viewing) => {
+            setMyActiveViewing(viewing);
+            setShowScheduleViewing(false);
+          }}
+        />
+      )}
+
+      {/* Gated on showMakeOffer alone — NOT `!activeNegotiation`. The CTA
+          that opens this modal already only appears when there's no active
+          negotiation (see ActionsCard below), but the modal's own onSuccess
+          callback SETS activeNegotiation on a successful submit; gating the
+          modal's render on `!activeNegotiation` would unmount it (and wipe
+          out its post-submit confirmation state) the instant submission
+          succeeds, before the customer ever sees it. */}
+      {showMakeOffer && (
+        <MakeOfferModal
+          property={property}
+          intelligence={intelligence}
+          initialViewingId={offerPrefillViewingId}
+          onClose={() => {
+            setShowMakeOffer(false);
+            setOfferPrefillViewingId(undefined);
+          }}
+          onSuccess={(negotiation) => setActiveNegotiation(negotiation)}
+        />
+      )}
+
+      {/* Mobile sticky action bar — fixed at bottom, hidden on desktop
+          (Prompt 10): primary Contact Agent, secondary Save / Ask AI — all
+          three reuse the exact handlers ActionsCard/IntelligenceHero already
+          use, no new logic. */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-xl lg:hidden">
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-[11px] text-muted-foreground">
-              {isSale ? t("propertyCard.salePrice") : t("propertyCard.annualRent")}
-            </div>
-            <div className="truncate text-base font-bold tracking-tight">
-              SAR {formatSAR(property.price)}
-              {!isSale && (
-                <span className="ms-1 text-xs font-normal text-muted-foreground">
-                  / SAR {formatSAR(Math.round(property.price / 12))}
-                  {tProp("perMonthShort")}
-                </span>
-              )}
-            </div>
-          </div>
-          {property.agentPhone ? (
-            <>
-              <a
-                href={whatsappLink(property.agentWhatsapp ?? property.agentPhone)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-whatsapp px-4 py-2.5 text-sm font-semibold text-white"
-              >
-                <WhatsAppIcon className="size-4" />
-                {t("propertyCard.whatsapp")}
-              </a>
-              <a
-                href={`tel:${property.agentPhone}`}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold"
-              >
-                <Phone className="size-4" /> {t("propertyCard.call")}
-              </a>
-            </>
-          ) : (
+        <div className="flex items-center gap-2">
+          <Button variant="hero" className="flex-1" onClick={() => openContact()}>
+            <Phone className="size-4" /> {tProp("actions.contactLandlord")}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={savedRecordId !== null ? tProp("actions.saved") : tProp("actions.save")}
+            aria-pressed={savedRecordId !== null}
+            onClick={() => void handleToggleSave()}
+          >
+            <Heart className={cn("size-4", savedRecordId !== null && "fill-destructive text-destructive")} />
+          </Button>
+          <Button variant="ai" size="icon" aria-label={tProp("actions.askAI")} asChild>
             <Link
-              to="/lead/new"
-              search={{ area: property.district, city: property.city }}
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+              to="/advisor"
+              search={{ propertyId: Number(property.id) }}
+              onClick={() => storeAdvisorCtx(property)}
             >
-              <MessageCircle className="size-4" /> {tProp("findAgent")}
+              <Sparkles className="size-4" />
             </Link>
-          )}
+          </Button>
         </div>
       </div>
     </div>
@@ -459,6 +716,898 @@ function Summary({ property }: { property: Property }) {
             <div className="mt-1 truncate text-sm font-semibold">{f.value}</div>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+/* --------------------------- myMakan Intelligence -------------------------- */
+// Prompt 7: hero + Decision Score + Price Intelligence. Comparables/Area/
+// Smart Questions/Negotiation sections are built in Prompts 8-9.
+
+const CLASSIFICATION_KEYS: Record<string, string> = {
+  "Excellent Value": "excellentValue",
+  "Good Value": "goodValue",
+  Fair: "fair",
+  "Above Market": "aboveMarket",
+  "Significantly Above Market": "significantlyAboveMarket",
+};
+
+function classificationKey(classification: string): string {
+  return CLASSIFICATION_KEYS[classification] ?? "fair";
+}
+
+function classificationTone(classification: string): "success" | "neutral" | "warning" | "destructive" {
+  if (classification === "Excellent Value" || classification === "Good Value") return "success";
+  if (classification === "Fair") return "neutral";
+  if (classification === "Above Market") return "warning";
+  return "destructive";
+}
+
+function IntelligenceHero({
+  property,
+  intelligence,
+  loading,
+  error,
+  onOpenContact,
+  onOpenWhyThisProperty,
+}: {
+  property: Property;
+  intelligence: ApiPropertyIntelligence | null;
+  loading: boolean;
+  error: boolean;
+  onOpenContact: () => void;
+  onOpenWhyThisProperty: () => void;
+}) {
+  const tProp = usePropT();
+  const isSale = property.listingType === "sale";
+  const pi = intelligence?.price_intelligence;
+
+  if (error) return null; // never block the rest of the page on a failed call
+
+  return (
+    <section className="rounded-2xl border border-ai/20 bg-ai/5 p-6 shadow-card md:p-8">
+      <div className="mb-4 flex items-center gap-2">
+        <Sparkles className="size-4 text-ai" />
+        <span className="text-xs font-semibold uppercase tracking-wide text-ai">
+          {tProp("intelligence.badge")}
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-6 w-1/3" />
+          <Skeleton className="h-4 w-2/3" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+        </div>
+      ) : !intelligence ? (
+        <p className="text-sm text-muted-foreground">{tProp("intelligence.unavailable")}</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            <ScoreRing score={intelligence.decision_score} size={48} />
+            {intelligence.personalized_fit && (
+              <Badge tone="ai">
+                {tProp("intelligence.matchLabel", {
+                  percent: Math.round(
+                    (intelligence.personalized_fit.priorities_matched /
+                      Math.max(1, intelligence.personalized_fit.priorities_total)) *
+                      100,
+                  ),
+                })}
+              </Badge>
+            )}
+            {pi?.classification && (
+              <Badge tone={classificationTone(pi.classification)}>
+                {tProp(`intelligence.priceIntelligence.classification.${classificationKey(pi.classification)}`)}
+              </Badge>
+            )}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-end gap-6">
+            <div>
+              <div className="text-xs text-muted-foreground">
+                {isSale ? tProp("intelligence.askingPrice") : tProp("intelligence.askingRent")}
+              </div>
+              <div className="text-xl font-bold tracking-tight">
+                {/* pi.asking_price is the same figure the fair range below was computed
+                    against (monthly for rent, total for sale) — deliberately NOT
+                    property.price (annual for rent) here, so the two numbers in this
+                    card are always expressed in the same unit. */}
+                SAR {formatSAR(pi?.asking_price ?? property.price)}
+                {!isSale && <span className="ms-1 text-xs font-normal text-muted-foreground">{tProp("perMonthShort")}</span>}
+              </div>
+            </div>
+            {pi?.sufficient_data && pi.fair_range_low != null && pi.fair_range_high != null && (
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  {tProp("intelligence.priceIntelligence.fairRange")}
+                </div>
+                <div className="text-sm font-semibold">
+                  SAR {formatSAR(Math.round(pi.fair_range_low))} – SAR {formatSAR(Math.round(pi.fair_range_high))}
+                  {!isSale && <span className="ms-1 text-xs font-normal text-muted-foreground">{tProp("perMonthShort")}</span>}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {intelligence.personalized_fit && (
+            <p className="mt-3 text-sm text-muted-foreground">{intelligence.personalized_fit.summary}</p>
+          )}
+
+          <div className="mt-5 flex flex-wrap gap-2.5">
+            <Button size="sm" variant="outline" onClick={onOpenWhyThisProperty}>
+              {tProp("intelligence.actions.whyThisProperty")}
+            </Button>
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/compare">
+                <GitCompare className="size-4" /> {tProp("intelligence.actions.compare")}
+              </Link>
+            </Button>
+            <Button size="sm" variant="ai" asChild>
+              <Link
+                to="/advisor"
+                search={{ propertyId: Number(property.id) }}
+                onClick={() => storeAdvisorCtx(property)}
+              >
+                <Sparkles className="size-4" /> {tProp("intelligence.actions.askMyMakan")}
+              </Link>
+            </Button>
+            <Button size="sm" variant="hero" onClick={onOpenContact}>
+              <Phone className="size-4" /> {tProp("intelligence.actions.contactAgent")}
+            </Button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+const DECISION_SCORE_DIMENSIONS = [
+  "price_value",
+  "location_fit",
+  "property_fit",
+  "amenities",
+  "area",
+  "listing_confidence",
+] as const;
+
+function DecisionScoreCard({ intelligence }: { intelligence: ApiPropertyIntelligence | null }) {
+  const tProp = usePropT();
+  if (!intelligence) return null;
+  const dims = DECISION_SCORE_DIMENSIONS.filter((key) => intelligence.component_scores[key]);
+  if (dims.length === 0) return null;
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <div className="flex items-center gap-4">
+        <ScoreRing score={intelligence.decision_score} size={56} />
+        <div>
+          <h2 className="text-lg font-bold">{tProp("intelligence.decisionScore.title")}</h2>
+          <p className="text-sm text-muted-foreground">{tProp("intelligence.decisionScore.subtitle")}</p>
+        </div>
+      </div>
+      <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {dims.map((key) => (
+          <ScoreBar
+            key={key}
+            label={tProp(`intelligence.decisionScore.dimensions.${key}`)}
+            value={intelligence.component_scores[key].score}
+          />
+        ))}
+      </div>
+      {intelligence.omitted_score_dimensions.length > 0 && (
+        <p className="mt-4 text-xs text-muted-foreground">{tProp("intelligence.decisionScore.omittedNote")}</p>
+      )}
+    </section>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="truncate text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function PriceIntelligenceCard({
+  intelligence,
+  isSale,
+}: {
+  intelligence: ApiPropertyIntelligence | null;
+  isSale: boolean;
+}) {
+  const tProp = usePropT();
+  if (!intelligence) return null;
+  const pi = intelligence.price_intelligence;
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <h2 className="text-lg font-bold">
+        {isSale ? tProp("intelligence.priceIntelligence.titleBuy") : tProp("intelligence.priceIntelligence.titleRent")}
+      </h2>
+
+      {!pi.sufficient_data ? (
+        <p className="mt-3 text-sm text-muted-foreground">{tProp("intelligence.priceIntelligence.insufficientData")}</p>
+      ) : (
+        <>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {pi.classification && (
+              <Badge tone={classificationTone(pi.classification)}>
+                {tProp(`intelligence.priceIntelligence.classification.${classificationKey(pi.classification)}`)}
+              </Badge>
+            )}
+            <span className="text-xs text-muted-foreground">
+              {tProp("intelligence.priceIntelligence.comparableCount", { count: pi.comparable_count })}
+            </span>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {!isSale ? (
+              // Every figure here is monthly (the unit price_intelligence.py compares
+              // rent listings on) — labelled explicitly so it's never read as the
+              // page's usual annual rent figure.
+              <>
+                <MiniStat
+                  label={tProp("intelligence.askingRent")}
+                  value={`SAR ${formatSAR(pi.asking_price ?? 0)} ${tProp("perMonthShort")}`}
+                />
+                {pi.fair_range_low != null && pi.fair_range_high != null && (
+                  <MiniStat
+                    label={tProp("intelligence.priceIntelligence.fairRange")}
+                    value={`SAR ${formatSAR(Math.round(pi.fair_range_low))} – ${formatSAR(Math.round(pi.fair_range_high))} ${tProp("perMonthShort")}`}
+                  />
+                )}
+                {pi.market_midpoint != null && (
+                  <MiniStat
+                    label={tProp("intelligence.priceIntelligence.marketMidpoint")}
+                    value={`SAR ${formatSAR(Math.round(pi.market_midpoint))} ${tProp("perMonthShort")}`}
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <MiniStat label={tProp("intelligence.askingPrice")} value={`SAR ${formatSAR(pi.asking_price ?? 0)}`} />
+                {pi.price_per_sqm != null && (
+                  <MiniStat
+                    label={tProp("intelligence.priceIntelligence.pricePerSqm")}
+                    value={`SAR ${formatSAR(Math.round(pi.price_per_sqm))}`}
+                  />
+                )}
+                {pi.comparable_median_price_per_sqm != null && (
+                  <MiniStat
+                    label={tProp("intelligence.priceIntelligence.comparableMedianPricePerSqm")}
+                    value={`SAR ${formatSAR(Math.round(pi.comparable_median_price_per_sqm))}`}
+                  />
+                )}
+                {pi.estimated_value_low != null && pi.estimated_value_high != null && (
+                  <MiniStat
+                    label={tProp("intelligence.priceIntelligence.estimatedValueRange")}
+                    value={`SAR ${formatSAR(Math.round(pi.estimated_value_low))} – ${formatSAR(Math.round(pi.estimated_value_high))}`}
+                  />
+                )}
+              </>
+            )}
+          </div>
+          {pi.factors_used.length > 0 && (
+            <p className="mt-4 text-xs text-muted-foreground">
+              {tProp("intelligence.priceIntelligence.factorsUsed")}:{" "}
+              {pi.factors_used.map((f) => tProp(`intelligence.priceIntelligence.factors.${f}`)).join(", ")}
+            </p>
+          )}
+          {isSale && (
+            <p className="mt-3 text-xs text-muted-foreground">{tProp("intelligence.priceIntelligence.disclaimerBuy")}</p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/* --------------------------- At a Glance (Prompt 8) ------------------------ */
+
+function AtAGlanceCard({ intelligence }: { intelligence: ApiPropertyIntelligence | null }) {
+  const tProp = usePropT();
+  const [showWhy, setShowWhy] = useState(false);
+  if (!intelligence) return null;
+  const { strengths, considerations, things_to_verify, data_confidence } = intelligence;
+  if (strengths.length === 0 && considerations.length === 0 && things_to_verify.length === 0) return null;
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display text-xl font-bold tracking-tight">{tProp("intelligence.atAGlance.title")}</h2>
+        <div className="flex items-center gap-2">
+          <Badge tone={data_confidence.level === "High" ? "success" : "warning"}>
+            {tProp(data_confidence.level === "High" ? "intelligence.dataConfidence.high" : "intelligence.dataConfidence.moderate")}
+          </Badge>
+          <button
+            type="button"
+            onClick={() => setShowWhy((v) => !v)}
+            className="text-xs font-semibold text-primary hover:underline"
+          >
+            {tProp("intelligence.dataConfidence.why")}
+          </button>
+        </div>
+      </div>
+      {showWhy && <p className="mt-2 text-xs text-muted-foreground">{data_confidence.reason}</p>}
+
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+        {strengths.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-success">{tProp("intelligence.atAGlance.strengths")}</h3>
+            <ul className="mt-3 space-y-2">
+              {strengths.map((s) => (
+                <li key={s} className="flex items-start gap-2 text-sm">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                  <span className="text-muted-foreground">{s}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {considerations.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-warning">{tProp("intelligence.atAGlance.considerations")}</h3>
+            <ul className="mt-3 space-y-2">
+              {considerations.map((c) => (
+                <li key={c} className="flex items-start gap-2 text-sm">
+                  <Lightbulb className="mt-0.5 size-4 shrink-0 text-warning" />
+                  <span className="text-muted-foreground">{c}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {things_to_verify.length > 0 && (
+        <div className="mt-6 border-t border-border pt-5">
+          <h3 className="text-sm font-semibold">{tProp("intelligence.atAGlance.thingsToVerify")}</h3>
+          <ul className="mt-3 space-y-2">
+            {things_to_verify.map((v) => (
+              <li key={v} className="flex items-start gap-2 text-sm">
+                <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <span className="text-muted-foreground">{v}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ----------------------- Similar Properties (Prompt 8) --------------------- */
+// Distinct from the pre-existing `ComparableListings` below (which ranks by
+// the older client-side rental-score heuristic) — this section is powered by
+// Prompt 3's deterministic comparable-selection service (match-similarity %,
+// value labels) via the intelligence payload's `comparable_summary`.
+// Deferred behind an expand toggle (this file's existing readMore/readLess
+// pattern) so the extra per-comparable property fetches only happen once the
+// user actually asks to see them — keeps the initial render light.
+
+const VALUE_LABEL_KEYS: Record<string, string> = {
+  "Better Value": "betterValue",
+  "Similar Price": "similarPrice",
+  "Higher Price": "higherPrice",
+};
+
+function valueLabelTone(label: string): "success" | "neutral" | "warning" {
+  if (label === "Better Value") return "success";
+  if (label === "Higher Price") return "warning";
+  return "neutral";
+}
+
+function SimilarPropertiesSection({
+  intelligence,
+  currentId,
+}: {
+  intelligence: ApiPropertyIntelligence | null;
+  currentId: string;
+}) {
+  const tProp = usePropT();
+  const [expanded, setExpanded] = useState(false);
+  const [properties, setProperties] = useState<Record<number, Property>>({});
+  const [loadingCards, setLoadingCards] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+
+  const items = intelligence?.comparable_summary.items ?? [];
+
+  useEffect(() => {
+    if (!expanded || items.length === 0) return;
+    let cancelled = false;
+    setLoadingCards(true);
+    Promise.all(
+      items.map((item) =>
+        fetchProperty(item.property_id)
+          .then((p) => [item.property_id, mapApiProperty(p)] as const)
+          .catch(() => null),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+      const map: Record<number, Property> = {};
+      for (const r of results) if (r) map[r[0]] = r[1];
+      setProperties(map);
+      setLoadingCards(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, items.length]);
+
+  if (!intelligence || items.length === 0) return null;
+
+  const toggleCompare = (id: string) =>
+    setCompareIds((c) => (c.includes(id) ? c.filter((x) => x !== id) : c.length < 3 ? [...c, id] : c));
+
+  return (
+    <section>
+      <div className="mb-4 flex items-end justify-between gap-4">
+        <div>
+          <h2 className="font-display text-2xl font-bold tracking-tight">{tProp("intelligence.similarProperties.title")}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{tProp("intelligence.similarProperties.subtitle")}</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? tProp("intelligence.similarProperties.hide") : tProp("intelligence.similarProperties.show")}
+        </Button>
+      </div>
+
+      {expanded && (
+        <>
+          {loadingCards ? (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {items.slice(0, 3).map((item) => (
+                <Skeleton key={item.property_id} className="h-80 w-full rounded-2xl" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {items.map((item) => {
+                const p = properties[item.property_id];
+                if (!p) return null;
+                const compared = compareIds.includes(p.id);
+                return (
+                  <div key={item.property_id} className="space-y-2">
+                    <PropertyCard p={p} />
+                    <div className="flex items-center justify-between gap-2 px-1">
+                      {item.value_label && (
+                        <Badge tone={valueLabelTone(item.value_label)}>
+                          {tProp(`intelligence.similarProperties.valueLabel.${VALUE_LABEL_KEYS[item.value_label] ?? "similarPrice"}`)}
+                        </Badge>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleCompare(p.id)}
+                        className={cn(
+                          "text-xs font-semibold hover:underline",
+                          compared ? "text-success" : "text-primary",
+                        )}
+                      >
+                        {compared ? tProp("intelligence.similarProperties.added") : tProp("intelligence.similarProperties.compareWith")}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {compareIds.length > 0 && (
+            <div className="mt-5 flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+              <span className="text-sm font-medium">{compareIds.length + 1} {tProp("actions.compare")}</span>
+              <Button size="sm" asChild>
+                <Link to="/compare">
+                  <GitCompare className="size-4" /> {tProp("actions.compare")}
+                </Link>
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/* ---------------------- Area Intelligence embed (Prompt 8) ----------------- */
+// Reuses the SAME `areaIntel` (full ApiAreaIntelligence) already fetched by
+// PropertyDetail's main effect — no second area-intelligence fetch — and the
+// intelligence payload's own price_intelligence range as the "typical
+// price/rent band," tying the two data sources together instead of
+// duplicating the Area Intelligence backend or inventing a second summary.
+
+function trendDirection(trend: ApiRentTrendPoint[]): "up" | "down" | "flat" | null {
+  if (trend.length < 2) return null;
+  const last = trend[trend.length - 1].avg_rent_annual;
+  const prev = trend[trend.length - 2].avg_rent_annual;
+  if (last > prev * 1.02) return "up";
+  if (last < prev * 0.98) return "down";
+  return "flat";
+}
+
+function AreaIntelligenceEmbed({
+  areaIntel,
+  intelligence,
+  district,
+}: {
+  areaIntel: ApiAreaIntelligence | null;
+  intelligence: ApiPropertyIntelligence | null;
+  district: string;
+}) {
+  const tProp = usePropT();
+  const [expanded, setExpanded] = useState(false);
+  if (!areaIntel) return null;
+
+  const trend = trendDirection(areaIntel.rent_trend);
+  const pi = intelligence?.price_intelligence;
+  const band =
+    pi?.sufficient_data && pi.fair_range_low != null && pi.fair_range_high != null
+      ? `SAR ${formatSAR(Math.round(pi.fair_range_low))} – ${formatSAR(Math.round(pi.fair_range_high))}`
+      : pi?.sufficient_data && pi.estimated_value_low != null && pi.estimated_value_high != null
+        ? `SAR ${formatSAR(Math.round(pi.estimated_value_low))} – ${formatSAR(Math.round(pi.estimated_value_high))}`
+        : null;
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="font-display text-xl font-bold tracking-tight">
+          {tProp("intelligence.areaEmbed.titlePrefix")} {district}
+        </h2>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <a href={`/areas?area=${encodeURIComponent(district)}`}>
+              <MapPin className="size-4" /> {tProp("intelligence.areaEmbed.exploreArea", { district })}
+            </a>
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setExpanded((v) => !v)}>
+            {expanded ? tProp("intelligence.areaEmbed.hide") : tProp("intelligence.areaEmbed.show")}
+          </Button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="mt-6 space-y-5">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {areaIntel.lifestyle_score != null && (
+              <MiniStat label={tProp("intelligence.areaEmbed.lifestyleScore")} value={`${Math.round(areaIntel.lifestyle_score)}/100`} />
+            )}
+            {areaIntel.school_score != null && (
+              <MiniStat label={tProp("intelligence.areaEmbed.schoolScore")} value={`${Math.round(areaIntel.school_score)}/100`} />
+            )}
+            {areaIntel.healthcare_score != null && (
+              <MiniStat label={tProp("intelligence.areaEmbed.healthcareScore")} value={`${Math.round(areaIntel.healthcare_score)}/100`} />
+            )}
+            {trend && (
+              <MiniStat
+                label={tProp("intelligence.areaEmbed.rentTrend")}
+                value={trend === "up" ? "↑" : trend === "down" ? "↓" : "→"}
+              />
+            )}
+          </div>
+          {band && <MiniStat label={tProp("intelligence.areaEmbed.typicalBand")} value={band} />}
+          <p className="text-sm leading-6 text-muted-foreground">
+            {areaIntel.overview || tProp("intelligence.areaEmbed.noOverview")}
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ------------------------ Personalized Fit (Prompt 9) ---------------------- */
+// Renders only when `personalized_fit` is present in the intelligence
+// response — i.e. the visitor arrived with AI Home Finder criteria (see
+// `consumeHomeFinderCriteria` / the sessionStorage handoff in
+// home-finder.tsx's MatchCard) or supplied criteria some other way. Never
+// fabricates personalization when none exists.
+
+const FIT_STATUS_TONE: Record<string, "success" | "warning" | "destructive"> = {
+  match: "success",
+  moderate: "warning",
+  miss: "destructive",
+};
+
+function PersonalizedFitSection({ intelligence }: { intelligence: ApiPropertyIntelligence | null }) {
+  const tProp = usePropT();
+  const fit = intelligence?.personalized_fit;
+  if (!fit) return null;
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display text-xl font-bold tracking-tight">{tProp("intelligence.personalizedFit.title")}</h2>
+        <span className="text-sm font-medium text-muted-foreground">{fit.summary}</span>
+      </div>
+      <ul className="mt-5 space-y-2">
+        {fit.rows.map((row) => (
+          <li
+            key={row.label}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-4 py-3"
+          >
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">{row.label}</div>
+              {row.detail && <div className="text-xs text-muted-foreground">{row.detail}</div>}
+            </div>
+            <Badge tone={FIT_STATUS_TONE[row.status] ?? "neutral"}>
+              {tProp(`intelligence.personalizedFit.status.${row.status}`)}
+            </Badge>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* --------------------------- Decision Sheet (Prompt 9) --------------------- */
+// A generalized "why this property" sheet driven by Property Intelligence
+// data (strengths/considerations/things_to_verify) — kept as its own
+// component here rather than reusing home-finder.tsx's `WhyThisPropertyModal`,
+// which is driven by a different data shape (AI Home Finder match results,
+// not Property Intelligence) and stays untouched. Documented per Prompt 9's
+// "your call" allowance on shared-vs-separate.
+
+function DecisionSheet({
+  intelligence,
+  propertyId,
+  onAskAI,
+  onClose,
+}: {
+  intelligence: ApiPropertyIntelligence | null;
+  propertyId: number;
+  onAskAI: () => void;
+  onClose: () => void;
+}) {
+  const tProp = usePropT();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const isEmpty =
+    !intelligence ||
+    (intelligence.strengths.length === 0 &&
+      intelligence.considerations.length === 0 &&
+      intelligence.things_to_verify.length === 0);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-border bg-background shadow-2xl sm:rounded-2xl"
+        style={{ maxHeight: "min(92vh, 720px)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex items-center gap-3">
+            {intelligence && <ScoreRing score={intelligence.decision_score} size={44} />}
+            <h3 className="font-display text-base font-bold">{tProp("intelligence.decisionSheet.title")}</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-surface-2"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {isEmpty ? (
+            <p className="text-sm text-muted-foreground">{tProp("intelligence.decisionSheet.empty")}</p>
+          ) : (
+            <>
+              {intelligence!.strengths.length > 0 && (
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {tProp("intelligence.decisionSheet.whyItWorks")}
+                  </p>
+                  <ul className="space-y-1">
+                    {intelligence!.strengths.map((s) => (
+                      <li key={s} className="flex items-start gap-1.5 text-sm">
+                        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" /> {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {intelligence!.considerations.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {tProp("intelligence.decisionSheet.tradeOffs")}
+                  </p>
+                  <ul className="space-y-1">
+                    {intelligence!.considerations.map((c) => (
+                      <li key={c} className="flex items-start gap-1.5 text-sm">
+                        <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-warning" /> {c}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {intelligence!.things_to_verify.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {tProp("intelligence.decisionSheet.thingsToVerify")}
+                  </p>
+                  <ul className="space-y-1">
+                    {intelligence!.things_to_verify.map((v) => (
+                      <li key={v} className="flex items-start gap-1.5 text-sm">
+                        <FileText className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" /> {v}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="shrink-0 border-t border-border p-4">
+          <Button variant="ai" className="w-full gap-2" asChild>
+            <Link to="/advisor" search={{ propertyId }} onClick={onAskAI}>
+              <MessageCircle className="size-4" /> {tProp("intelligence.decisionSheet.askAI")}
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------- Smart Questions (Prompt 9) --------------------- */
+
+function SmartQuestionsSection({
+  intelligence,
+  onSendToAgent,
+}: {
+  intelligence: ApiPropertyIntelligence | null;
+  onSendToAgent: (message: string) => void;
+}) {
+  const tProp = usePropT();
+  const [copied, setCopied] = useState(false);
+  const questions = intelligence?.smart_questions ?? [];
+  if (questions.length === 0) return null;
+
+  const questionsText = questions.map((q, i) => `${i + 1}. ${q}`).join("\n");
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(questionsText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable — no-op, button simply won't show "Copied!"
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <h2 className="font-display text-xl font-bold tracking-tight">{tProp("intelligence.smartQuestions.title")}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{tProp("intelligence.smartQuestions.subtitle")}</p>
+      <ol className="mt-4 list-inside list-decimal space-y-2 text-sm">
+        {questions.map((q) => (
+          <li key={q}>{q}</li>
+        ))}
+      </ol>
+      <div className="mt-5 flex flex-wrap gap-2.5">
+        <Button variant="outline" size="sm" onClick={() => void handleCopy()}>
+          {copied ? tProp("intelligence.smartQuestions.copied") : tProp("intelligence.smartQuestions.copyQuestions")}
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => onSendToAgent(questionsText)}>
+          {tProp("intelligence.smartQuestions.sendToAgent")}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------ Negotiation Insight (Prompt 9) ------------------- */
+
+function NegotiationInsightCard({
+  property,
+  intelligence,
+  onUseInContact,
+}: {
+  property: Property;
+  intelligence: ApiPropertyIntelligence | null;
+  onUseInContact: (message: string) => void;
+}) {
+  const tProp = usePropT();
+  const { lang } = useLanguage();
+  const [draft, setDraft] = useState<string | null>(null);
+  const [drafting, setDrafting] = useState(false);
+
+  const negotiation = intelligence?.negotiation_intelligence;
+  if (!negotiation) return null;
+
+  async function handleDraft() {
+    setDrafting(true);
+    try {
+      const resp = await fetchPropertyAiSummary(Number(property.id), lang === "ar" ? "ar" : "en", "negotiation_message");
+      setDraft(resp.summary);
+    } catch {
+      setDraft(null);
+    } finally {
+      setDrafting(false);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-6 shadow-card md:p-8">
+      <h2 className="font-display text-xl font-bold tracking-tight">{tProp("intelligence.negotiation.title")}</h2>
+      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <MiniStat label={tProp("intelligence.negotiation.askingPrice")} value={`SAR ${formatSAR(negotiation.asking_price)}`} />
+        <MiniStat label={tProp("intelligence.negotiation.marketMidpoint")} value={`SAR ${formatSAR(Math.round(negotiation.market_midpoint))}`} />
+        <MiniStat
+          label={tProp("intelligence.negotiation.discussionRange")}
+          value={`SAR ${formatSAR(Math.round(negotiation.discussion_range_low))} – ${formatSAR(Math.round(negotiation.discussion_range_high))}`}
+        />
+      </div>
+      <p className="mt-4 text-sm text-muted-foreground">{negotiation.approach}</p>
+
+      {draft === null ? (
+        <Button variant="outline" size="sm" className="mt-5" disabled={drafting} onClick={() => void handleDraft()}>
+          {drafting ? tProp("intelligence.negotiation.drafting") : tProp("intelligence.negotiation.draftMessage")}
+        </Button>
+      ) : (
+        <div className="mt-5 rounded-xl border border-border bg-surface p-4">
+          <p className="text-xs font-semibold">{tProp("intelligence.negotiation.draftedTitle")}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{tProp("intelligence.negotiation.draftedDesc")}</p>
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={4}
+            className="mt-3 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary resize-none"
+          />
+          <Button size="sm" className="mt-3" onClick={() => onUseInContact(draft)}>
+            {tProp("intelligence.negotiation.useInContact")}
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* -------------------------- Ask myMakan (Prompt 9) -------------------------- */
+// Property-aware quick questions into the existing AI Advisor, via the same
+// sessionStorage handoff (`storeAdvisorCtx`) property.$id.tsx already uses
+// for the hero's "Ask myMakan" button — not a new chat surface.
+
+function AskMyMakanQuickQuestions({ property, isSale }: { property: Property; isSale: boolean }) {
+  const tProp = usePropT();
+  const baseKeys = ["fairPricing", "compromises", "compare", "whatToAsk", "familySuitability", "negotiateHelp", "areaInfo"] as const;
+  const buyKeys = ["pricePerSqm", "rentalIncome"] as const;
+  const keys = isSale ? [...baseKeys, ...buyKeys] : baseKeys;
+
+  return (
+    <section className="rounded-2xl border border-ai/20 bg-ai/5 p-6 shadow-card md:p-8">
+      <div className="flex items-center gap-2">
+        <Sparkles className="size-4 text-ai" />
+        <h2 className="font-display text-xl font-bold tracking-tight">{tProp("intelligence.quickQuestions.title")}</h2>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">{tProp("intelligence.quickQuestions.subtitle")}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {keys.map((key) => {
+          const question = tProp(`intelligence.quickQuestions.${key}`, { district: property.district });
+          return (
+            <Link
+              key={key}
+              to="/advisor"
+              search={{ propertyId: Number(property.id), q: question }}
+              onClick={() => storeAdvisorCtx(property)}
+              className="rounded-full border border-ai/30 bg-background px-3.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-ai/10"
+            >
+              {question}
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
@@ -1285,12 +2434,14 @@ function ContactModal({
   property,
   savedRecordId,
   userId,
+  initialMessage,
   onSaved,
   onClose,
 }: {
   property: Property;
   savedRecordId: number | null;
   userId?: number;
+  initialMessage?: string | null;
   onSaved: (newId: number) => void;
   onClose: () => void;
 }) {
@@ -1298,7 +2449,7 @@ function ContactModal({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState(
-    tProp("contactModal.inquiryDefault", { title: property.title }),
+    initialMessage || tProp("contactModal.inquiryDefault", { title: property.title }),
   );
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1413,6 +2564,615 @@ function ContactModal({
             </form>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Schedule Viewing (Prompt 7 — Visit & Viewing Management) ───────────────
+// Business hours are fixed client-side (09:00-21:00 Riyadh time, 30-min
+// slots) — there's no real mediator-availability data source yet (brief
+// §4), which is exactly why every slot is labeled "Request a preferred
+// time" rather than "Available Slot": submitting only creates a request the
+// mediator still has to confirm or counter-propose.
+const VIEWING_BUSINESS_HOURS_START = "09:00";
+const VIEWING_BUSINESS_HOURS_END = "21:00";
+const VIEWING_SLOT_MINUTES = 30;
+const RIYADH_UTC_OFFSET_MS = 3 * 60 * 60 * 1000; // Asia/Riyadh has no DST — fixed UTC+3
+
+function hhmmToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function minutesToHHMM(total: number): string {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+// Wall-clock time in Riyadh, independent of the visitor's actual device
+// timezone — matches the brief's "Default timezone: Asia/Riyadh" instruction.
+function riyadhNowMinutesOfDay(): { y: number; m: number; d: number; minutes: number } {
+  const riyadh = new Date(Date.now() + RIYADH_UTC_OFFSET_MS);
+  return {
+    y: riyadh.getUTCFullYear(),
+    m: riyadh.getUTCMonth(),
+    d: riyadh.getUTCDate(),
+    minutes: riyadh.getUTCHours() * 60 + riyadh.getUTCMinutes(),
+  };
+}
+
+function buildViewingSlots(date: Date): string[] {
+  const start = hhmmToMinutes(VIEWING_BUSINESS_HOURS_START);
+  const end = hhmmToMinutes(VIEWING_BUSINESS_HOURS_END);
+  const slots: string[] = [];
+  for (let t = start; t + VIEWING_SLOT_MINUTES <= end; t += VIEWING_SLOT_MINUTES) {
+    slots.push(minutesToHHMM(t));
+  }
+  const now = riyadhNowMinutesOfDay();
+  const isToday = date.getFullYear() === now.y && date.getMonth() === now.m && date.getDate() === now.d;
+  if (!isToday) return slots;
+  return slots.filter((slot) => hhmmToMinutes(slot) > now.minutes);
+}
+
+// Combines the calendar's selected date (only its Y/M/D matters — the
+// calendar's own time-of-day component is ignored) with a business-hours
+// HH:MM into an ISO datetime carrying Riyadh's fixed +03:00 offset.
+function toRiyadhISOString(date: Date, hhmm: string): string {
+  const y = date.getFullYear();
+  const mo = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${d}T${hhmm}:00+03:00`;
+}
+
+type ViewingModalStep = "date" | "time" | "note" | "review";
+const VIEWING_MODAL_STEPS: ViewingModalStep[] = ["date", "time", "note", "review"];
+
+function ScheduleViewingModal({
+  property,
+  onClose,
+  onSuccess,
+}: {
+  property: Property;
+  onClose: () => void;
+  onSuccess: (viewing: ApiPropertyViewing) => void;
+}) {
+  const tProp = usePropT();
+  const [stepIndex, setStepIndex] = useState(0);
+  const [date, setDate] = useState<Date | undefined>();
+  const [time, setTime] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const step = VIEWING_MODAL_STEPS[stepIndex];
+  const today = startOfDay(new Date());
+  const slots = useMemo(() => (date ? buildViewingSlots(date) : []), [date]);
+
+  async function handleSubmit() {
+    if (!date || !time) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const requested_start_at = toRiyadhISOString(date, time);
+      const requested_end_at = toRiyadhISOString(date, minutesToHHMM(hhmmToMinutes(time) + VIEWING_SLOT_MINUTES));
+      const viewing = await createViewing({
+        property_id: Number(property.id),
+        requested_start_at,
+        requested_end_at,
+        timezone: "Asia/Riyadh",
+        customer_note: note.trim() || undefined,
+      });
+      onSuccess(viewing);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : tProp("viewing.modal.submitFailed"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function goNext() {
+    if (stepIndex < VIEWING_MODAL_STEPS.length - 1) setStepIndex(stepIndex + 1);
+  }
+  function goBack() {
+    if (stepIndex > 0) setStepIndex(stepIndex - 1);
+  }
+
+  const stepTitle =
+    step === "date"
+      ? tProp("viewing.modal.stepDate")
+      : step === "time"
+        ? tProp("viewing.modal.stepTime")
+        : step === "note"
+          ? tProp("viewing.modal.stepNote")
+          : tProp("viewing.modal.stepReview");
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm px-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold">{tProp("viewing.modal.title")}</h2>
+            <p className="text-xs text-muted-foreground">{stepTitle}</p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        {step === "date" && (
+          <div className="flex justify-center">
+            <DateRangeCalendar
+              mode="single"
+              selected={date}
+              onSelect={(d) => {
+                setDate(d);
+                setTime(null);
+              }}
+              disabled={{ before: today }}
+            />
+          </div>
+        )}
+
+        {step === "time" && (
+          <div>
+            <p className="mb-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Sparkles className="size-3.5 text-ai" /> {tProp("viewing.modal.preferredTimeHint")}
+            </p>
+            {slots.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{tProp("viewing.modal.noSlotsToday")}</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {slots.map((slot) => (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setTime(slot)}
+                    className={cn(
+                      "rounded-lg border px-2 py-2 text-sm font-medium transition-colors",
+                      time === slot
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border hover:border-primary/50",
+                    )}
+                  >
+                    {slot}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {step === "note" && (
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={4}
+            placeholder={tProp("viewing.modal.notePlaceholder")}
+            className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary resize-none"
+          />
+        )}
+
+        {step === "review" && date && time && (
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center gap-3 rounded-xl bg-surface p-3">
+              {property.image && (
+                <img src={property.image} alt="" className="size-12 shrink-0 rounded-lg object-cover" />
+              )}
+              <div className="min-w-0">
+                <div className="truncate font-semibold">{property.title}</div>
+                <div className="truncate text-xs text-muted-foreground">{property.district}, {property.city}</div>
+              </div>
+            </div>
+            <Row icon={<Building2 className="size-4" />} label={tProp("viewing.modal.reviewMediator")} value={property.agent} />
+            <Row
+              icon={<Calendar className="size-4" />}
+              label={tProp("viewing.modal.reviewDateTime")}
+              value={`${format(date, "MMM d, yyyy")}, ${time} (${tProp("viewing.modal.timezone")})`}
+            />
+            <div>
+              <div className="mb-1 inline-flex items-center gap-2 text-muted-foreground">
+                <MessageCircle className="size-4" /> {tProp("viewing.modal.reviewNote")}
+              </div>
+              <p className="text-sm">{note.trim() || tProp("viewing.modal.noNote")}</p>
+            </div>
+            <p className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+              {tProp("viewing.modal.preferredTimeLabel")} — {tProp("viewing.modal.preferredTimeHint")}
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <p className="mt-3 rounded-xl border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs text-destructive">
+            {error}
+          </p>
+        )}
+
+        <div className="mt-5 flex gap-2.5">
+          {stepIndex > 0 && (
+            <Button variant="outline" className="flex-1" onClick={goBack} disabled={submitting}>
+              {tProp("viewing.modal.back")}
+            </Button>
+          )}
+          {step !== "review" ? (
+            <Button
+              variant="hero"
+              className="flex-1"
+              onClick={goNext}
+              disabled={(step === "date" && !date) || (step === "time" && !time)}
+            >
+              {tProp("viewing.modal.next")}
+            </Button>
+          ) : (
+            <Button variant="hero" className="flex-1" onClick={() => void handleSubmit()} disabled={submitting}>
+              {submitting ? tProp("viewing.modal.submitting") : tProp("viewing.modal.submit")}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Make an Offer (Prompt 7 — AI Negotiation & Offer Management) ───────────
+// Modal stepper mirroring ScheduleViewingModal's structure exactly: Offer
+// Intelligence (reuses NegotiationInsightCard's already-fetched
+// `intelligence.negotiation_intelligence` — no second fetch) -> Enter Amount
+// -> optional Message (Draft with AI, reusing the same
+// POST /properties/{id}/ai-summary?variant=negotiation_message call
+// NegotiationInsightCard already makes) -> Review -> Submit. On success shows
+// an inline confirmation state (mirrors ContactModal's own `sent` state)
+// linking into /negotiations/$id (Prompt 8's screen, not yet a route file —
+// see the plain <a> note on the "View Negotiation" button above).
+type OfferModalStep = "intelligence" | "amount" | "message" | "review";
+const OFFER_MODAL_STEPS: OfferModalStep[] = ["intelligence", "amount", "message", "review"];
+
+function MakeOfferModal({
+  property,
+  intelligence,
+  initialViewingId,
+  onClose,
+  onSuccess,
+}: {
+  property: Property;
+  intelligence: ApiPropertyIntelligence | null;
+  initialViewingId?: number;
+  onClose: () => void;
+  onSuccess: (negotiation: ApiPropertyNegotiation) => void;
+}) {
+  const tProp = usePropT();
+  const { t, lang } = useLanguage();
+  const [stepIndex, setStepIndex] = useState(0);
+  const [amount, setAmount] = useState("");
+  const [message, setMessage] = useState("");
+  const [drafting, setDrafting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState<ApiPropertyNegotiation | null>(null);
+
+  const step = OFFER_MODAL_STEPS[stepIndex];
+  const negotiationInsight = intelligence?.negotiation_intelligence ?? null;
+  // Brief §4: when Price Intelligence doesn't have sufficient_data, show the
+  // "make an offer based on your own preference" copy instead of a range —
+  // never fabricate a market range from insufficient data.
+  const hasSufficientData = intelligence?.price_intelligence?.sufficient_data ?? false;
+  // Fallback (negotiation_intelligence unavailable/insufficient data): the
+  // backend's original_listing_amount snapshot is Property.monthly_rent for
+  // rent listings, NOT the annualized figure property.price displays as
+  // "Annual rent" — same /12 conversion ActionsCard already uses for its
+  // "~SAR X/month" hint, so the amount hint here stays unit-consistent with
+  // what create_negotiation() actually compares the offer against.
+  const listingPrice =
+    negotiationInsight?.asking_price ??
+    (property.listingType === "rent" ? Math.round(property.price / 12) : property.price);
+  const amountNumber = Number(amount);
+  // Review step's offer-vs-listing comparison (brief §23/§27 money
+  // typography) — mirrors negotiations.$id.tsx's offerBlock delta line
+  // exactly, same reused i18n keys, so the visual language carries straight
+  // from Review into the Negotiation Detail screen the customer lands on
+  // right after submitting.
+  const reviewDiff = amountNumber - listingPrice;
+  const reviewDiffPct = listingPrice ? (Math.abs(reviewDiff) / listingPrice) * 100 : 0;
+  const reviewIsBelow = reviewDiff < 0;
+
+  async function handleDraft() {
+    setDrafting(true);
+    try {
+      const resp = await fetchPropertyAiSummary(Number(property.id), lang === "ar" ? "ar" : "en", "negotiation_message");
+      setMessage(resp.summary);
+    } catch {
+      // Draft with AI is best-effort — leave the field as-is on failure,
+      // never blocks the customer from typing/submitting their own message.
+    } finally {
+      setDrafting(false);
+    }
+  }
+
+  async function handleSubmit() {
+    if (!amountNumber || amountNumber <= 0) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const created = await createNegotiation(Number(property.id), {
+        amount: amountNumber,
+        message: message.trim() || undefined,
+        viewing_id: initialViewingId,
+      });
+      setSubmitted(created);
+      onSuccess(created);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : tProp("negotiation.modal.submitFailed"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function goNext() {
+    if (stepIndex < OFFER_MODAL_STEPS.length - 1) setStepIndex(stepIndex + 1);
+  }
+  function goBack() {
+    if (stepIndex > 0) setStepIndex(stepIndex - 1);
+  }
+
+  const stepTitle =
+    step === "intelligence"
+      ? tProp("negotiation.modal.stepIntelligence")
+      : step === "amount"
+        ? tProp("negotiation.modal.stepAmount")
+        : step === "message"
+          ? tProp("negotiation.modal.stepMessage")
+          : tProp("negotiation.modal.stepReview");
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm px-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {submitted ? (
+          <div className="py-2 text-center space-y-4">
+            <div className="grid size-14 place-items-center rounded-full bg-success/15 mx-auto">
+              <CheckCircle2 className="size-8 text-success" />
+            </div>
+            <h2 className="text-lg font-bold">{tProp("negotiation.modal.submittedTitle")}</h2>
+            <p className="text-sm text-muted-foreground">
+              {tProp("negotiation.modal.submittedDesc", {
+                amount: formatSAR(Math.round(Number(submitted.current_offer_amount))),
+              })}
+            </p>
+            {/* Typed Link — /negotiations/$id has existed since Prompt 8;
+                this was left as a plain <a> at Prompt 7 time before that
+                route file existed, closed in the Prompt 12 polish pass. */}
+            <Button className="w-full" asChild>
+              <Link to="/negotiations/$id" params={{ id: String(submitted.id) }}>
+                {tProp("negotiation.modal.viewNegotiation")}
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full" onClick={onClose}>
+              {tProp("negotiation.modal.done")}
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold">{tProp("negotiation.modal.title")}</h2>
+                <p className="text-xs text-muted-foreground">{stepTitle}</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={onClose}>
+                <X className="size-4" />
+              </Button>
+            </div>
+
+            {step === "intelligence" && (
+              <div className="space-y-4 text-sm">
+                <MiniStat label={tProp("negotiation.modal.listingPrice")} value={`SAR ${formatSAR(Math.round(listingPrice))}`} />
+                {negotiationInsight && hasSufficientData ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <MiniStat
+                        label={tProp("intelligence.negotiation.marketMidpoint")}
+                        value={`SAR ${formatSAR(Math.round(negotiationInsight.market_midpoint))}`}
+                      />
+                      <MiniStat
+                        label={tProp("intelligence.negotiation.discussionRange")}
+                        value={`SAR ${formatSAR(Math.round(negotiationInsight.discussion_range_low))} – ${formatSAR(Math.round(negotiationInsight.discussion_range_high))}`}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">{negotiationInsight.approach}</p>
+                  </>
+                ) : (
+                  <p className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                    {tProp("negotiation.modal.limitedData")}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {step === "amount" && (
+              <div>
+                <label className="mb-1 block text-sm font-medium">{tProp("negotiation.modal.amountLabel")}</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder={String(Math.round(listingPrice))}
+                  className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+                />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {tProp("negotiation.modal.amountHint", { amount: formatSAR(Math.round(listingPrice)) })}
+                </p>
+              </div>
+            )}
+
+            {step === "message" && (
+              <div>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <label className="block text-sm font-medium">{tProp("negotiation.modal.messageLabel")}</label>
+                  <Button variant="ghost" size="sm" onClick={() => void handleDraft()} disabled={drafting}>
+                    <Sparkles className="size-3.5" />
+                    {drafting ? tProp("intelligence.negotiation.drafting") : tProp("negotiation.modal.draftWithAI")}
+                  </Button>
+                </div>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={4}
+                  placeholder={tProp("negotiation.modal.messagePlaceholder")}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary resize-none"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">{tProp("negotiation.modal.messageOptionalHint")}</p>
+              </div>
+            )}
+
+            {step === "review" && (
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-3 rounded-xl bg-surface p-3">
+                  {property.image && (
+                    <img src={property.image} alt="" className="size-12 shrink-0 rounded-lg object-cover" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="truncate font-semibold">{property.title}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {property.district}, {property.city}
+                    </div>
+                  </div>
+                </div>
+                {/* Offer vs. listing comparison — large money typography +
+                    a below/above-listing delta line, not just two plain
+                    rows (brief §23/§27 "one obvious next action" / money
+                    typography — Prompt 12 polish pass). */}
+                <div className="rounded-xl border border-border bg-surface p-3.5">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Wallet className="size-3.5" /> {tProp("negotiation.modal.reviewOffer")}
+                      </div>
+                      <div className="font-display text-xl font-bold tracking-tight">SAR {formatSAR(amountNumber || 0)}</div>
+                    </div>
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Building2 className="size-3.5" /> {tProp("negotiation.modal.reviewListingPrice")}
+                      </div>
+                      <div className="font-display text-xl font-bold tracking-tight text-muted-foreground">
+                        SAR {formatSAR(Math.round(listingPrice))}
+                      </div>
+                    </div>
+                  </div>
+                  {listingPrice > 0 && amountNumber > 0 && (
+                    <div
+                      className={`mt-2.5 inline-flex items-center gap-1.5 text-xs font-medium ${reviewIsBelow ? "text-success" : "text-warning"}`}
+                    >
+                      {reviewIsBelow ? <TrendingDown className="size-3.5" /> : <TrendingUp className="size-3.5" />}
+                      {t(reviewIsBelow ? "negotiationDetail.offerBlock.belowListing" : "negotiationDetail.offerBlock.aboveListing", {
+                        amount: formatSAR(Math.round(Math.abs(reviewDiff))),
+                        percent: reviewDiffPct.toFixed(1),
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="mb-1 inline-flex items-center gap-2 text-muted-foreground">
+                    <MessageCircle className="size-4" /> {tProp("negotiation.modal.reviewMessage")}
+                  </div>
+                  <p className="text-sm">{message.trim() || tProp("negotiation.modal.noMessage")}</p>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <p className="mt-3 rounded-xl border border-destructive/30 bg-destructive/8 px-3 py-2 text-xs text-destructive">
+                {error}
+              </p>
+            )}
+
+            <div className="mt-5 flex gap-2.5">
+              {stepIndex > 0 && (
+                <Button variant="outline" className="flex-1" onClick={goBack} disabled={submitting}>
+                  {tProp("negotiation.modal.back")}
+                </Button>
+              )}
+              {step !== "review" ? (
+                <Button
+                  variant="hero"
+                  className="flex-1"
+                  onClick={goNext}
+                  disabled={step === "amount" && (!amountNumber || amountNumber <= 0)}
+                >
+                  {tProp("negotiation.modal.next")}
+                </Button>
+              ) : (
+                <Button variant="hero" className="flex-1" onClick={() => void handleSubmit()} disabled={submitting}>
+                  {submitting ? tProp("negotiation.modal.submitting") : tProp("negotiation.modal.submit")}
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function formatViewingDateTime(iso: string): string {
+  return format(new Date(iso), "EEE, MMM d, h:mm a");
+}
+
+function ViewingStatusBanner({ viewing, onMessageMediator }: { viewing: ApiPropertyViewing; onMessageMediator: () => void }) {
+  const tProp = usePropT();
+
+  let title: string;
+  let subtitle: string;
+  if (viewing.status === "confirmed" && viewing.confirmed_start_at) {
+    title = tProp("viewing.banner.confirmedTitle");
+    subtitle = tProp("viewing.banner.confirmedSubtitle", { datetime: formatViewingDateTime(viewing.confirmed_start_at) });
+  } else if (viewing.status === "reschedule_proposed") {
+    title = tProp("viewing.banner.reschedulePendingTitle");
+    subtitle = tProp("viewing.banner.reschedulePendingSubtitle");
+  } else {
+    title = tProp("viewing.banner.requestedTitle");
+    subtitle = tProp("viewing.banner.requestedSubtitle");
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+      <div className="flex items-center gap-3">
+        <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+          <Calendar className="size-4" />
+        </div>
+        <div>
+          <div className="text-sm font-semibold">{title}</div>
+          <div className="text-xs text-muted-foreground">{subtitle}</div>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/viewings/$id" params={{ id: String(viewing.id) }}>
+            {tProp("viewing.banner.viewAppointment")}
+          </Link>
+        </Button>
+        <Button variant="outline" size="sm" onClick={onMessageMediator}>
+          <MessageCircle className="size-4" /> {tProp("viewing.banner.messageMediator")}
+        </Button>
+        {/* TODO(Prompt 9): once the AI Viewing Checklist section exists on
+            the viewing detail screen, deep-link straight to it instead of
+            the screen's top. */}
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/viewings/$id" params={{ id: String(viewing.id) }}>
+            {tProp("viewing.banner.prepareForVisit")}
+          </Link>
+        </Button>
       </div>
     </div>
   );
@@ -1538,6 +3298,63 @@ function storeAdvisorCtx(property: Property) {
     sessionStorage.setItem("maskan_advisor_ctx", JSON.stringify(property));
   } catch {
     // sessionStorage unavailable (private browsing edge case)
+  }
+}
+
+// AI Negotiation & Offer Management (Prompt 7) — same sessionStorage handoff
+// idiom as storeAdvisorCtx above: viewings.$id.tsx's "Ask AI about
+// negotiation" action writes the viewing id right before navigating to
+// Property Detail; this reads it once and clears it so it never leaks into
+// an unrelated later visit, then pre-fills + auto-opens the Make an Offer
+// modal instead of deep-linking into /advisor.
+function storeOfferHandoff(viewingId: number) {
+  try {
+    sessionStorage.setItem("maskan_offer_viewing_id", String(viewingId));
+  } catch {
+    // sessionStorage unavailable (private browsing edge case)
+  }
+}
+
+function consumeOfferHandoff(): number | undefined {
+  try {
+    const raw = sessionStorage.getItem("maskan_offer_viewing_id");
+    if (!raw) return undefined;
+    sessionStorage.removeItem("maskan_offer_viewing_id");
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Prompt 9: personalized_fit only appears in the intelligence response when
+// real criteria are supplied. Before this, no context survived navigation
+// from AI Home Finder results to a property page at all — this is the
+// minimal extension (same sessionStorage handoff idiom as
+// `maskan_advisor_ctx` above: written once by home-finder.tsx's MatchCard
+// right before navigating away, read once here and immediately cleared so
+// it never leaks into an unrelated later visit).
+function consumeHomeFinderCriteria(): PropertyIntelligenceCriteria | undefined {
+  try {
+    const raw = sessionStorage.getItem("maskan_home_finder_criteria");
+    if (!raw) return undefined;
+    sessionStorage.removeItem("maskan_home_finder_criteria");
+    const c = JSON.parse(raw) as {
+      max_price?: number | null;
+      min_price?: number | null;
+      bedrooms?: number | null;
+      districts?: string[];
+      required_amenities?: string[];
+    };
+    return {
+      maxPrice: c.max_price ?? undefined,
+      minPrice: c.min_price ?? undefined,
+      bedrooms: c.bedrooms ?? undefined,
+      districts: c.districts?.length ? c.districts : undefined,
+      requiredAmenities: c.required_amenities?.length ? c.required_amenities : undefined,
+    };
+  } catch {
+    return undefined;
   }
 }
 
@@ -1868,99 +3685,106 @@ function PurchaseCostBreakdown({ property }: { property: Property }) {
         </p>
       </div>
 
-      {/* Financing estimate */}
-      <div>
-        <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {tProp("purchaseCost.financingEstimate")}
-        </div>
-        <div className="flex items-center justify-between rounded-xl bg-surface p-4">
+      {/* Financing estimate + the affordability check below it (both derive
+          from a mortgage monthlyPayment) are Hide-Phase1 — mortgage/financing
+          is out of scope for myMakan Phase-1. Kept as existing code, not
+          removed, per "do not invent new financing/mortgage UI" — this only
+          hides what's already there. */}
+      {PHASE1_FLAGS.financing && (
+        <>
           <div>
-            <div className="text-xs text-muted-foreground">
-              {tProp("purchaseCost.estMonthlyPayment")}
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {tProp("purchaseCost.financingEstimate")}
             </div>
-            <div className="mt-1 text-xl font-bold tracking-tight">
-              SAR {formatSAR(monthlyPayment)}
-            </div>
-          </div>
-          <PiggyBank className="size-6 text-muted-foreground" />
-        </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          {tProp("purchaseCost.financingNote", {
-            years: MORTGAGE_YEARS,
-            rate: (MORTGAGE_ANNUAL_RATE * 100).toFixed(0),
-          })}
-        </p>
-      </div>
-
-      {/* Affordability check */}
-      <div>
-        <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {tProp("rentCalculator.affordabilityCheck")}
-        </div>
-        <div className="flex items-center gap-3">
-          <label className="shrink-0 text-sm text-muted-foreground">
-            {tProp("rentCalculator.monthlySalary")}
-          </label>
-          <div className="relative flex-1">
-            <span className="absolute inset-y-0 start-3 flex items-center text-xs font-semibold text-muted-foreground">
-              SAR
-            </span>
-            <input
-              type="number"
-              min={0}
-              value={salaryInput}
-              onChange={(e) => setSalaryInput(e.target.value)}
-              placeholder={tProp("rentCalculator.salaryPlaceholder")}
-              className="h-9 w-full rounded-lg border border-border bg-background ps-10 pe-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-        </div>
-
-        {pct !== null ? (
-          <div
-            className={cn(
-              "mt-3 flex items-start gap-3 rounded-xl border p-4",
-              affordTone === "success" && "border-success/30 bg-success/8",
-              affordTone === "warning" && "border-warning/30 bg-warning/8",
-              affordTone === "danger" && "border-destructive/30 bg-destructive/8",
-            )}
-          >
-            <span
-              className={cn(
-                "mt-1 size-2.5 shrink-0 rounded-full",
-                affordTone === "success" && "bg-success",
-                affordTone === "warning" && "bg-warning",
-                affordTone === "danger" && "bg-destructive",
-              )}
-            />
-            <div>
-              <div className="text-sm font-bold">
-                {tProp("rentCalculator.pctOfIncome", { pct: pct.toFixed(1) })}
+            <div className="flex items-center justify-between rounded-xl bg-surface p-4">
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  {tProp("purchaseCost.estMonthlyPayment")}
+                </div>
+                <div className="mt-1 text-xl font-bold tracking-tight">
+                  SAR {formatSAR(monthlyPayment)}
+                </div>
               </div>
+              <PiggyBank className="size-6 text-muted-foreground" />
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {tProp("purchaseCost.financingNote", {
+                years: MORTGAGE_YEARS,
+                rate: (MORTGAGE_ANNUAL_RATE * 100).toFixed(0),
+              })}
+            </p>
+          </div>
+
+          <div>
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {tProp("rentCalculator.affordabilityCheck")}
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="shrink-0 text-sm text-muted-foreground">
+                {tProp("rentCalculator.monthlySalary")}
+              </label>
+              <div className="relative flex-1">
+                <span className="absolute inset-y-0 start-3 flex items-center text-xs font-semibold text-muted-foreground">
+                  SAR
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  value={salaryInput}
+                  onChange={(e) => setSalaryInput(e.target.value)}
+                  placeholder={tProp("rentCalculator.salaryPlaceholder")}
+                  className="h-9 w-full rounded-lg border border-border bg-background ps-10 pe-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+            </div>
+
+            {pct !== null ? (
               <div
                 className={cn(
-                  "mt-0.5 text-xs",
-                  affordTone === "success" && "text-success",
-                  affordTone === "warning" && "text-warning",
-                  affordTone === "danger" && "text-destructive",
+                  "mt-3 flex items-start gap-3 rounded-xl border p-4",
+                  affordTone === "success" && "border-success/30 bg-success/8",
+                  affordTone === "warning" && "border-warning/30 bg-warning/8",
+                  affordTone === "danger" && "border-destructive/30 bg-destructive/8",
                 )}
               >
-                {affordMsg}
+                <span
+                  className={cn(
+                    "mt-1 size-2.5 shrink-0 rounded-full",
+                    affordTone === "success" && "bg-success",
+                    affordTone === "warning" && "bg-warning",
+                    affordTone === "danger" && "bg-destructive",
+                  )}
+                />
+                <div>
+                  <div className="text-sm font-bold">
+                    {tProp("rentCalculator.pctOfIncome", { pct: pct.toFixed(1) })}
+                  </div>
+                  <div
+                    className={cn(
+                      "mt-0.5 text-xs",
+                      affordTone === "success" && "text-success",
+                      affordTone === "warning" && "text-warning",
+                      affordTone === "danger" && "text-destructive",
+                    )}
+                  >
+                    {affordMsg}
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {tProp("purchaseAffordability.enterSalaryPrompt")}
+              </p>
+            )}
           </div>
-        ) : (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {tProp("purchaseAffordability.enterSalaryPrompt")}
-          </p>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }
 
 // ── Short-Term Stay Booking ─────────────────────────────────────────────────
-// No per-listing nightly rate exists in the data model yet (Maskan only
+// No per-listing nightly rate exists in the data model yet (myMakan only
 // tracks long-term monthly_rent) — the nightly rate shown here is an
 // indicative estimate derived from it, using the same short-term premium
 // heuristic as the AI pricing suggestion shown to landlords (see
@@ -2141,44 +3965,37 @@ function ShortTermBooking({ property }: { property: Property }) {
 
 // ── ActionsCard ───────────────────────────────────────────────────────────────
 
-function ActionsCard({ property }: { property: Property }) {
+function ActionsCard({
+  property,
+  savedRecordId,
+  setSavedRecordId,
+  showContact,
+  setShowContact,
+  contactPrefillMessage,
+  onToggleSave,
+  activeViewing,
+  onScheduleViewing,
+  isPublished,
+  activeNegotiation,
+  onMakeOffer,
+}: {
+  property: Property;
+  savedRecordId: number | null;
+  setSavedRecordId: (id: number | null) => void;
+  showContact: boolean;
+  setShowContact: (show: boolean) => void;
+  contactPrefillMessage?: string | null;
+  onToggleSave: () => void;
+  activeViewing?: ApiPropertyViewing | null;
+  onScheduleViewing?: () => void;
+  isPublished?: boolean;
+  activeNegotiation?: ApiPropertyNegotiation | null;
+  onMakeOffer?: () => void;
+}) {
   const { t } = useLanguage();
   const tProp = usePropT();
   const { user } = useAuth();
-  const [savedRecordId, setSavedRecordId] = useState<number | null>(null);
-  const [showContact, setShowContact] = useState(false);
   const [showFinancing, setShowFinancing] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    fetchSavedProperties(user.id)
-      .then((list) => {
-        const match = list.find((s) => String(s.property_id) === String(property.id));
-        setSavedRecordId(match ? match.id : null);
-      })
-      .catch(() => {});
-  }, [user, property.id]);
-
-  const handleToggleSave = async () => {
-    if (!user) return;
-    if (savedRecordId !== null) {
-      const prev = savedRecordId;
-      setSavedRecordId(null);
-      try {
-        await deleteSavedProperty(prev);
-      } catch {
-        setSavedRecordId(prev);
-      }
-    } else {
-      setSavedRecordId(-1);
-      try {
-        const record = await saveProperty(user.id, Number(property.id));
-        setSavedRecordId(record.id);
-      } catch {
-        setSavedRecordId(null);
-      }
-    }
-  };
 
   const saved = savedRecordId !== null;
   const isSale = property.listingType === "sale";
@@ -2203,6 +4020,38 @@ function ActionsCard({ property }: { property: Property }) {
           <Button variant="hero" size="lg" className="w-full" onClick={() => setShowContact(true)}>
             <Phone className="size-4" /> {tProp("actions.contactLandlord")}
           </Button>
+          {onScheduleViewing &&
+            (activeViewing ? (
+              <Button variant="outline" size="lg" className="w-full" asChild>
+                <Link to="/viewings/$id" params={{ id: String(activeViewing.id) }}>
+                  <Calendar className="size-4" /> {tProp("viewing.banner.viewAppointment")}
+                </Link>
+              </Button>
+            ) : (
+              <Button variant="outline" size="lg" className="w-full" onClick={onScheduleViewing}>
+                <Calendar className="size-4" /> {tProp("actions.scheduleViewing")}
+              </Button>
+            ))}
+          {/* Make an Offer / View Negotiation (Prompt 7) — hidden entirely
+              for inactive/unavailable properties (brief §3). The "View
+              Negotiation" link uses a plain <a> rather than the typed
+              TanStack <Link>, because /negotiations/$id doesn't exist as a
+              route file yet — Prompt 8 builds it next; switching this to
+              <Link to="/negotiations/$id"> then is a trivial follow-up. */}
+          {isPublished &&
+            (activeNegotiation ? (
+              <Button variant="outline" size="lg" className="w-full" asChild>
+                <a href={`/negotiations/${activeNegotiation.id}`}>
+                  <Handshake className="size-4" /> {tProp("actions.viewNegotiation")}
+                </a>
+              </Button>
+            ) : (
+              onMakeOffer && (
+                <Button variant="outline" size="lg" className="w-full" onClick={onMakeOffer}>
+                  <Handshake className="size-4" /> {tProp("actions.makeOffer")}
+                </Button>
+              )
+            ))}
           <Button variant="ai" size="lg" className="w-full" asChild>
             <Link
               to="/advisor"
@@ -2213,7 +4062,7 @@ function ActionsCard({ property }: { property: Property }) {
             </Link>
           </Button>
           <div className="grid grid-cols-2 gap-2.5">
-            <Button variant="outline" onClick={() => void handleToggleSave()} aria-pressed={saved}>
+            <Button variant="outline" onClick={onToggleSave} aria-pressed={saved}>
               <Heart className={"size-4 " + (saved ? "fill-destructive text-destructive" : "")} />
               {saved ? tProp("actions.saved") : tProp("actions.save")}
             </Button>
@@ -2223,7 +4072,7 @@ function ActionsCard({ property }: { property: Property }) {
               </Link>
             </Button>
           </div>
-          {!isSale && (
+          {!isSale && PHASE1_FLAGS.financing && (
             <Button variant="outline" className="w-full" onClick={() => setShowFinancing(true)}>
               <Landmark className="size-4" /> {tProp("actions.requestFinancing")}
             </Button>
@@ -2280,6 +4129,7 @@ function ActionsCard({ property }: { property: Property }) {
           property={property}
           savedRecordId={savedRecordId}
           userId={user?.id}
+          initialMessage={contactPrefillMessage}
           onSaved={(newId) => setSavedRecordId(newId)}
           onClose={() => setShowContact(false)}
         />

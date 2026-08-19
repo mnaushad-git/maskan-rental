@@ -109,7 +109,8 @@ export function SearchBar({
   }
 
   return (
-    <View className="rounded-2xl border border-border bg-background p-2 shadow-elevated">
+    <View className="rounded-2xl shadow-elevated">
+      <View className="overflow-hidden rounded-2xl border border-border bg-background p-2">
       <View className="flex-row items-center gap-1 p-1">
         <Pressable
           onPress={() => switchListingType("rent")}
@@ -163,6 +164,8 @@ export function SearchBar({
           <Search size={16} color="#FFFFFF" />
           <Text className="text-sm font-semibold text-primary-foreground">{t("searchBar.search")}</Text>
         </Pressable>
+      </View>
+      <View className="h-2" />
       </View>
 
       <OptionModal

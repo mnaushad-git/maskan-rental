@@ -1,15 +1,20 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
+  AlertTriangle,
   Briefcase,
   Building2,
+  CalendarClock,
   CheckCircle,
-  ClipboardList,
+  CheckCircle2,
   Clock,
+  CreditCard,
   Eye,
   EyeOff,
+  Handshake,
   History,
   Home,
+  LayoutDashboard,
   ListChecks,
   LogOut,
   Mail,
@@ -19,15 +24,19 @@ import {
   Phone,
   Plus,
   Sparkles,
+  Star,
   Trash2,
+  User,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/maskan/Badges";
 import { ListingStatusBadge } from "@/components/maskan/ListingStatusBadge";
+import { ScoreBar } from "@/components/maskan/ScoreIndicator";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { cities as CITY_LIST } from "@/lib/maskan-data";
+import { PHASE1_FLAGS } from "@/lib/phase1-flags";
 import {
   login,
   fetchAreas,
@@ -42,10 +51,18 @@ import {
   patchPartnerListing,
   addPartnerPropertyImage,
   deletePartnerPropertyImage,
+  fetchPartnerListingQuality,
+  confirmPartnerListingAvailability,
+  improvePartnerListingWithAi,
+  fetchDuplicateCheck,
   fetchPricingSuggestion,
   fetchPartnerProjects,
   createPartnerProject,
   patchPartnerProject,
+  updateMediatorProfile,
+  fetchMediatorReviews,
+  fetchMediatorReviewSummary,
+  subscribePartnerMock,
   type ApiAreaSummary,
   type ApiPartner,
   type ApiLeadDetail,
@@ -53,6 +70,11 @@ import {
   type ApiProperty,
   type ApiProject,
   type ApiPricingSuggestion,
+  type ApiReview,
+  type ApiReviewSummary,
+  type ApiPartnerListingQuality,
+  type ApiPartnerImproveWithAi,
+  type ApiDuplicateCheck,
   type PartnerPropertyPayload,
   type PartnerProjectPayload,
 } from "@/lib/api/maskan";
@@ -61,11 +83,27 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/partner")({
-  head: () => ({ meta: [{ title: "Partner Dashboard — Maskan" }] }),
+  head: () => ({ meta: [{ title: "Partner Dashboard — myMakan" }] }),
   component: PartnerDashboard,
 });
 
-type PartnerView = "leads" | "listings" | "projects";
+// "properties" is the single reused listings table for My Properties / Rental
+// Listings / Sale Listings — those three nav items just set `listingFilter`
+// differently rather than being three separate views (see docs/implementation/
+// mymakan-phase1.md "Navigation changed", Prompt 6). "projects" (off-plan) is
+// kept only so PHASE1_FLAGS.projects can restore it later without rebuilding
+// it — it has no nav entry while that flag is off.
+type PartnerView =
+  | "dashboard"
+  | "properties"
+  | "leads"
+  | "messages"
+  | "profile"
+  | "reviews"
+  | "areas"
+  | "subscription"
+  | "projects";
+type ListingFilter = "all" | "rent" | "sale";
 
 function PartnerDashboard() {
   const { user, authLoading, clearAuth } = useAuth();
@@ -73,7 +111,8 @@ function PartnerDashboard() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const [view, setView] = useState<PartnerView>("leads");
+  const [view, setView] = useState<PartnerView>("dashboard");
+  const [listingFilter, setListingFilter] = useState<ListingFilter>("all");
   const [partner, setPartner] = useState<ApiPartner | null>(null);
   const [leads, setLeads] = useState<ApiLeadDetail[]>([]);
   const [availableLeads, setAvailableLeads] = useState<ApiLeadAvailable[]>([]);
@@ -131,7 +170,7 @@ function PartnerDashboard() {
   }, [user, pathname]);
 
   useEffect(() => {
-    if (view === "listings" && !loadingListings) {
+    if ((view === "properties" || view === "dashboard") && !loadingListings) {
       setLoadingListings(true);
       fetchPartnerListings()
         .then(setListings)
@@ -179,11 +218,16 @@ function PartnerDashboard() {
     setPartner((m) => (m ? { ...m, areas: m.areas.filter((a) => a.id !== area_id) } : m));
   }
 
+  // Returns the saved property (with its id) — PartnerListingForm needs it
+  // after save to run the duplicate-awareness check (Prompt 2's
+  // GET /duplicate-check only works against an already-saved property id;
+  // see the form's own submit() for the post-save flow) and to refresh its
+  // Listing Quality panel.
   async function handleSaveListing(
     payload: PartnerPropertyPayload,
     imageUrls: string[],
     editId?: number,
-  ) {
+  ): Promise<ApiProperty> {
     let saved: ApiProperty;
     if (editId) {
       saved = await patchPartnerListing(editId, payload);
@@ -207,6 +251,7 @@ function PartnerDashboard() {
     // Re-fetch to get updated images
     const fresh = await fetchPartnerListings();
     setListings(fresh);
+    return saved;
   }
 
   async function handleSaveProject(payload: PartnerProjectPayload, editId?: number) {
@@ -265,6 +310,128 @@ function PartnerDashboard() {
   );
   const closedLeads = leads.filter((l) => l.status === "closed_won" || l.status === "closed_lost");
 
+  // Shared by both the desktop sidebar and the mobile top nav so the two
+  // never drift out of sync (they used to be two separately hand-written
+  // lists). Matches the myMakan Phase-1 partner-portal nav spec exactly —
+  // see docs/implementation/mymakan-phase1.md "Navigation changed" (Prompt 6).
+  // "Property Requests" (Keep-Phase1, its own route at /partner/requests) was
+  // dropped from this list per that spec even though it's in-scope — still
+  // reachable by direct URL, flagged there as a judgment call worth revisiting.
+  const NAV_ITEMS = [
+    {
+      key: "dashboard",
+      icon: LayoutDashboard,
+      label: t("partnerDashboard.sidebar.navDashboard"),
+      active: view === "dashboard",
+      onClick: () => setView("dashboard"),
+    },
+    {
+      key: "properties",
+      icon: Home,
+      label: t("partnerDashboard.sidebar.navMyProperties"),
+      active: view === "properties" && listingFilter === "all",
+      onClick: () => {
+        setView("properties");
+        setListingFilter("all");
+      },
+    },
+    {
+      key: "rental",
+      icon: Home,
+      label: t("partnerDashboard.sidebar.navRentalListings"),
+      active: view === "properties" && listingFilter === "rent",
+      onClick: () => {
+        setView("properties");
+        setListingFilter("rent");
+      },
+    },
+    {
+      key: "sale",
+      icon: Home,
+      label: t("partnerDashboard.sidebar.navSaleListings"),
+      active: view === "properties" && listingFilter === "sale",
+      onClick: () => {
+        setView("properties");
+        setListingFilter("sale");
+      },
+    },
+    {
+      key: "leads",
+      icon: ListChecks,
+      label: t("partnerDashboard.sidebar.navLeads"),
+      active: view === "leads",
+      onClick: () => setView("leads"),
+    },
+    {
+      // Separate route (/partner/viewings), not a `view` switch within this
+      // SPA-style dashboard — same reasoning as the "messages" entry above
+      // but navigates instead of setting local state.
+      key: "viewings",
+      icon: CalendarClock,
+      label: t("partnerViewings.heading"),
+      active: false,
+      onClick: () => navigate({ to: "/partner/viewings" }),
+    },
+    {
+      // Separate route (/partner/negotiations), mirrors the "viewings" entry
+      // above exactly — see docs/implementation/mymakan-negotiations.md
+      // "Screens changed" (Prompt 10).
+      key: "negotiations",
+      icon: Handshake,
+      label: t("partnerNegotiations.heading"),
+      active: false,
+      onClick: () => navigate({ to: "/partner/negotiations" }),
+    },
+    {
+      key: "messages",
+      icon: MessageSquare,
+      label: t("partnerDashboard.sidebar.navMessages"),
+      active: view === "messages",
+      onClick: () => setView("messages"),
+    },
+    {
+      key: "profile",
+      icon: User,
+      label: t("partnerDashboard.sidebar.navProfile"),
+      active: view === "profile",
+      onClick: () => setView("profile"),
+    },
+    {
+      key: "reviews",
+      icon: Star,
+      label: t("partnerDashboard.sidebar.navReviews"),
+      active: view === "reviews",
+      onClick: () => setView("reviews"),
+    },
+    {
+      key: "areas",
+      icon: MapPin,
+      label: t("partnerDashboard.sidebar.navAreaCoverage"),
+      active: view === "areas",
+      onClick: () => setView("areas"),
+    },
+    {
+      key: "subscription",
+      icon: CreditCard,
+      label: t("partnerDashboard.sidebar.navSubscription"),
+      active: view === "subscription",
+      onClick: () => setView("subscription"),
+    },
+    // Off-plan projects — Hide-Phase1 (see Prompt 5's PHASE1_FLAGS). Kept
+    // fully working, just not linked from the nav while the flag is off.
+    ...(PHASE1_FLAGS.projects
+      ? [
+          {
+            key: "projects",
+            icon: Building2,
+            label: t("partnerDashboard.sidebar.navProjects"),
+            active: view === "projects",
+            onClick: () => setView("projects" as PartnerView),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="flex min-h-screen bg-surface">
       {/* ── Left sidebar ── */}
@@ -281,31 +448,15 @@ function PartnerDashboard() {
           </div>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          {[
-            {
-              v: "leads" as const,
-              icon: ListChecks,
-              label: t("partnerDashboard.sidebar.navLeads"),
-            },
-            {
-              v: "listings" as const,
-              icon: Home,
-              label: t("partnerDashboard.sidebar.navListings"),
-            },
-            {
-              v: "projects" as const,
-              icon: Building2,
-              label: t("partnerDashboard.sidebar.navProjects"),
-            },
-          ].map(({ v, icon: Icon, label }) => (
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+          {NAV_ITEMS.map(({ key, icon: Icon, label, active, onClick }) => (
             <button
-              key={v}
+              key={key}
               type="button"
-              onClick={() => setView(v)}
+              onClick={onClick}
               className={cn(
                 "flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                view === v
+                active
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
               )}
@@ -314,16 +465,6 @@ function PartnerDashboard() {
               {label}
             </button>
           ))}
-          {/* Property Request Marketplace lives at its own route (/partner/requests),
-              not as a client-state PartnerView — mirrors admin.tsx's Notification
-              Operations Link pattern for the same reason. */}
-          <Link
-            to="/partner/requests"
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
-          >
-            <ClipboardList className="size-4 shrink-0" />
-            {t("partnerPropertyRequest.nav")}
-          </Link>
         </nav>
 
         <div className="border-t border-border px-3 py-4 space-y-2">
@@ -369,31 +510,18 @@ function PartnerDashboard() {
               <LogOut className="size-4" /> Sign out
             </button>
           </div>
-          <nav className="flex gap-1 px-3 pb-2">
-            {[
-              {
-                v: "leads" as const,
-                icon: ListChecks,
-                label: t("partnerDashboard.sidebar.navLeads"),
-              },
-              {
-                v: "listings" as const,
-                icon: Home,
-                label: t("partnerDashboard.sidebar.navListings"),
-              },
-              {
-                v: "projects" as const,
-                icon: Building2,
-                label: t("partnerDashboard.sidebar.navProjects"),
-              },
-            ].map(({ v, icon: Icon, label }) => (
+          {/* Horizontally scrollable, non-growing pills — same pattern as the
+              customer TopNav's mobile strip, needed once the nav grew past a
+              handful of items (flex-1 tabs would get unusably narrow). */}
+          <nav className="flex gap-2 overflow-x-auto px-3 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {NAV_ITEMS.map(({ key, icon: Icon, label, active, onClick }) => (
               <button
-                key={v}
+                key={key}
                 type="button"
-                onClick={() => setView(v)}
+                onClick={onClick}
                 className={cn(
-                  "flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
-                  view === v
+                  "flex shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                  active
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
                 )}
@@ -402,22 +530,14 @@ function PartnerDashboard() {
                 {label}
               </button>
             ))}
-            <Link
-              to="/partner/requests"
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
-            >
-              <ClipboardList className="size-4 shrink-0" />
-              {t("partnerPropertyRequest.nav")}
-            </Link>
           </nav>
         </div>
 
         <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-8">
           {/* ══ LEADS VIEW ══ */}
           {view === "leads" && (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2 space-y-8">
-                {/* Available Leads */}
+            <div className="space-y-8">
+              {/* Available Leads */}
                 <section className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h2 className="text-lg font-bold">
@@ -671,101 +791,22 @@ function PartnerDashboard() {
                     ))
                   )}
                 </section>
-              </div>
-
-              {/* Covered areas sidebar */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-bold">{t("partnerDashboard.coveredAreas.heading")}</h2>
-                <div className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-3">
-                  {partner!.areas.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      {t("partnerDashboard.coveredAreas.noAreasYet")}
-                    </p>
-                  )}
-                  {partner!.areas.map((area) => (
-                    <div key={area.id} className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="size-3.5 text-muted-foreground" />
-                        <span>{area.area_name}</span>
-                        <span className="text-xs text-muted-foreground">{area.city}</span>
-                      </div>
-                      <button
-                        onClick={() => handleRemoveArea(area.id)}
-                        className="text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                  <form onSubmit={handleAddArea} className="border-t border-border pt-3 space-y-2">
-                    <select
-                      value={newArea.area_name ? `${newArea.area_name}|${newArea.city}` : ""}
-                      onChange={(e) => {
-                        const [area_name, city] = e.target.value.split("|");
-                        setNewArea({ area_name: area_name ?? "", city: city ?? "" });
-                      }}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-primary"
-                    >
-                      <option value="">{t("partnerDashboard.coveredAreas.selectDistrict")}</option>
-                      {Array.from(new Set(availableAreas.map((a) => a.city)))
-                        .sort()
-                        .map((city) => {
-                          const taken = new Set(
-                            partner!.areas.filter((a) => a.city === city).map((a) => a.area_name),
-                          );
-                          return (
-                            <optgroup key={city} label={city}>
-                              {availableAreas
-                                .filter((a) => a.city === city)
-                                .sort((a, b) => a.name.localeCompare(b.name))
-                                .map((area) => (
-                                  <option
-                                    key={`${area.name}|${city}`}
-                                    value={`${area.name}|${city}`}
-                                    disabled={taken.has(area.name)}
-                                  >
-                                    {area.name}
-                                    {taken.has(area.name)
-                                      ? t("partnerDashboard.coveredAreas.addedSuffix")
-                                      : ""}
-                                  </option>
-                                ))}
-                            </optgroup>
-                          );
-                        })}
-                    </select>
-                    <Button
-                      type="submit"
-                      size="sm"
-                      variant="outline"
-                      className="w-full"
-                      disabled={addingArea || !newArea.area_name.trim()}
-                    >
-                      <Plus className="size-3.5" /> {t("partnerDashboard.coveredAreas.addArea")}
-                    </Button>
-                  </form>
-                </div>
-                <div className="rounded-xl border border-border bg-surface p-4 text-xs text-muted-foreground space-y-1">
-                  <div>
-                    <strong>{t("partnerDashboard.coveredAreas.subscriptionLabel")}</strong>{" "}
-                    {partner!.subscription_status}
-                  </div>
-                  {partner!.subscription_expires_at && (
-                    <div>
-                      {t("partnerDashboard.coveredAreas.expires", {
-                        date: new Date(partner!.subscription_expires_at).toLocaleDateString(
-                          lang === "ar" ? "ar-SA" : "en-SA",
-                        ),
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
           )}
 
-          {/* ══ LISTINGS VIEW ══ */}
-          {view === "listings" && (
+          {/* ══ DASHBOARD VIEW ══ */}
+          {view === "dashboard" && (
+            <PartnerOverviewView
+              partner={partner!}
+              newLeadsCount={availableLeads.length}
+              activeLeadsCount={acceptedLeads.length}
+              listingsCount={listings.length}
+              onGo={setView}
+            />
+          )}
+
+          {/* ══ PROPERTIES VIEW (My Properties / Rental Listings / Sale Listings) ══ */}
+          {view === "properties" && (
             <div>
               {listingFormOpen || editingListing ? (
                 <PartnerListingForm
@@ -775,21 +816,63 @@ function PartnerDashboard() {
                     setListingFormOpen(false);
                     setEditingListing(null);
                   }}
-                  onSave={async (payload, imageUrls) => {
-                    await handleSaveListing(payload, imageUrls, editingListing?.id);
-                    setListingFormOpen(false);
-                    setEditingListing(null);
-                  }}
+                  onSave={(payload, imageUrls) =>
+                    handleSaveListing(payload, imageUrls, editingListing?.id)
+                  }
                 />
               ) : (
                 <PartnerListingsView
                   listings={listings}
                   loading={loadingListings}
+                  filter={listingFilter}
+                  onFilterChange={setListingFilter}
                   onAdd={() => setListingFormOpen(true)}
                   onEdit={(l) => setEditingListing(l)}
                 />
               )}
             </div>
+          )}
+
+          {/* ══ MESSAGES VIEW ══ */}
+          {view === "messages" && (
+            <PartnerMessagesView
+              threads={[...acceptedLeads, ...closedLeads]}
+              onOpen={(leadId) =>
+                navigate({ to: "/partner/leads/$leadId", params: { leadId: String(leadId) } })
+              }
+            />
+          )}
+
+          {/* ══ PROFILE VIEW ══ */}
+          {view === "profile" && (
+            <PartnerProfileView
+              partner={partner!}
+              onSaved={(updated) => setPartner(updated)}
+            />
+          )}
+
+          {/* ══ REVIEWS VIEW ══ */}
+          {view === "reviews" && <PartnerReviewsView mediatorId={partner!.id} />}
+
+          {/* ══ AREA COVERAGE VIEW ══ */}
+          {view === "areas" && (
+            <PartnerAreaCoverageView
+              partner={partner!}
+              availableAreas={availableAreas}
+              newArea={newArea}
+              setNewArea={setNewArea}
+              addingArea={addingArea}
+              onAddArea={handleAddArea}
+              onRemoveArea={handleRemoveArea}
+            />
+          )}
+
+          {/* ══ SUBSCRIPTION VIEW ══ */}
+          {view === "subscription" && (
+            <PartnerSubscriptionView
+              partner={partner!}
+              onRenewed={(updates) => setPartner((p) => (p ? { ...p, ...updates } : p))}
+            />
           )}
 
           {/* ══ PROJECTS VIEW ══ */}
@@ -829,15 +912,20 @@ function PartnerDashboard() {
 function PartnerListingsView({
   listings,
   loading,
+  filter,
+  onFilterChange,
   onAdd,
   onEdit,
 }: {
   listings: ApiProperty[];
   loading: boolean;
+  filter: ListingFilter;
+  onFilterChange: (f: ListingFilter) => void;
   onAdd: () => void;
   onEdit: (l: ApiProperty) => void;
 }) {
   const { t } = useLanguage();
+  const filtered = filter === "all" ? listings : listings.filter((l) => l.listing_type === filter);
   return (
     <div>
       <div className="mb-6 flex items-start justify-between gap-4">
@@ -857,17 +945,46 @@ function PartnerListingsView({
         </Button>
       </div>
 
+      {/* All / Rent / Sale — the only transaction types myMakan Phase-1
+          exposes (see docs/implementation/mymakan-phase1.md "Navigation
+          changed", Prompt 6). */}
+      <div className="mb-4 flex gap-2">
+        {(["all", "rent", "sale"] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => onFilterChange(f)}
+            className={cn(
+              "rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+              filter === f
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-surface text-foreground hover:bg-surface-2",
+            )}
+          >
+            {t(
+              f === "all"
+                ? "partnerDashboard.listingsView.filterAll"
+                : f === "rent"
+                  ? "partnerDashboard.listingsView.filterRent"
+                  : "partnerDashboard.listingsView.filterSale",
+            )}
+          </button>
+        ))}
+      </div>
+
       {loading && (
         <div className="py-16 text-center text-sm text-muted-foreground">
           {t("partnerDashboard.listingsView.loadingListings")}
         </div>
       )}
 
-      {!loading && listings.length === 0 && (
+      {!loading && filtered.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border py-16 text-center space-y-3">
           <Home className="mx-auto size-10 text-muted-foreground/40" />
           <p className="text-sm text-muted-foreground">
-            {t("partnerDashboard.listingsView.noListingsYet")}
+            {listings.length === 0
+              ? t("partnerDashboard.listingsView.noListingsYet")
+              : t("partnerDashboard.listingsView.noMatchingListings")}
           </p>
           <Button variant="outline" onClick={onAdd}>
             <Plus className="size-4" /> {t("partnerDashboard.listingsView.addListing")}
@@ -875,9 +992,9 @@ function PartnerListingsView({
         </div>
       )}
 
-      {!loading && listings.length > 0 && (
+      {!loading && filtered.length > 0 && (
         <div className="space-y-3">
-          {listings.map((l) => {
+          {filtered.map((l) => {
             const canEdit = l.status === "Published";
             return (
               <div key={l.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
@@ -886,6 +1003,11 @@ function PartnerListingsView({
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold truncate">{l.title}</span>
                       <ListingStatusBadge status={l.status} />
+                      <Badge tone="neutral">
+                        {l.listing_type === "sale"
+                          ? t("partnerDashboard.listingsView.filterSale")
+                          : t("partnerDashboard.listingsView.filterRent")}
+                      </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {l.area}, {l.city}
@@ -894,7 +1016,9 @@ function PartnerListingsView({
                       {l.size_sq_m ? ` · ${l.size_sq_m} m²` : ""}
                     </p>
                     <p className="text-sm font-semibold text-primary">
-                      SAR {formatSAR(l.monthly_rent ?? 0)}/mo
+                      {l.listing_type === "sale"
+                        ? `SAR ${formatSAR(l.sale_price ?? 0)}`
+                        : `SAR ${formatSAR(l.monthly_rent ?? 0)}/mo`}
                     </p>
                     {l.status === "Pending Approval" && (
                       <p className="text-xs text-muted-foreground">
@@ -941,7 +1065,9 @@ type ListingFormState = {
   title: string;
   city: string;
   district: string;
+  listingType: "rent" | "sale";
   rent: string;
+  salePrice: string;
   bedrooms: string;
   bathrooms: string;
   size: string;
@@ -954,6 +1080,45 @@ type ListingFormState = {
   whatsappSameAsCall: boolean;
 };
 
+// Client-side completeness estimate for a listing that hasn't been saved
+// yet, so there's no property id to call the real
+// GET /partner/properties/{id}/quality endpoint against (Prompt 3's
+// completeness score reads a persisted `Property` row). Mirrors
+// trust_config.py's COMPLETENESS_TIER_WEIGHTS (required=3, important=2,
+// optional=1), limited to just the fields this form actually collects —
+// map coordinates, living rooms, property age, deed area, and license
+// number aren't editable here, so they're excluded rather than counted as
+// permanently missing. NOT the authoritative score; the same "clearly a
+// client approximation, never the real /trust-backed number" precedent
+// PropertyCard.tsx's estimateCompletenessPercent already set in Prompt 7.
+// Live-updates on every keystroke since it only reads local form state.
+function estimateFormCompleteness(form: ListingFormState, mediaCount: number): number {
+  const price = form.listingType === "sale" ? form.salePrice : form.rent;
+  const required = [
+    !!form.title.trim(),
+    !!form.district.trim(),
+    !!form.city.trim(),
+    !!price && parseFloat(price) > 0,
+    !!form.property_type,
+    !!form.bedrooms,
+    !!form.bathrooms,
+    !!form.size,
+    mediaCount >= 1,
+    !!form.description.trim(),
+  ];
+  const important = [!!form.furnished, !!form.contact_phone.trim(), mediaCount >= 3];
+  const optional = [form.whatsappSameAsCall || !!form.whatsapp_phone.trim()];
+  const tier = (flags: boolean[], weight: number) => ({
+    present: flags.filter(Boolean).length * weight,
+    total: flags.length * weight,
+  });
+  const r = tier(required, 3);
+  const i = tier(important, 2);
+  const o = tier(optional, 1);
+  const total = r.total + i.total + o.total;
+  return total > 0 ? Math.round(((r.present + i.present + o.present) / total) * 100) : 0;
+}
+
 function PartnerListingForm({
   areas,
   editing,
@@ -963,14 +1128,16 @@ function PartnerListingForm({
   areas: ApiAreaSummary[];
   editing: ApiProperty | null;
   onClose: () => void;
-  onSave: (p: PartnerPropertyPayload, imageUrls: string[]) => Promise<void>;
+  onSave: (p: PartnerPropertyPayload, imageUrls: string[]) => Promise<ApiProperty>;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [form, setForm] = useState<ListingFormState>({
     title: editing?.title ?? "",
     city: editing?.city ?? "",
     district: editing?.area ?? "",
-    rent: editing ? String(editing.monthly_rent) : "",
+    listingType: editing?.listing_type ?? "rent",
+    rent: editing && editing.listing_type !== "sale" ? String(editing.monthly_rent ?? "") : "",
+    salePrice: editing && editing.listing_type === "sale" ? String(editing.sale_price ?? "") : "",
     bedrooms: editing?.bedrooms != null ? String(editing.bedrooms) : "3",
     bathrooms: editing?.bathrooms != null ? String(editing.bathrooms) : "2",
     size: editing?.size_sq_m != null ? String(editing.size_sq_m) : "",
@@ -993,6 +1160,79 @@ function PartnerListingForm({
   const [pricing, setPricing] = useState<ApiPricingSuggestion | null>(null);
   const [pricingLoading, setPricingLoading] = useState(false);
   const [pricingError, setPricingError] = useState<string | null>(null);
+
+  // ── Listing Quality panel state (Trust Center, Prompt 8) ──────────────────
+  // `quality` is only fetchable for an already-saved listing (Prompt 3's
+  // GET /partner/properties/{id}/quality reads a persisted Property row) —
+  // see PartnerListingQualityPanel below for the client-side estimate shown
+  // instead while creating a brand-new (not-yet-saved) listing.
+  const [quality, setQuality] = useState<ApiPartnerListingQuality | null>(null);
+  const [qualityLoading, setQualityLoading] = useState(false);
+  const [confirmingAvailability, setConfirmingAvailability] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<ApiPartnerImproveWithAi | null>(null);
+  const [aiLoading, setAiLoading] = useState<"title" | "description" | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [duplicateCheck, setDuplicateCheck] = useState<ApiDuplicateCheck | null>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    let cancelled = false;
+    setQualityLoading(true);
+    fetchPartnerListingQuality(editing.id)
+      .then((q) => {
+        if (!cancelled) setQuality(q);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setQualityLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editing]);
+
+  async function handleConfirmAvailability() {
+    if (!editing) return;
+    setConfirmingAvailability(true);
+    try {
+      const result = await confirmPartnerListingAvailability(editing.id);
+      setQuality((q) => (q ? { ...q, availability_confirmed_at: result.availability_confirmed_at } : q));
+    } catch {
+      // Non-fatal — the panel simply keeps showing the prior confirmation state.
+    } finally {
+      setConfirmingAvailability(false);
+    }
+  }
+
+  async function handleImproveWithAi(focus: "title" | "description") {
+    if (!editing) return;
+    setAiLoading(focus);
+    setAiError(null);
+    setAiSuggestion(null);
+    try {
+      const result = await improvePartnerListingWithAi(editing.id, { focus, language: lang });
+      setAiSuggestion(result);
+    } catch (err) {
+      setAiError(
+        err instanceof Error ? err.message : t("partnerDashboard.listingForm.quality.ai.failed"),
+      );
+    } finally {
+      setAiLoading(null);
+    }
+  }
+
+  // The partner must explicitly approve before an AI suggestion touches the
+  // form — this only fills the (still unsaved) form fields; nothing is
+  // persisted until the partner presses the normal Save button below.
+  function applyAiSuggestion() {
+    if (!aiSuggestion) return;
+    setForm((f) => ({
+      ...f,
+      title: aiSuggestion.suggested_title ?? f.title,
+      description: aiSuggestion.suggested_description ?? f.description,
+    }));
+    setAiSuggestion(null);
+  }
 
   async function handleGetPricing() {
     const rent = parseFloat(form.rent);
@@ -1030,8 +1270,14 @@ function PartnerListingForm({
       return;
     }
     const rent = parseFloat(form.rent);
-    if (!rent || rent <= 0) {
-      setError(t("partnerDashboard.listingForm.errors.invalidRent"));
+    const salePrice = parseFloat(form.salePrice);
+    if (form.listingType === "rent") {
+      if (!rent || rent <= 0) {
+        setError(t("partnerDashboard.listingForm.errors.invalidRent"));
+        return;
+      }
+    } else if (!salePrice || salePrice <= 0) {
+      setError(t("partnerDashboard.listingForm.errors.invalidSalePrice"));
       return;
     }
     if (!form.title.trim()) {
@@ -1051,12 +1297,14 @@ function PartnerListingForm({
     setSaving(true);
     setError(null);
     try {
-      await onSave(
+      const saved = await onSave(
         {
           title: form.title.trim() || "Untitled listing",
           city: form.city.trim(),
           area: form.district.trim(),
-          monthly_rent: rent,
+          listing_type: form.listingType,
+          monthly_rent: form.listingType === "rent" ? rent : undefined,
+          sale_price: form.listingType === "sale" ? salePrice : undefined,
           bedrooms: form.bedrooms ? parseInt(form.bedrooms) : undefined,
           bathrooms: form.bathrooms ? parseInt(form.bathrooms) : undefined,
           size_sq_m: form.size ? parseInt(form.size) : undefined,
@@ -1069,6 +1317,29 @@ function PartnerListingForm({
         },
         media,
       );
+      // Listing Quality panel now has a real, saved property id — refresh it
+      // (edit mode only; a freshly-created listing closes the form below
+      // before the panel would ever be shown again for it).
+      if (editing) {
+        fetchPartnerListingQuality(saved.id).then(setQuality).catch(() => {});
+      }
+      // Duplicate awareness (spec section 17) — the listing is already saved
+      // at this point either way (still subject to admin approval), so this
+      // can only ever warn, never block. GET /duplicate-check only works
+      // against a saved property id, so this has to run after save, not
+      // before — see docs/implementation/mymakan-trust-center.md Prompt 2's
+      // "Known limitations" for that backend constraint.
+      try {
+        const dup = await fetchDuplicateCheck(saved.id);
+        if (dup.is_possible_duplicate) {
+          setDuplicateCheck(dup);
+          setSaving(false);
+          return; // keep the form open so the warning is visible
+        }
+      } catch {
+        // A failed duplicate-check must never block an already-saved listing.
+      }
+      onClose();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : t("partnerDashboard.listingForm.errors.failedToSave"),
@@ -1078,9 +1349,14 @@ function PartnerListingForm({
   }
 
   const isEdit = !!editing;
+  const estimatedCompleteness = estimateFormCompleteness(form, media.length);
 
   return (
     <div>
+      {duplicateCheck && (
+        <DuplicateWarningModal result={duplicateCheck} onDismiss={() => { setDuplicateCheck(null); onClose(); }} />
+      )}
+
       {/* Header */}
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
@@ -1104,7 +1380,23 @@ function PartnerListingForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <PartnerListingQualityPanel
+        isEdit={isEdit}
+        estimatedCompleteness={estimatedCompleteness}
+        quality={quality}
+        qualityLoading={qualityLoading}
+        confirmingAvailability={confirmingAvailability}
+        onConfirmAvailability={handleConfirmAvailability}
+        aiSuggestion={aiSuggestion}
+        aiLoading={aiLoading}
+        aiError={aiError}
+        onImproveWithAi={handleImproveWithAi}
+        onApplyAiSuggestion={applyAiSuggestion}
+        onDismissAiSuggestion={() => setAiSuggestion(null)}
+        lang={lang}
+      />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mt-6">
         {/* Left column */}
         <div className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-card">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1155,62 +1447,106 @@ function PartnerListingForm({
             </FormField>
           </div>
 
-          <FormField label={t("partnerDashboard.listingForm.monthlyRent")}>
-            <Input
-              type="number"
-              min={1}
-              value={form.rent}
-              onChange={(e) => setForm((f) => ({ ...f, rent: e.target.value }))}
-              placeholder={t("partnerDashboard.listingForm.monthlyRentPlaceholder")}
-            />
+          {/* myMakan Phase-1 only exposes Rent / Sale as transaction types
+              (see docs/implementation/mymakan-phase1.md "Navigation changed",
+              Prompt 6). */}
+          <FormField label={t("partnerDashboard.listingForm.transactionType")}>
+            <div className="grid grid-cols-2 gap-2">
+              {(["rent", "sale"] as const).map((lt) => (
+                <button
+                  key={lt}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, listingType: lt }))}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                    form.listingType === lt
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-surface text-foreground hover:bg-surface-2",
+                  )}
+                >
+                  {t(
+                    lt === "rent"
+                      ? "partnerDashboard.listingForm.rent"
+                      : "partnerDashboard.listingForm.sale",
+                  )}
+                </button>
+              ))}
+            </div>
           </FormField>
+
+          {form.listingType === "sale" ? (
+            <FormField label={t("partnerDashboard.listingForm.salePrice")}>
+              <Input
+                type="number"
+                min={1}
+                value={form.salePrice}
+                onChange={(e) => setForm((f) => ({ ...f, salePrice: e.target.value }))}
+                placeholder={t("partnerDashboard.listingForm.salePricePlaceholder")}
+              />
+            </FormField>
+          ) : (
+            <FormField label={t("partnerDashboard.listingForm.monthlyRent")}>
+              <Input
+                type="number"
+                min={1}
+                value={form.rent}
+                onChange={(e) => setForm((f) => ({ ...f, rent: e.target.value }))}
+                placeholder={t("partnerDashboard.listingForm.monthlyRentPlaceholder")}
+              />
+            </FormField>
+          )}
 
           {/* AI dynamic pricing suggestion — nightly rate for short-term
               (Airbnb-style) bookings, distinct from the long-term monthly
               rent above. Reuses backend/app/api/routes/ai.py's
-              /pricing-suggestion endpoint. */}
-          <div className="rounded-xl border border-ai/20 bg-ai-soft p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-ai">
-                <Sparkles className="size-4" /> {t("partnerDashboard.listingForm.pricingSuggestion.title")}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!form.city.trim() || !form.district.trim() || pricingLoading}
-                onClick={() => void handleGetPricing()}
-              >
-                {pricingLoading
-                  ? t("partnerDashboard.listingForm.pricingSuggestion.loading")
-                  : t("partnerDashboard.listingForm.pricingSuggestion.cta")}
-              </Button>
-            </div>
-            {!form.city.trim() || !form.district.trim() ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                {t("partnerDashboard.listingForm.pricingSuggestion.needsAreaCity")}
-              </p>
-            ) : null}
-            {pricingError && <p className="mt-2 text-xs text-destructive">{pricingError}</p>}
-            {pricing && (
-              <div className="mt-3 space-y-1.5">
-                <div className="text-lg font-bold tracking-tight text-ai">
-                  SAR {formatSAR(pricing.suggested_nightly_min)} – {formatSAR(pricing.suggested_nightly_max)}
-                  <span className="ms-1 text-xs font-normal text-muted-foreground">
-                    {t("partnerDashboard.listingForm.pricingSuggestion.perNight")}
-                  </span>
+              /pricing-suggestion endpoint. Rent-only (a nightly rate implies
+              a rental) and gated behind PHASE1_FLAGS.booking — short-stay
+              bookings are Hide-Phase1 for myMakan, same reasoning as the
+              ShortTermBooking widget gated on property.$id.tsx in Prompt 5. */}
+          {form.listingType === "rent" && PHASE1_FLAGS.booking && (
+            <div className="rounded-xl border border-ai/20 bg-ai-soft p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-ai">
+                  <Sparkles className="size-4" /> {t("partnerDashboard.listingForm.pricingSuggestion.title")}
                 </div>
-                <p className="text-xs text-muted-foreground">{pricing.reasoning}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {t(
-                    pricing.generated_by === "ai"
-                      ? "partnerDashboard.listingForm.pricingSuggestion.aiGenerated"
-                      : "partnerDashboard.listingForm.pricingSuggestion.estimateGenerated",
-                  )}
-                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!form.city.trim() || !form.district.trim() || pricingLoading}
+                  onClick={() => void handleGetPricing()}
+                >
+                  {pricingLoading
+                    ? t("partnerDashboard.listingForm.pricingSuggestion.loading")
+                    : t("partnerDashboard.listingForm.pricingSuggestion.cta")}
+                </Button>
               </div>
-            )}
-          </div>
+              {!form.city.trim() || !form.district.trim() ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t("partnerDashboard.listingForm.pricingSuggestion.needsAreaCity")}
+                </p>
+              ) : null}
+              {pricingError && <p className="mt-2 text-xs text-destructive">{pricingError}</p>}
+              {pricing && (
+                <div className="mt-3 space-y-1.5">
+                  <div className="text-lg font-bold tracking-tight text-ai">
+                    SAR {formatSAR(pricing.suggested_nightly_min)} – {formatSAR(pricing.suggested_nightly_max)}
+                    <span className="ms-1 text-xs font-normal text-muted-foreground">
+                      {t("partnerDashboard.listingForm.pricingSuggestion.perNight")}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{pricing.reasoning}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {t(
+                      pricing.generated_by === "ai"
+                        ? "partnerDashboard.listingForm.pricingSuggestion.aiGenerated"
+                        : "partnerDashboard.listingForm.pricingSuggestion.estimateGenerated",
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <FormField label={t("partnerDashboard.listingForm.bedrooms")}>
@@ -1385,6 +1721,8 @@ function PartnerListingForm({
             {t("partnerDashboard.listingForm.firstPhotoNote")}
           </p>
 
+          <ImageQualityNotes isEdit={isEdit} quality={quality} mediaCount={media.length} />
+
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground pt-2">
             {t("partnerDashboard.listingForm.description")}
           </h2>
@@ -1418,6 +1756,782 @@ function PartnerListingForm({
             </Button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Listing Quality panel (Trust Center, Prompt 8) ───────────────────────────
+// Wraps Prompt 3's GET /partner/properties/{id}/quality (completeness %,
+// missing-field suggestions, image quality), the Confirm Availability
+// action, and the "Improve with AI" flow (suggestion only — the partner
+// must explicitly press Apply before it touches the form; nothing is
+// auto-saved). Before the listing has an id (new-listing draft), falls
+// back to a live client-side completeness estimate and hides the
+// backend-only actions behind an explanatory note, per this prompt's own
+// "no draft entry point" backend constraint (see
+// docs/implementation/mymakan-trust-center.md Prompt 3's known limitations).
+function PartnerListingQualityPanel({
+  isEdit,
+  estimatedCompleteness,
+  quality,
+  qualityLoading,
+  confirmingAvailability,
+  onConfirmAvailability,
+  aiSuggestion,
+  aiLoading,
+  aiError,
+  onImproveWithAi,
+  onApplyAiSuggestion,
+  onDismissAiSuggestion,
+  lang,
+}: {
+  isEdit: boolean;
+  estimatedCompleteness: number;
+  quality: ApiPartnerListingQuality | null;
+  qualityLoading: boolean;
+  confirmingAvailability: boolean;
+  onConfirmAvailability: () => void;
+  aiSuggestion: ApiPartnerImproveWithAi | null;
+  aiLoading: "title" | "description" | null;
+  aiError: string | null;
+  onImproveWithAi: (focus: "title" | "description") => void;
+  onApplyAiSuggestion: () => void;
+  onDismissAiSuggestion: () => void;
+  lang: string;
+}) {
+  const { t } = useLanguage();
+  // Real, backend-authoritative once the listing has been saved (isEdit);
+  // otherwise the live client-side estimate — see estimateFormCompleteness's
+  // own comment for why the two numbers can differ slightly.
+  const score = quality ? quality.completeness.score : estimatedCompleteness;
+  const suggestions = quality?.missing_field_suggestions ?? [];
+
+  return (
+    <div className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-card space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          {t("partnerDashboard.listingForm.quality.heading")}
+        </h2>
+        {!isEdit && (
+          <span className="text-[11px] text-muted-foreground">
+            {t("partnerDashboard.listingForm.quality.estimatedLabel")}
+          </span>
+        )}
+      </div>
+
+      <ScoreBar label={t("partnerDashboard.listingForm.quality.completenessLabel")} value={score} />
+
+      {!isEdit && (
+        <p className="text-xs text-muted-foreground">{t("partnerDashboard.listingForm.quality.estimatedNote")}</p>
+      )}
+
+      {isEdit && qualityLoading && (
+        <p className="text-xs text-muted-foreground">{t("partnerDashboard.listingForm.quality.loading")}</p>
+      )}
+
+      {isEdit && !qualityLoading && quality && (
+        <>
+          {suggestions.length > 0 ? (
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground">
+                {t("partnerDashboard.listingForm.quality.suggestionsHeading")}
+              </p>
+              <ul className="space-y-1">
+                {suggestions.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" />
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="flex items-center gap-2 text-sm text-success">
+              <CheckCircle2 className="size-4" /> {t("partnerDashboard.listingForm.quality.noSuggestions")}
+            </p>
+          )}
+
+          {/* Availability */}
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                {t("partnerDashboard.listingForm.quality.availability.heading")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {quality.availability_confirmed_at
+                  ? t("partnerDashboard.listingForm.quality.availability.confirmedOn", {
+                      date: new Date(quality.availability_confirmed_at).toLocaleDateString(
+                        lang === "ar" ? "ar-SA" : "en-SA",
+                        { day: "numeric", month: "short", year: "numeric" },
+                      ),
+                    })
+                  : t("partnerDashboard.listingForm.quality.availability.neverConfirmed")}
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onConfirmAvailability}
+              disabled={confirmingAvailability}
+            >
+              <CheckCircle className="size-3.5" />
+              {confirmingAvailability
+                ? t("partnerDashboard.listingForm.quality.availability.confirming")
+                : t("partnerDashboard.listingForm.quality.availability.confirmCta")}
+            </Button>
+          </div>
+
+          {/* Improve with AI — same ai-soft styling as the pricing-suggestion
+              box above, for a consistent "this is AI" visual language. */}
+          <div className="rounded-xl border border-ai/20 bg-ai-soft p-4 space-y-3">
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-ai">
+              <Sparkles className="size-4" /> {t("partnerDashboard.listingForm.quality.ai.heading")}
+            </div>
+            <p className="text-xs text-muted-foreground">{t("partnerDashboard.listingForm.quality.ai.desc")}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={aiLoading !== null}
+                onClick={() => onImproveWithAi("title")}
+              >
+                {aiLoading === "title"
+                  ? t("partnerDashboard.listingForm.quality.ai.thinking")
+                  : t("partnerDashboard.listingForm.quality.ai.improveTitle")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={aiLoading !== null}
+                onClick={() => onImproveWithAi("description")}
+              >
+                {aiLoading === "description"
+                  ? t("partnerDashboard.listingForm.quality.ai.thinking")
+                  : t("partnerDashboard.listingForm.quality.ai.improveDescription")}
+              </Button>
+            </div>
+            {aiError && <p className="text-xs text-destructive">{aiError}</p>}
+            {aiSuggestion && (
+              <div className="space-y-2 rounded-lg border border-ai/30 bg-background p-3">
+                {aiSuggestion.generated_by === "fallback" && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {t("partnerDashboard.listingForm.quality.ai.fallbackNote")}
+                  </p>
+                )}
+                {aiSuggestion.suggested_title && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-muted-foreground">
+                      {t("partnerDashboard.listingForm.quality.ai.suggestedTitle")}
+                    </p>
+                    <p className="text-sm">{aiSuggestion.suggested_title}</p>
+                  </div>
+                )}
+                {aiSuggestion.suggested_description && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-muted-foreground">
+                      {t("partnerDashboard.listingForm.quality.ai.suggestedDescription")}
+                    </p>
+                    <p className="whitespace-pre-line text-sm">{aiSuggestion.suggested_description}</p>
+                  </div>
+                )}
+                <div className="flex gap-2 pt-1">
+                  <Button type="button" size="sm" onClick={onApplyAiSuggestion}>
+                    {t("partnerDashboard.listingForm.quality.ai.apply")}
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={onDismissAiSuggestion}>
+                    {t("partnerDashboard.listingForm.quality.ai.dismiss")}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {!isEdit && (
+        <p className="text-xs text-muted-foreground">
+          {t("partnerDashboard.listingForm.quality.availability.saveFirst")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Image-quality suggestions, surfaced right next to the photo upload UI.
+// In edit mode, uses the real deterministic signals from Prompt 3's
+// image_quality.py (via the already-fetched `quality`); for a brand-new
+// draft (no id yet), mirrors the same no-computer-vision, presence-only
+// checks client-side so the partner still sees feedback while adding
+// photos — duplicate-URL / missing-primary-image / low-resolution checks
+// are skipped client-side (the latter two are inert server-side today too,
+// see docs/implementation/mymakan-trust-center.md Prompt 3).
+function ImageQualityNotes({
+  isEdit,
+  quality,
+  mediaCount,
+}: {
+  isEdit: boolean;
+  quality: ApiPartnerListingQuality | null;
+  mediaCount: number;
+}) {
+  const { t } = useLanguage();
+  const messages: string[] =
+    isEdit && quality
+      ? quality.image_quality.issues.map((issue) => issue.message)
+      : mediaCount === 0
+        ? [t("partnerDashboard.listingForm.quality.imageQuality.noImages")]
+        : mediaCount < 3
+          ? [t("partnerDashboard.listingForm.quality.imageQuality.tooFewImages")]
+          : [];
+
+  if (messages.length === 0) return null;
+
+  return (
+    <ul className="space-y-1">
+      {messages.map((m, i) => (
+        <li key={i} className="flex items-start gap-1.5 text-[11px] text-warning">
+          <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+          <span>{m}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// Duplicate-awareness warning (spec section 17) — never auto-blocks. Shown
+// after the listing has already been saved (GET /duplicate-check needs a
+// real property id), so both actions below are non-destructive: the
+// listing exists in either case, this is purely informational with an
+// optional "go compare it yourself" escape hatch.
+function DuplicateWarningModal({ result, onDismiss }: { result: ApiDuplicateCheck; onDismiss: () => void }) {
+  const { t } = useLanguage();
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onDismiss();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onDismiss]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4" onClick={onDismiss}>
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 text-warning">
+          <AlertTriangle className="size-5" />
+          <h3 className="text-base font-bold text-foreground">
+            {t("partnerDashboard.listingForm.duplicateWarning.title")}
+          </h3>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t("partnerDashboard.listingForm.duplicateWarning.desc")}
+        </p>
+        {result.matches.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {result.matches.slice(0, 3).map((m) => (
+              <div key={m.property_id} className="rounded-lg border border-border bg-surface px-3 py-2">
+                <p className="truncate text-sm font-medium">{m.title}</p>
+                {m.reasons.length > 0 && <p className="text-xs text-muted-foreground">{m.reasons.join(" · ")}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-4 flex gap-2">
+          {result.matches[0] && (
+            <a
+              href={`/property/${result.matches[0].property_id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1"
+            >
+              <Button type="button" variant="outline" className="w-full">
+                {t("partnerDashboard.listingForm.duplicateWarning.compare")}
+              </Button>
+            </a>
+          )}
+          <Button type="button" onClick={onDismiss} className="flex-1">
+            {t("partnerDashboard.listingForm.duplicateWarning.continueAnyway")}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Dashboard overview ───────────────────────────────────────────────────────
+// Lightweight stat tiles built entirely from state the other views already
+// load (leads/listings counts, areas, subscription) — no new API calls.
+
+function PartnerOverviewView({
+  partner,
+  newLeadsCount,
+  activeLeadsCount,
+  listingsCount,
+  onGo,
+}: {
+  partner: ApiPartner;
+  newLeadsCount: number;
+  activeLeadsCount: number;
+  listingsCount: number;
+  onGo: (v: PartnerView) => void;
+}) {
+  const { t } = useLanguage();
+  const stats: Array<{ label: string; value: number; icon: typeof Home; onClick: () => void }> = [
+    {
+      label: t("partnerDashboard.dashboard.newLeads"),
+      value: newLeadsCount,
+      icon: ListChecks,
+      onClick: () => onGo("leads"),
+    },
+    {
+      label: t("partnerDashboard.dashboard.activeLeads"),
+      value: activeLeadsCount,
+      icon: MessageSquare,
+      onClick: () => onGo("leads"),
+    },
+    {
+      label: t("partnerDashboard.dashboard.myProperties"),
+      value: listingsCount,
+      icon: Home,
+      onClick: () => onGo("properties"),
+    },
+    {
+      label: t("partnerDashboard.dashboard.areasCovered"),
+      value: partner.areas.length,
+      icon: MapPin,
+      onClick: () => onGo("areas"),
+    },
+  ];
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold tracking-tight">{t("partnerDashboard.dashboard.heading")}</h1>
+      <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.dashboard.subtitle")}</p>
+
+      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {stats.map((s) => (
+          <button
+            key={s.label}
+            type="button"
+            onClick={s.onClick}
+            className="rounded-2xl border border-border bg-card p-5 text-start shadow-card transition-colors hover:border-primary/40"
+          >
+            <s.icon className="size-5 text-primary" />
+            <div className="mt-3 text-2xl font-bold tracking-tight">{s.value}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{s.label}</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold">{t("partnerDashboard.dashboard.subscriptionLabel")}</div>
+            <Badge tone={partner.subscription_status === "active" ? "success" : "warning"} className="mt-1.5">
+              {partner.subscription_status === "active" ? (
+                <CheckCircle className="size-3" />
+              ) : (
+                <Clock className="size-3" />
+              )}
+              {partner.subscription_status}
+            </Badge>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => onGo("subscription")}>
+            {t("partnerDashboard.dashboard.manageSubscription")}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Messages ─────────────────────────────────────────────────────────────────
+// An inbox-style index over the same per-lead chat threads that already exist
+// at /partner/leads/$leadId (fetchLeadMessages/sendLeadMessage) — no new
+// messaging backend, just a way to see all active/closed threads in one list.
+
+function PartnerMessagesView({
+  threads,
+  onOpen,
+}: {
+  threads: ApiLeadDetail[];
+  onOpen: (leadId: number) => void;
+}) {
+  const { t } = useLanguage();
+  return (
+    <div>
+      <h1 className="text-2xl font-bold tracking-tight">{t("partnerDashboard.messages.heading")}</h1>
+      <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.messages.subtitle")}</p>
+      <div className="mt-6 space-y-3">
+        {threads.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+            {t("partnerDashboard.messages.empty")}
+          </div>
+        )}
+        {threads.map((lead) => (
+          <button
+            key={lead.id}
+            type="button"
+            onClick={() => onOpen(lead.id)}
+            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 text-start shadow-card transition-colors hover:border-primary/40"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <MapPin className="size-4 shrink-0 text-muted-foreground" />
+                <span className="truncate font-semibold">
+                  {lead.area_name}, {lead.city}
+                </span>
+              </div>
+              <p className="mt-1 truncate text-sm text-muted-foreground">{lead.customer_name}</p>
+            </div>
+            <span className="shrink-0 text-xs font-medium text-primary">
+              {t("partnerDashboard.messages.open")}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Profile ──────────────────────────────────────────────────────────────────
+// Reuses the existing PATCH /mediators/me endpoint (updateMediatorProfile) —
+// already used nowhere in this file before, but already existed in the API
+// layer. License number / member-since are read-only (backend-assigned).
+
+function PartnerProfileView({
+  partner,
+  onSaved,
+}: {
+  partner: ApiPartner;
+  onSaved: (p: ApiPartner) => void;
+}) {
+  const { t } = useLanguage();
+  const [agencyName, setAgencyName] = useState(partner.agency_name ?? "");
+  const [phone, setPhone] = useState(partner.phone);
+  const [bio, setBio] = useState(partner.bio ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const updated = await updateMediatorProfile({
+        agency_name: agencyName.trim() || undefined,
+        phone: phone.trim(),
+        bio: bio.trim() || undefined,
+      });
+      onSaved(updated);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("partnerDashboard.profile.failedToSave"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="max-w-xl">
+      <h1 className="text-2xl font-bold tracking-tight">{t("partnerDashboard.profile.heading")}</h1>
+      <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.profile.subtitle")}</p>
+      <form
+        onSubmit={handleSave}
+        className="mt-6 space-y-4 rounded-2xl border border-border bg-card p-6 shadow-card"
+      >
+        <FormField label={t("partnerDashboard.profile.agencyName")}>
+          <Input value={agencyName} onChange={(e) => setAgencyName(e.target.value)} />
+        </FormField>
+        <FormField label={t("partnerDashboard.profile.phone")}>
+          <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </FormField>
+        <FormField label={t("partnerDashboard.profile.bio")}>
+          <textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            rows={4}
+            className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+        </FormField>
+        <div className="grid grid-cols-2 gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
+          <div>
+            {t("partnerDashboard.profile.licenseNumber")}: {partner.license_number}
+          </div>
+          <div>
+            {t("partnerDashboard.profile.memberSince")}:{" "}
+            {new Date(partner.created_at).toLocaleDateString()}
+          </div>
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {saved && !error && (
+          <p className="text-sm text-success">{t("partnerDashboard.profile.saved")}</p>
+        )}
+        <Button type="submit" disabled={saving}>
+          {saving ? t("partnerDashboard.profile.saving") : t("partnerDashboard.profile.save")}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+// ── Reviews ──────────────────────────────────────────────────────────────────
+// Reuses the existing public review endpoints (fetchMediatorReviews /
+// fetchMediatorReviewSummary), scoped to the partner's own mediator id — the
+// same data already shown on the public agent profile page (agent.$id.tsx).
+
+function PartnerReviewsView({ mediatorId }: { mediatorId: number }) {
+  const { t } = useLanguage();
+  const [reviews, setReviews] = useState<ApiReview[]>([]);
+  const [summary, setSummary] = useState<ApiReviewSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([fetchMediatorReviews(mediatorId), fetchMediatorReviewSummary(mediatorId)])
+      .then(([r, s]) => {
+        if (!cancelled) {
+          setReviews(r);
+          setSummary(s);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mediatorId]);
+
+  const approved = reviews.filter((r) => r.status === "approved");
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold tracking-tight">{t("partnerDashboard.reviews.heading")}</h1>
+      <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.reviews.subtitle")}</p>
+
+      {summary && summary.review_count > 0 && (
+        <div className="mt-4 flex items-center gap-3 rounded-2xl border border-border bg-card p-5 shadow-card">
+          <Star className="size-6 fill-amber-500 text-amber-500" />
+          <div>
+            <div className="text-2xl font-bold tracking-tight">
+              {summary.avg_rating != null ? summary.avg_rating.toFixed(1) : "—"}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {t("partnerDashboard.reviews.reviewCount", { count: summary.review_count })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-6 space-y-3">
+        {loading && (
+          <div className="py-10 text-center text-sm text-muted-foreground">{t("common.loading")}</div>
+        )}
+        {!loading && approved.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+            {t("partnerDashboard.reviews.empty")}
+          </div>
+        )}
+        {approved.map((r) => (
+          <div key={r.id} className="rounded-2xl border border-border bg-card p-5 shadow-card space-y-1.5">
+            <div className="flex items-center gap-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star
+                  key={i}
+                  className={cn(
+                    "size-3.5",
+                    i < r.rating ? "fill-amber-500 text-amber-500" : "text-border",
+                  )}
+                />
+              ))}
+            </div>
+            {r.comment && <p className="text-sm text-foreground">{r.comment}</p>}
+            <p className="text-xs text-muted-foreground">
+              {r.reviewer_name ?? t("partnerDashboard.reviews.anonymous")}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Area coverage ────────────────────────────────────────────────────────────
+// Moved out of the leads view's sidebar (Prompt 6) into its own nav item —
+// same add/remove-area logic and JSX as before, just no longer squeezed next
+// to the leads list.
+
+function PartnerAreaCoverageView({
+  partner,
+  availableAreas,
+  newArea,
+  setNewArea,
+  addingArea,
+  onAddArea,
+  onRemoveArea,
+}: {
+  partner: ApiPartner;
+  availableAreas: ApiAreaSummary[];
+  newArea: { area_name: string; city: string };
+  setNewArea: (updater: (v: { area_name: string; city: string }) => { area_name: string; city: string }) => void;
+  addingArea: boolean;
+  onAddArea: (e: React.FormEvent) => void;
+  onRemoveArea: (area_id: number) => void;
+}) {
+  const { t } = useLanguage();
+  return (
+    <div className="max-w-xl">
+      <h1 className="text-2xl font-bold tracking-tight">{t("partnerDashboard.coveredAreas.heading")}</h1>
+      <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.coveredAreas.subtitle")}</p>
+      <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-card space-y-3">
+        {partner.areas.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            {t("partnerDashboard.coveredAreas.noAreasYet")}
+          </p>
+        )}
+        {partner.areas.map((area) => (
+          <div key={area.id} className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="size-3.5 text-muted-foreground" />
+              <span>{area.area_name}</span>
+              <span className="text-xs text-muted-foreground">{area.city}</span>
+            </div>
+            <button
+              onClick={() => onRemoveArea(area.id)}
+              className="text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+        ))}
+        <form onSubmit={onAddArea} className="border-t border-border pt-3 space-y-2">
+          <select
+            value={newArea.area_name ? `${newArea.area_name}|${newArea.city}` : ""}
+            onChange={(e) => {
+              const [area_name, city] = e.target.value.split("|");
+              setNewArea(() => ({ area_name: area_name ?? "", city: city ?? "" }));
+            }}
+            className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-primary"
+          >
+            <option value="">{t("partnerDashboard.coveredAreas.selectDistrict")}</option>
+            {Array.from(new Set(availableAreas.map((a) => a.city)))
+              .sort()
+              .map((city) => {
+                const taken = new Set(
+                  partner.areas.filter((a) => a.city === city).map((a) => a.area_name),
+                );
+                return (
+                  <optgroup key={city} label={city}>
+                    {availableAreas
+                      .filter((a) => a.city === city)
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((area) => (
+                        <option
+                          key={`${area.name}|${city}`}
+                          value={`${area.name}|${city}`}
+                          disabled={taken.has(area.name)}
+                        >
+                          {area.name}
+                          {taken.has(area.name) ? t("partnerDashboard.coveredAreas.addedSuffix") : ""}
+                        </option>
+                      ))}
+                  </optgroup>
+                );
+              })}
+          </select>
+          <Button
+            type="submit"
+            size="sm"
+            variant="outline"
+            className="w-full"
+            disabled={addingArea || !newArea.area_name.trim()}
+          >
+            <Plus className="size-3.5" /> {t("partnerDashboard.coveredAreas.addArea")}
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Subscription ─────────────────────────────────────────────────────────────
+// Reuses the existing mock subscribe/renew endpoint (subscribePartnerMock →
+// POST /mediators/me/subscribe, the same one activated from partner.register.tsx)
+// — no new payment flow.
+
+function PartnerSubscriptionView({
+  partner,
+  onRenewed,
+}: {
+  partner: ApiPartner;
+  onRenewed: (updates: { subscription_status: string; subscription_expires_at: string }) => void;
+}) {
+  const { t, lang } = useLanguage();
+  const [renewing, setRenewing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const active = partner.subscription_status === "active";
+
+  async function handleRenew() {
+    setRenewing(true);
+    setError(null);
+    try {
+      const res = await subscribePartnerMock();
+      onRenewed({ subscription_status: res.status, subscription_expires_at: res.subscription_expires_at });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("partnerDashboard.subscriptionView.failed"));
+    } finally {
+      setRenewing(false);
+    }
+  }
+
+  return (
+    <div className="max-w-xl">
+      <h1 className="text-2xl font-bold tracking-tight">{t("partnerDashboard.subscriptionView.heading")}</h1>
+      <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.subscriptionView.subtitle")}</p>
+      <div className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-card space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">{t("partnerDashboard.subscriptionView.status")}</span>
+          <Badge tone={active ? "success" : "warning"}>
+            {active ? <CheckCircle className="size-3" /> : <Clock className="size-3" />}
+            {partner.subscription_status}
+          </Badge>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">{t("partnerDashboard.subscriptionView.tier")}</span>
+          <span className="text-sm font-medium">{partner.subscription_tier}</span>
+        </div>
+        {partner.subscription_expires_at && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              {t("partnerDashboard.subscriptionView.expires")}
+            </span>
+            <span className="text-sm font-medium">
+              {new Date(partner.subscription_expires_at).toLocaleDateString(
+                lang === "ar" ? "ar-SA" : "en-SA",
+              )}
+            </span>
+          </div>
+        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <Button className="w-full" onClick={() => void handleRenew()} disabled={renewing}>
+          {renewing
+            ? t("partnerDashboard.subscriptionView.renewing")
+            : active
+              ? t("partnerDashboard.subscriptionView.renewCta")
+              : t("partnerDashboard.subscriptionView.subscribeCta")}
+        </Button>
       </div>
     </div>
   );

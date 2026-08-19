@@ -2,16 +2,16 @@ import { useEffect, useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Image } from "react-native";
 import { useRouter, type Href } from "expo-router";
-import { Briefcase, Sparkles, Calculator, ChevronRight, SearchCheck } from "lucide-react-native";
+import { Briefcase, Calculator, ChevronRight, SearchCheck, Wand2 } from "lucide-react-native";
 import { fetchPublicPartners, type ApiPartnerPublic } from "@/lib/api/maskan";
 import { useLanguage } from "@/lib/i18n/context";
 import { colors } from "@/lib/colors";
 
-type TabKey = "partner" | "advisor" | "estimate" | "requests";
+type TabKey = "partner" | "homeFinder" | "estimate" | "requests";
 
 const ACCENTS: Record<TabKey, { tabBg: string; tabText: string; cardBg: string; accent: string }> = {
   partner: { tabBg: "#E0F2FE", tabText: colors.info, cardBg: "#F0F9FF", accent: colors.info },
-  advisor: { tabBg: "#EDE9FE", tabText: "#6D28D9", cardBg: "#F5F3FF", accent: "#6D28D9" },
+  homeFinder: { tabBg: "#FCE7F3", tabText: "#DB2777", cardBg: "#FDF2F8", accent: "#DB2777" },
   estimate: { tabBg: "#DCFCE7", tabText: colors.success, cardBg: "#F0FDF4", accent: colors.success },
   requests: { tabBg: colors.primarySoft, tabText: colors.primary, cardBg: "#EFF6FF", accent: colors.primary },
 };
@@ -32,14 +32,18 @@ export function MoreWaysSection() {
 
   const tabs: { key: TabKey; icon: typeof Briefcase; label: string; to: Href }[] = [
     { key: "partner", icon: Briefcase, label: t("home.truPartner.badge"), to: "/lead/new" },
-    { key: "advisor", icon: Sparkles, label: t("home.truAIAdvisor.badge"), to: "/advisor" },
+    { key: "homeFinder", icon: Wand2, label: t("home.truHomeFinder.badge"), to: "/home-finder" },
     { key: "estimate", icon: Calculator, label: t("home.truEstimate.badge"), to: "/estimate" },
     { key: "requests", icon: SearchCheck, label: t("propertyRequest.entryPoint.cta"), to: "/property-requests/new" },
   ];
 
   const content: Record<TabKey, { newLabel?: string; title: string; body: string }> = {
     partner: { newLabel: t("home.truPartner.new"), title: t("home.truPartner.title"), body: t("home.truPartner.body") },
-    advisor: { newLabel: t("home.truAIAdvisor.new"), title: t("home.truAIAdvisor.title"), body: t("home.truAIAdvisor.body") },
+    homeFinder: {
+      newLabel: t("home.truHomeFinder.new"),
+      title: t("home.truHomeFinder.title"),
+      body: t("home.truHomeFinder.body"),
+    },
     estimate: { title: t("home.truEstimate.title"), body: t("home.truEstimate.body") },
     requests: {
       newLabel: t("home.truAIAdvisor.new"),
@@ -124,6 +128,10 @@ export function MoreWaysSection() {
           ) : active === "estimate" ? (
             <Text className="text-sm font-semibold" style={{ color: accent.accent }}>
               {t("home.truEstimate.getStarted")}
+            </Text>
+          ) : active === "homeFinder" ? (
+            <Text className="text-sm font-semibold" style={{ color: accent.accent }}>
+              {t("home.truHomeFinder.getStarted")}
             </Text>
           ) : active === "requests" ? (
             <Text className="text-sm font-semibold" style={{ color: accent.accent }}>

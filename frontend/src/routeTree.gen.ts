@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ViewingsRouteImport } from './routes/viewings'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SavedSearchesRouteImport } from './routes/saved-searches'
 import { Route as SavedRouteImport } from './routes/saved'
@@ -18,9 +19,11 @@ import { Route as PartnersRouteImport } from './routes/partners'
 import { Route as PartnerRouteImport } from './routes/partner'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as NotificationSettingsRouteImport } from './routes/notification-settings'
+import { Route as NegotiationsRouteImport } from './routes/negotiations'
 import { Route as MyLeadsRouteImport } from './routes/my-leads'
 import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as ImportRouteImport } from './routes/import'
+import { Route as HomeFinderRouteImport } from './routes/home-finder'
 import { Route as EstimateRouteImport } from './routes/estimate'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -29,22 +32,36 @@ import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as AdvisorRouteImport } from './routes/advisor'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ViewingsIdRouteImport } from './routes/viewings.$id'
+import { Route as TransactionIdRouteImport } from './routes/transaction.$id'
 import { Route as PropertyIdRouteImport } from './routes/property.$id'
 import { Route as PropertyRequestsNewRouteImport } from './routes/property-requests.new'
 import { Route as PropertyRequestsIdRouteImport } from './routes/property-requests.$id'
 import { Route as ProjectIdRouteImport } from './routes/project.$id'
+import { Route as PartnerViewingsRouteImport } from './routes/partner.viewings'
 import { Route as PartnerRequestsRouteImport } from './routes/partner.requests'
 import { Route as PartnerRegisterRouteImport } from './routes/partner.register'
+import { Route as PartnerNegotiationsRouteImport } from './routes/partner.negotiations'
+import { Route as NegotiationsIdRouteImport } from './routes/negotiations.$id'
 import { Route as LeadNewRouteImport } from './routes/lead.new'
 import { Route as LeadLeadIdRouteImport } from './routes/lead.$leadId'
 import { Route as ContractLeadIdRouteImport } from './routes/contract.$leadId'
 import { Route as AgentIdRouteImport } from './routes/agent.$id'
+import { Route as AdminTrustModerationRouteImport } from './routes/admin_.trust-moderation'
 import { Route as AdminPropertyRequestsRouteImport } from './routes/admin_.property-requests'
 import { Route as AdminNotificationsRouteImport } from './routes/admin_.notifications'
 import { Route as PropertyRouteImport } from './routes/property.'
+import { Route as PartnerViewingsIdRouteImport } from './routes/partner.viewings.$id'
 import { Route as PartnerRequestsIdRouteImport } from './routes/partner.requests.$id'
+import { Route as PartnerNegotiationsIdRouteImport } from './routes/partner.negotiations.$id'
 import { Route as PartnerLeadsLeadIdRouteImport } from './routes/partner.leads.$leadId'
+import { Route as NegotiationsIdAgreementRouteImport } from './routes/negotiations.$id_.agreement'
 
+const ViewingsRoute = ViewingsRouteImport.update({
+  id: '/viewings',
+  path: '/viewings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
@@ -90,6 +107,11 @@ const NotificationSettingsRoute = NotificationSettingsRouteImport.update({
   path: '/notification-settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NegotiationsRoute = NegotiationsRouteImport.update({
+  id: '/negotiations',
+  path: '/negotiations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MyLeadsRoute = MyLeadsRouteImport.update({
   id: '/my-leads',
   path: '/my-leads',
@@ -103,6 +125,11 @@ const MethodologyRoute = MethodologyRouteImport.update({
 const ImportRoute = ImportRouteImport.update({
   id: '/import',
   path: '/import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HomeFinderRoute = HomeFinderRouteImport.update({
+  id: '/home-finder',
+  path: '/home-finder',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EstimateRoute = EstimateRouteImport.update({
@@ -145,6 +172,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ViewingsIdRoute = ViewingsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ViewingsRoute,
+} as any)
+const TransactionIdRoute = TransactionIdRouteImport.update({
+  id: '/transaction/$id',
+  path: '/transaction/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PropertyIdRoute = PropertyIdRouteImport.update({
   id: '/property/$id',
   path: '/property/$id',
@@ -165,6 +202,11 @@ const ProjectIdRoute = ProjectIdRouteImport.update({
   path: '/project/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PartnerViewingsRoute = PartnerViewingsRouteImport.update({
+  id: '/viewings',
+  path: '/viewings',
+  getParentRoute: () => PartnerRoute,
+} as any)
 const PartnerRequestsRoute = PartnerRequestsRouteImport.update({
   id: '/requests',
   path: '/requests',
@@ -174,6 +216,16 @@ const PartnerRegisterRoute = PartnerRegisterRouteImport.update({
   id: '/register',
   path: '/register',
   getParentRoute: () => PartnerRoute,
+} as any)
+const PartnerNegotiationsRoute = PartnerNegotiationsRouteImport.update({
+  id: '/negotiations',
+  path: '/negotiations',
+  getParentRoute: () => PartnerRoute,
+} as any)
+const NegotiationsIdRoute = NegotiationsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => NegotiationsRoute,
 } as any)
 const LeadNewRoute = LeadNewRouteImport.update({
   id: '/lead/new',
@@ -195,6 +247,11 @@ const AgentIdRoute = AgentIdRouteImport.update({
   path: '/agent/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminTrustModerationRoute = AdminTrustModerationRouteImport.update({
+  id: '/admin_/trust-moderation',
+  path: '/admin/trust-moderation',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminPropertyRequestsRoute = AdminPropertyRequestsRouteImport.update({
   id: '/admin_/property-requests',
   path: '/admin/property-requests',
@@ -210,15 +267,30 @@ const PropertyRoute = PropertyRouteImport.update({
   path: '/property/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PartnerViewingsIdRoute = PartnerViewingsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PartnerViewingsRoute,
+} as any)
 const PartnerRequestsIdRoute = PartnerRequestsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => PartnerRequestsRoute,
 } as any)
+const PartnerNegotiationsIdRoute = PartnerNegotiationsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PartnerNegotiationsRoute,
+} as any)
 const PartnerLeadsLeadIdRoute = PartnerLeadsLeadIdRouteImport.update({
   id: '/leads/$leadId',
   path: '/leads/$leadId',
   getParentRoute: () => PartnerRoute,
+} as any)
+const NegotiationsIdAgreementRoute = NegotiationsIdAgreementRouteImport.update({
+  id: '/$id_/agreement',
+  path: '/$id/agreement',
+  getParentRoute: () => NegotiationsRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -230,9 +302,11 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
   '/estimate': typeof EstimateRoute
+  '/home-finder': typeof HomeFinderRoute
   '/import': typeof ImportRoute
   '/methodology': typeof MethodologyRoute
   '/my-leads': typeof MyLeadsRoute
+  '/negotiations': typeof NegotiationsRouteWithChildren
   '/notification-settings': typeof NotificationSettingsRoute
   '/notifications': typeof NotificationsRoute
   '/partner': typeof PartnerRouteWithChildren
@@ -242,21 +316,31 @@ export interface FileRoutesByFullPath {
   '/saved': typeof SavedRoute
   '/saved-searches': typeof SavedSearchesRoute
   '/search': typeof SearchRoute
+  '/viewings': typeof ViewingsRouteWithChildren
   '/property/': typeof PropertyRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/property-requests': typeof AdminPropertyRequestsRoute
+  '/admin/trust-moderation': typeof AdminTrustModerationRoute
   '/agent/$id': typeof AgentIdRoute
   '/contract/$leadId': typeof ContractLeadIdRoute
   '/lead/$leadId': typeof LeadLeadIdRoute
   '/lead/new': typeof LeadNewRoute
+  '/negotiations/$id': typeof NegotiationsIdRoute
+  '/partner/negotiations': typeof PartnerNegotiationsRouteWithChildren
   '/partner/register': typeof PartnerRegisterRoute
   '/partner/requests': typeof PartnerRequestsRouteWithChildren
+  '/partner/viewings': typeof PartnerViewingsRouteWithChildren
   '/project/$id': typeof ProjectIdRoute
   '/property-requests/$id': typeof PropertyRequestsIdRoute
   '/property-requests/new': typeof PropertyRequestsNewRoute
   '/property/$id': typeof PropertyIdRoute
+  '/transaction/$id': typeof TransactionIdRoute
+  '/viewings/$id': typeof ViewingsIdRoute
+  '/negotiations/$id/agreement': typeof NegotiationsIdAgreementRoute
   '/partner/leads/$leadId': typeof PartnerLeadsLeadIdRoute
+  '/partner/negotiations/$id': typeof PartnerNegotiationsIdRoute
   '/partner/requests/$id': typeof PartnerRequestsIdRoute
+  '/partner/viewings/$id': typeof PartnerViewingsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -267,9 +351,11 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
   '/estimate': typeof EstimateRoute
+  '/home-finder': typeof HomeFinderRoute
   '/import': typeof ImportRoute
   '/methodology': typeof MethodologyRoute
   '/my-leads': typeof MyLeadsRoute
+  '/negotiations': typeof NegotiationsRouteWithChildren
   '/notification-settings': typeof NotificationSettingsRoute
   '/notifications': typeof NotificationsRoute
   '/partner': typeof PartnerRouteWithChildren
@@ -279,21 +365,31 @@ export interface FileRoutesByTo {
   '/saved': typeof SavedRoute
   '/saved-searches': typeof SavedSearchesRoute
   '/search': typeof SearchRoute
+  '/viewings': typeof ViewingsRouteWithChildren
   '/property': typeof PropertyRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/property-requests': typeof AdminPropertyRequestsRoute
+  '/admin/trust-moderation': typeof AdminTrustModerationRoute
   '/agent/$id': typeof AgentIdRoute
   '/contract/$leadId': typeof ContractLeadIdRoute
   '/lead/$leadId': typeof LeadLeadIdRoute
   '/lead/new': typeof LeadNewRoute
+  '/negotiations/$id': typeof NegotiationsIdRoute
+  '/partner/negotiations': typeof PartnerNegotiationsRouteWithChildren
   '/partner/register': typeof PartnerRegisterRoute
   '/partner/requests': typeof PartnerRequestsRouteWithChildren
+  '/partner/viewings': typeof PartnerViewingsRouteWithChildren
   '/project/$id': typeof ProjectIdRoute
   '/property-requests/$id': typeof PropertyRequestsIdRoute
   '/property-requests/new': typeof PropertyRequestsNewRoute
   '/property/$id': typeof PropertyIdRoute
+  '/transaction/$id': typeof TransactionIdRoute
+  '/viewings/$id': typeof ViewingsIdRoute
+  '/negotiations/$id/agreement': typeof NegotiationsIdAgreementRoute
   '/partner/leads/$leadId': typeof PartnerLeadsLeadIdRoute
+  '/partner/negotiations/$id': typeof PartnerNegotiationsIdRoute
   '/partner/requests/$id': typeof PartnerRequestsIdRoute
+  '/partner/viewings/$id': typeof PartnerViewingsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -305,9 +401,11 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
   '/estimate': typeof EstimateRoute
+  '/home-finder': typeof HomeFinderRoute
   '/import': typeof ImportRoute
   '/methodology': typeof MethodologyRoute
   '/my-leads': typeof MyLeadsRoute
+  '/negotiations': typeof NegotiationsRouteWithChildren
   '/notification-settings': typeof NotificationSettingsRoute
   '/notifications': typeof NotificationsRoute
   '/partner': typeof PartnerRouteWithChildren
@@ -317,21 +415,31 @@ export interface FileRoutesById {
   '/saved': typeof SavedRoute
   '/saved-searches': typeof SavedSearchesRoute
   '/search': typeof SearchRoute
+  '/viewings': typeof ViewingsRouteWithChildren
   '/property/': typeof PropertyRoute
   '/admin_/notifications': typeof AdminNotificationsRoute
   '/admin_/property-requests': typeof AdminPropertyRequestsRoute
+  '/admin_/trust-moderation': typeof AdminTrustModerationRoute
   '/agent/$id': typeof AgentIdRoute
   '/contract/$leadId': typeof ContractLeadIdRoute
   '/lead/$leadId': typeof LeadLeadIdRoute
   '/lead/new': typeof LeadNewRoute
+  '/negotiations/$id': typeof NegotiationsIdRoute
+  '/partner/negotiations': typeof PartnerNegotiationsRouteWithChildren
   '/partner/register': typeof PartnerRegisterRoute
   '/partner/requests': typeof PartnerRequestsRouteWithChildren
+  '/partner/viewings': typeof PartnerViewingsRouteWithChildren
   '/project/$id': typeof ProjectIdRoute
   '/property-requests/$id': typeof PropertyRequestsIdRoute
   '/property-requests/new': typeof PropertyRequestsNewRoute
   '/property/$id': typeof PropertyIdRoute
+  '/transaction/$id': typeof TransactionIdRoute
+  '/viewings/$id': typeof ViewingsIdRoute
+  '/negotiations/$id_/agreement': typeof NegotiationsIdAgreementRoute
   '/partner/leads/$leadId': typeof PartnerLeadsLeadIdRoute
+  '/partner/negotiations/$id': typeof PartnerNegotiationsIdRoute
   '/partner/requests/$id': typeof PartnerRequestsIdRoute
+  '/partner/viewings/$id': typeof PartnerViewingsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -344,9 +452,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compare'
     | '/estimate'
+    | '/home-finder'
     | '/import'
     | '/methodology'
     | '/my-leads'
+    | '/negotiations'
     | '/notification-settings'
     | '/notifications'
     | '/partner'
@@ -356,21 +466,31 @@ export interface FileRouteTypes {
     | '/saved'
     | '/saved-searches'
     | '/search'
+    | '/viewings'
     | '/property/'
     | '/admin/notifications'
     | '/admin/property-requests'
+    | '/admin/trust-moderation'
     | '/agent/$id'
     | '/contract/$leadId'
     | '/lead/$leadId'
     | '/lead/new'
+    | '/negotiations/$id'
+    | '/partner/negotiations'
     | '/partner/register'
     | '/partner/requests'
+    | '/partner/viewings'
     | '/project/$id'
     | '/property-requests/$id'
     | '/property-requests/new'
     | '/property/$id'
+    | '/transaction/$id'
+    | '/viewings/$id'
+    | '/negotiations/$id/agreement'
     | '/partner/leads/$leadId'
+    | '/partner/negotiations/$id'
     | '/partner/requests/$id'
+    | '/partner/viewings/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -381,9 +501,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compare'
     | '/estimate'
+    | '/home-finder'
     | '/import'
     | '/methodology'
     | '/my-leads'
+    | '/negotiations'
     | '/notification-settings'
     | '/notifications'
     | '/partner'
@@ -393,21 +515,31 @@ export interface FileRouteTypes {
     | '/saved'
     | '/saved-searches'
     | '/search'
+    | '/viewings'
     | '/property'
     | '/admin/notifications'
     | '/admin/property-requests'
+    | '/admin/trust-moderation'
     | '/agent/$id'
     | '/contract/$leadId'
     | '/lead/$leadId'
     | '/lead/new'
+    | '/negotiations/$id'
+    | '/partner/negotiations'
     | '/partner/register'
     | '/partner/requests'
+    | '/partner/viewings'
     | '/project/$id'
     | '/property-requests/$id'
     | '/property-requests/new'
     | '/property/$id'
+    | '/transaction/$id'
+    | '/viewings/$id'
+    | '/negotiations/$id/agreement'
     | '/partner/leads/$leadId'
+    | '/partner/negotiations/$id'
     | '/partner/requests/$id'
+    | '/partner/viewings/$id'
   id:
     | '__root__'
     | '/'
@@ -418,9 +550,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/compare'
     | '/estimate'
+    | '/home-finder'
     | '/import'
     | '/methodology'
     | '/my-leads'
+    | '/negotiations'
     | '/notification-settings'
     | '/notifications'
     | '/partner'
@@ -430,21 +564,31 @@ export interface FileRouteTypes {
     | '/saved'
     | '/saved-searches'
     | '/search'
+    | '/viewings'
     | '/property/'
     | '/admin_/notifications'
     | '/admin_/property-requests'
+    | '/admin_/trust-moderation'
     | '/agent/$id'
     | '/contract/$leadId'
     | '/lead/$leadId'
     | '/lead/new'
+    | '/negotiations/$id'
+    | '/partner/negotiations'
     | '/partner/register'
     | '/partner/requests'
+    | '/partner/viewings'
     | '/project/$id'
     | '/property-requests/$id'
     | '/property-requests/new'
     | '/property/$id'
+    | '/transaction/$id'
+    | '/viewings/$id'
+    | '/negotiations/$id_/agreement'
     | '/partner/leads/$leadId'
+    | '/partner/negotiations/$id'
     | '/partner/requests/$id'
+    | '/partner/viewings/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -456,9 +600,11 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CompareRoute: typeof CompareRoute
   EstimateRoute: typeof EstimateRoute
+  HomeFinderRoute: typeof HomeFinderRoute
   ImportRoute: typeof ImportRoute
   MethodologyRoute: typeof MethodologyRoute
   MyLeadsRoute: typeof MyLeadsRoute
+  NegotiationsRoute: typeof NegotiationsRouteWithChildren
   NotificationSettingsRoute: typeof NotificationSettingsRoute
   NotificationsRoute: typeof NotificationsRoute
   PartnerRoute: typeof PartnerRouteWithChildren
@@ -468,19 +614,29 @@ export interface RootRouteChildren {
   SavedRoute: typeof SavedRoute
   SavedSearchesRoute: typeof SavedSearchesRoute
   SearchRoute: typeof SearchRoute
+  ViewingsRoute: typeof ViewingsRouteWithChildren
   PropertyRoute: typeof PropertyRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminPropertyRequestsRoute: typeof AdminPropertyRequestsRoute
+  AdminTrustModerationRoute: typeof AdminTrustModerationRoute
   AgentIdRoute: typeof AgentIdRoute
   ContractLeadIdRoute: typeof ContractLeadIdRoute
   LeadLeadIdRoute: typeof LeadLeadIdRoute
   LeadNewRoute: typeof LeadNewRoute
   ProjectIdRoute: typeof ProjectIdRoute
   PropertyIdRoute: typeof PropertyIdRoute
+  TransactionIdRoute: typeof TransactionIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/viewings': {
+      id: '/viewings'
+      path: '/viewings'
+      fullPath: '/viewings'
+      preLoaderRoute: typeof ViewingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/search': {
       id: '/search'
       path: '/search'
@@ -544,6 +700,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NotificationSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/negotiations': {
+      id: '/negotiations'
+      path: '/negotiations'
+      fullPath: '/negotiations'
+      preLoaderRoute: typeof NegotiationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/my-leads': {
       id: '/my-leads'
       path: '/my-leads'
@@ -563,6 +726,13 @@ declare module '@tanstack/react-router' {
       path: '/import'
       fullPath: '/import'
       preLoaderRoute: typeof ImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/home-finder': {
+      id: '/home-finder'
+      path: '/home-finder'
+      fullPath: '/home-finder'
+      preLoaderRoute: typeof HomeFinderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/estimate': {
@@ -621,6 +791,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/viewings/$id': {
+      id: '/viewings/$id'
+      path: '/$id'
+      fullPath: '/viewings/$id'
+      preLoaderRoute: typeof ViewingsIdRouteImport
+      parentRoute: typeof ViewingsRoute
+    }
+    '/transaction/$id': {
+      id: '/transaction/$id'
+      path: '/transaction/$id'
+      fullPath: '/transaction/$id'
+      preLoaderRoute: typeof TransactionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/property/$id': {
       id: '/property/$id'
       path: '/property/$id'
@@ -649,6 +833,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/partner/viewings': {
+      id: '/partner/viewings'
+      path: '/viewings'
+      fullPath: '/partner/viewings'
+      preLoaderRoute: typeof PartnerViewingsRouteImport
+      parentRoute: typeof PartnerRoute
+    }
     '/partner/requests': {
       id: '/partner/requests'
       path: '/requests'
@@ -662,6 +853,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/partner/register'
       preLoaderRoute: typeof PartnerRegisterRouteImport
       parentRoute: typeof PartnerRoute
+    }
+    '/partner/negotiations': {
+      id: '/partner/negotiations'
+      path: '/negotiations'
+      fullPath: '/partner/negotiations'
+      preLoaderRoute: typeof PartnerNegotiationsRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/negotiations/$id': {
+      id: '/negotiations/$id'
+      path: '/$id'
+      fullPath: '/negotiations/$id'
+      preLoaderRoute: typeof NegotiationsIdRouteImport
+      parentRoute: typeof NegotiationsRoute
     }
     '/lead/new': {
       id: '/lead/new'
@@ -691,6 +896,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/trust-moderation': {
+      id: '/admin_/trust-moderation'
+      path: '/admin/trust-moderation'
+      fullPath: '/admin/trust-moderation'
+      preLoaderRoute: typeof AdminTrustModerationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/property-requests': {
       id: '/admin_/property-requests'
       path: '/admin/property-requests'
@@ -712,12 +924,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PropertyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/partner/viewings/$id': {
+      id: '/partner/viewings/$id'
+      path: '/$id'
+      fullPath: '/partner/viewings/$id'
+      preLoaderRoute: typeof PartnerViewingsIdRouteImport
+      parentRoute: typeof PartnerViewingsRoute
+    }
     '/partner/requests/$id': {
       id: '/partner/requests/$id'
       path: '/$id'
       fullPath: '/partner/requests/$id'
       preLoaderRoute: typeof PartnerRequestsIdRouteImport
       parentRoute: typeof PartnerRequestsRoute
+    }
+    '/partner/negotiations/$id': {
+      id: '/partner/negotiations/$id'
+      path: '/$id'
+      fullPath: '/partner/negotiations/$id'
+      preLoaderRoute: typeof PartnerNegotiationsIdRouteImport
+      parentRoute: typeof PartnerNegotiationsRoute
     }
     '/partner/leads/$leadId': {
       id: '/partner/leads/$leadId'
@@ -726,8 +952,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PartnerLeadsLeadIdRouteImport
       parentRoute: typeof PartnerRoute
     }
+    '/negotiations/$id_/agreement': {
+      id: '/negotiations/$id_/agreement'
+      path: '/$id/agreement'
+      fullPath: '/negotiations/$id/agreement'
+      preLoaderRoute: typeof NegotiationsIdAgreementRouteImport
+      parentRoute: typeof NegotiationsRoute
+    }
   }
 }
+
+interface NegotiationsRouteChildren {
+  NegotiationsIdRoute: typeof NegotiationsIdRoute
+  NegotiationsIdAgreementRoute: typeof NegotiationsIdAgreementRoute
+}
+
+const NegotiationsRouteChildren: NegotiationsRouteChildren = {
+  NegotiationsIdRoute: NegotiationsIdRoute,
+  NegotiationsIdAgreementRoute: NegotiationsIdAgreementRoute,
+}
+
+const NegotiationsRouteWithChildren = NegotiationsRoute._addFileChildren(
+  NegotiationsRouteChildren,
+)
+
+interface PartnerNegotiationsRouteChildren {
+  PartnerNegotiationsIdRoute: typeof PartnerNegotiationsIdRoute
+}
+
+const PartnerNegotiationsRouteChildren: PartnerNegotiationsRouteChildren = {
+  PartnerNegotiationsIdRoute: PartnerNegotiationsIdRoute,
+}
+
+const PartnerNegotiationsRouteWithChildren =
+  PartnerNegotiationsRoute._addFileChildren(PartnerNegotiationsRouteChildren)
 
 interface PartnerRequestsRouteChildren {
   PartnerRequestsIdRoute: typeof PartnerRequestsIdRoute
@@ -741,15 +999,31 @@ const PartnerRequestsRouteWithChildren = PartnerRequestsRoute._addFileChildren(
   PartnerRequestsRouteChildren,
 )
 
+interface PartnerViewingsRouteChildren {
+  PartnerViewingsIdRoute: typeof PartnerViewingsIdRoute
+}
+
+const PartnerViewingsRouteChildren: PartnerViewingsRouteChildren = {
+  PartnerViewingsIdRoute: PartnerViewingsIdRoute,
+}
+
+const PartnerViewingsRouteWithChildren = PartnerViewingsRoute._addFileChildren(
+  PartnerViewingsRouteChildren,
+)
+
 interface PartnerRouteChildren {
+  PartnerNegotiationsRoute: typeof PartnerNegotiationsRouteWithChildren
   PartnerRegisterRoute: typeof PartnerRegisterRoute
   PartnerRequestsRoute: typeof PartnerRequestsRouteWithChildren
+  PartnerViewingsRoute: typeof PartnerViewingsRouteWithChildren
   PartnerLeadsLeadIdRoute: typeof PartnerLeadsLeadIdRoute
 }
 
 const PartnerRouteChildren: PartnerRouteChildren = {
+  PartnerNegotiationsRoute: PartnerNegotiationsRouteWithChildren,
   PartnerRegisterRoute: PartnerRegisterRoute,
   PartnerRequestsRoute: PartnerRequestsRouteWithChildren,
+  PartnerViewingsRoute: PartnerViewingsRouteWithChildren,
   PartnerLeadsLeadIdRoute: PartnerLeadsLeadIdRoute,
 }
 
@@ -769,6 +1043,18 @@ const PropertyRequestsRouteChildren: PropertyRequestsRouteChildren = {
 const PropertyRequestsRouteWithChildren =
   PropertyRequestsRoute._addFileChildren(PropertyRequestsRouteChildren)
 
+interface ViewingsRouteChildren {
+  ViewingsIdRoute: typeof ViewingsIdRoute
+}
+
+const ViewingsRouteChildren: ViewingsRouteChildren = {
+  ViewingsIdRoute: ViewingsIdRoute,
+}
+
+const ViewingsRouteWithChildren = ViewingsRoute._addFileChildren(
+  ViewingsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -778,9 +1064,11 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CompareRoute: CompareRoute,
   EstimateRoute: EstimateRoute,
+  HomeFinderRoute: HomeFinderRoute,
   ImportRoute: ImportRoute,
   MethodologyRoute: MethodologyRoute,
   MyLeadsRoute: MyLeadsRoute,
+  NegotiationsRoute: NegotiationsRouteWithChildren,
   NotificationSettingsRoute: NotificationSettingsRoute,
   NotificationsRoute: NotificationsRoute,
   PartnerRoute: PartnerRouteWithChildren,
@@ -790,15 +1078,18 @@ const rootRouteChildren: RootRouteChildren = {
   SavedRoute: SavedRoute,
   SavedSearchesRoute: SavedSearchesRoute,
   SearchRoute: SearchRoute,
+  ViewingsRoute: ViewingsRouteWithChildren,
   PropertyRoute: PropertyRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminPropertyRequestsRoute: AdminPropertyRequestsRoute,
+  AdminTrustModerationRoute: AdminTrustModerationRoute,
   AgentIdRoute: AgentIdRoute,
   ContractLeadIdRoute: ContractLeadIdRoute,
   LeadLeadIdRoute: LeadLeadIdRoute,
   LeadNewRoute: LeadNewRoute,
   ProjectIdRoute: ProjectIdRoute,
   PropertyIdRoute: PropertyIdRoute,
+  TransactionIdRoute: TransactionIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

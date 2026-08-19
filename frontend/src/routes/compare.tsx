@@ -11,12 +11,15 @@ import {
   CheckCircle2,
   Crown,
   Dumbbell,
+  Gauge,
   Heart,
   MapPin,
   Maximize,
   Minus,
+  PiggyBank,
   Plus,
   Search,
+  ShieldCheck,
   Sofa,
   Sparkles,
   Trees,
@@ -32,9 +35,11 @@ import {
   fetchProperties,
   fetchAreas,
   fetchAreaIntelligence,
+  fetchPropertyIntelligence,
   mapApiProperty,
   saveProperty,
   type ApiAreaIntelligence,
+  type ApiPropertyIntelligence,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -43,7 +48,7 @@ import { useLanguage } from "@/lib/i18n/context";
 export const Route = createFileRoute("/compare")({
   head: () => ({
     meta: [
-      { title: "Compare Properties — Maskan" },
+      { title: "Compare Properties — myMakan" },
       {
         name: "description",
         content:
@@ -115,6 +120,11 @@ function ComparePage() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [areaIntelMap, setAreaIntelMap] = useState<Record<string, ApiAreaIntelligence | null>>({});
   const [areaAvgMap, setAreaAvgMap] = useState<Record<string, number>>({});
+  // Prompt 10: myMakan Property Intelligence per compared property — bounded
+  // to however many the page supports (currently ≤3, same cap as
+  // `selectedIds`), fetched once per id and cached, same pattern as the
+  // areaIntel fetch below (never re-fetched once present, even as null).
+  const [intelMap, setIntelMap] = useState<Record<string, ApiPropertyIntelligence | null>>({});
 
   useEffect(() => {
     fetchProperties()
@@ -147,6 +157,17 @@ function ComparePage() {
         fetchAreaIntelligence(p.district, p.city)
           .then((intel) => setAreaIntelMap((prev) => ({ ...prev, [p.district]: intel })))
           .catch(() => setAreaIntelMap((prev) => ({ ...prev, [p.district]: null })));
+      }
+    });
+  }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch Property Intelligence for any newly-selected property (Prompt 10)
+  useEffect(() => {
+    selected.forEach((p) => {
+      if (!(p.id in intelMap)) {
+        fetchPropertyIntelligence(Number(p.id))
+          .then((intel) => setIntelMap((prev) => ({ ...prev, [p.id]: intel })))
+          .catch(() => setIntelMap((prev) => ({ ...prev, [p.id]: null })));
       }
     });
   }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -253,8 +274,21 @@ function ComparePage() {
           />
         )}
 
+        {/* myMakan Recommendation (Prompt 10) — distinct from AiRecommendationCard
+            above: that one picks a single overall winner from a client-side
+            composite (area/family/rental/match); this one picks three separate
+            category winners (Overall/Value/Location) straight from the real
+            Property Intelligence Decision Score / price classification / area
+            score, with a deterministic one-line "why" per winner — never an AI
+            call choosing the winner. */}
+        {selected.length >= 2 && (
+          <MyMakanRecommendationCard selected={selected} intelMap={intelMap} />
+        )}
+
         {/* Comparison categories */}
         <div className="mt-10 space-y-6">
+          <PropertyIntelligenceCategory selected={selected} intelMap={intelMap} />
+
           <CategoryTable
             title={t("compare.categories.financial")}
             icon={<Crown className="size-4" />}
@@ -940,6 +974,204 @@ function RentalIntelligenceCategory({
             </div>
           );
         })}
+      </div>
+    </section>
+  );
+}
+
+// ---------- myMakan Intelligence category (Prompt 10) ----------
+
+function PropertyIntelligenceCategory({
+  selected,
+  intelMap,
+}: {
+  selected: Property[];
+  intelMap: Record<string, ApiPropertyIntelligence | null>;
+}) {
+  const { t } = useLanguage();
+  return (
+    <CategoryTable
+      title={t("compare.categories.myMakanIntelligence")}
+      icon={<Gauge className="size-4" />}
+      rows={[
+        {
+          label: t("compare.rows.decisionScore"),
+          values: selected.map((p) => {
+            const score = intelMap[p.id]?.decision_score ?? null;
+            return {
+              value: score != null ? `${score}/100` : "—",
+              best: score != null && score === Math.max(...selected.map((s) => intelMap[s.id]?.decision_score ?? -1)),
+            };
+          }),
+        },
+        {
+          label: t("compare.rows.matchScore"),
+          values: selected.map((p) => ({ value: `${p.matchScore}/100` })),
+        },
+        {
+          label: t("compare.rows.priceClassification"),
+          values: selected.map((p) => {
+            const classification = intelMap[p.id]?.price_intelligence.classification ?? null;
+            return {
+              value: classification ? (
+                <Badge tone={classificationTone(classification)}>{classification}</Badge>
+              ) : (
+                t("compare.notAvailable")
+              ),
+            };
+          }),
+        },
+        {
+          label: t("compare.rows.areaScoreIntel"),
+          values: selected.map((p) => {
+            const score = intelMap[p.id]?.area_intelligence?.area_score ?? null;
+            return { value: score != null ? `${Math.round(score)}/100` : "—" };
+          }),
+        },
+        {
+          label: t("compare.rows.dataConfidence"),
+          values: selected.map((p) => {
+            const conf = intelMap[p.id]?.data_confidence.level ?? null;
+            return {
+              value: conf ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <ShieldCheck className="size-4" /> {conf}
+                </span>
+              ) : (
+                "—"
+              ),
+            };
+          }),
+        },
+        {
+          label: t("compare.rows.strengthsConsiderations"),
+          values: selected.map((p) => {
+            const intel = intelMap[p.id];
+            if (!intel) return { value: "—" };
+            return { value: `${intel.strengths.length} / ${intel.considerations.length}` };
+          }),
+        },
+      ]}
+    />
+  );
+}
+
+function classificationTone(classification: string): "success" | "neutral" | "warning" | "destructive" {
+  if (classification === "Excellent Value" || classification === "Good Value") return "success";
+  if (classification === "Fair") return "neutral";
+  if (classification === "Above Market") return "warning";
+  return "destructive";
+}
+
+// ---------- myMakan Recommendation (Prompt 10) ----------
+// Pure, deterministic category-picking — mirrors home_finder_scoring.py's
+// `pick_categories` style (best-of by a single real metric, `None` when no
+// candidate has data for it). Lives in the frontend since every input is
+// already-fetched Property Intelligence data and the comparison itself is
+// simple arithmetic — no new backend endpoint needed for this.
+
+const CLASSIFICATION_RANK: Record<string, number> = {
+  "Excellent Value": 5,
+  "Good Value": 4,
+  Fair: 3,
+  "Above Market": 2,
+  "Significantly Above Market": 1,
+};
+
+type RecommendationEntry = {
+  id: string;
+  title: string;
+  district: string;
+  decisionScore: number | null;
+  classification: string | null;
+  areaScore: number | null;
+};
+
+function pickIntelligenceRecommendations(entries: RecommendationEntry[]) {
+  const withScore = entries.filter((e) => e.decisionScore != null);
+  const bestOverall = withScore.length
+    ? withScore.reduce((a, b) => (b.decisionScore! > a.decisionScore! ? b : a))
+    : null;
+
+  const withClass = entries.filter((e) => e.classification != null && e.classification in CLASSIFICATION_RANK);
+  const bestValue = withClass.length
+    ? withClass.reduce((a, b) => (CLASSIFICATION_RANK[b.classification!] > CLASSIFICATION_RANK[a.classification!] ? b : a))
+    : null;
+
+  const withArea = entries.filter((e) => e.areaScore != null);
+  const bestLocation = withArea.length ? withArea.reduce((a, b) => (b.areaScore! > a.areaScore! ? b : a)) : null;
+
+  return { bestOverall, bestValue, bestLocation };
+}
+
+function MyMakanRecommendationCard({
+  selected,
+  intelMap,
+}: {
+  selected: Property[];
+  intelMap: Record<string, ApiPropertyIntelligence | null>;
+}) {
+  const { t } = useLanguage();
+  const entries: RecommendationEntry[] = selected.map((p) => {
+    const intel = intelMap[p.id];
+    return {
+      id: p.id,
+      title: p.title,
+      district: p.district,
+      decisionScore: intel?.decision_score ?? null,
+      classification: intel?.price_intelligence.classification ?? null,
+      areaScore: intel?.area_intelligence?.area_score ?? null,
+    };
+  });
+  const { bestOverall, bestValue, bestLocation } = pickIntelligenceRecommendations(entries);
+  if (!bestOverall && !bestValue && !bestLocation) return null;
+
+  const rows: { key: string; icon: React.ReactNode; entry: RecommendationEntry | null; why: (e: RecommendationEntry) => string }[] = [
+    {
+      key: "bestOverall",
+      icon: <Trophy className="size-4" />,
+      entry: bestOverall,
+      why: (e) => t("compare.myMakanReco.whyOverall", { score: e.decisionScore ?? 0 }),
+    },
+    {
+      key: "bestValue",
+      icon: <PiggyBank className="size-4" />,
+      entry: bestValue,
+      why: (e) => t("compare.myMakanReco.whyValue", { classification: e.classification ?? "" }),
+    },
+    {
+      key: "bestLocation",
+      icon: <MapPin className="size-4" />,
+      entry: bestLocation,
+      why: (e) => t("compare.myMakanReco.whyLocation", { score: Math.round(e.areaScore ?? 0) }),
+    },
+  ];
+
+  return (
+    <section className="mt-6 overflow-hidden rounded-2xl border border-ai/20 bg-ai/5 p-6 shadow-card">
+      <div className="mb-4 flex items-center gap-2">
+        <Sparkles className="size-4 text-ai" />
+        <h2 className="text-sm font-bold uppercase tracking-wide text-ai">{t("compare.myMakanReco.title")}</h2>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {rows
+          .filter((r) => r.entry)
+          .map((r) => (
+            <div key={r.key} className="rounded-xl border border-border bg-card p-4">
+              <Badge tone="ai" icon={r.icon}>
+                {t(`compare.myMakanReco.${r.key}`)}
+              </Badge>
+              <div className="mt-2 truncate text-sm font-semibold">{r.entry!.title}</div>
+              <p className="mt-1 text-xs text-muted-foreground">{r.why(r.entry!)}</p>
+              <Link
+                to="/property/$id"
+                params={{ id: r.entry!.id }}
+                className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
+              >
+                {t("compare.myMakanReco.view")}
+              </Link>
+            </div>
+          ))}
       </div>
     </section>
   );

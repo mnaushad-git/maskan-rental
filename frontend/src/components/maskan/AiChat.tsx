@@ -21,7 +21,7 @@ export function AiChatPanel() {
             <Sparkles className="size-4" />
           </div>
           <div>
-            <div className="text-sm font-semibold">Maskan AI</div>
+            <div className="text-sm font-semibold">myMakan AI</div>
             <div className="text-xs text-muted-foreground">Rental intelligence assistant</div>
           </div>
         </div>
@@ -62,7 +62,7 @@ export function AiChatPanel() {
 
       <form className="flex items-center gap-2 border-t border-border p-3">
         <input
-          placeholder="Ask Maskan anything about rentals…"
+          placeholder="Ask myMakan anything about rentals…"
           className="flex-1 rounded-xl bg-surface px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground focus:bg-surface-2"
         />
         <button

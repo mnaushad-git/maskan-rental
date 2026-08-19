@@ -236,7 +236,7 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
           ? "Reserved"
           : "Available",
     pricePerSqm: estimatedArea > 0 ? Math.round(displayPrice / estimatedArea) : 0,
-    agent: property.mediator_agent_name ?? property.owner_name ?? "Maskan Agent",
+    agent: property.mediator_agent_name ?? property.owner_name ?? "myMakan Agent",
     agentPhone: property.call_phone ?? property.mediator_phone ?? null,
     agentWhatsapp: property.whatsapp_number ?? property.mediator_phone ?? null,
     agentProfileImage: property.mediator_profile_image_url ?? null,
@@ -457,7 +457,9 @@ export function createProperty(payload: {
   area: string;
   city: string;
   size_sq_m: number;
-  monthly_rent: number;
+  listing_type?: "rent" | "sale";
+  monthly_rent?: number;
+  sale_price?: number;
   bedrooms: number;
   bathrooms: number;
   owner_name: string;
@@ -514,7 +516,9 @@ export type PartnerPropertyPayload = {
   area: string;
   city: string;
   size_sq_m?: number;
-  monthly_rent: number;
+  listing_type: "rent" | "sale";
+  monthly_rent?: number;
+  sale_price?: number;
   bedrooms?: number;
   bathrooms?: number;
   owner_name?: string;
@@ -540,6 +544,78 @@ export function patchPartnerListing(id: number, payload: Partial<PartnerProperty
   return requestJson<ApiProperty>(`/properties/partner/${id}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
+  });
+}
+
+// ── Partner Listing Quality (Trust Center, Prompt 8) ────────────────────────
+// Backend: backend/app/api/routes/partner_quality.py (Prompt 3), mounted at
+// /partner/properties. Types mirror backend/app/schemas/partner_quality.py
+// exactly — see docs/implementation/mymakan-trust-center.md "Full API
+// surface (Prompts 2-6)". `completeness` reuses the same `ApiTrustCompleteness`
+// shape defined below for the customer Trust Center (Prompt 7) — both wrap
+// the identical `compute_listing_completeness` result on the backend, so the
+// two objects agree by construction.
+
+export type ApiImageQualityIssue = {
+  code: string;
+  severity: "info" | "warning" | "blocking";
+  message: string;
+};
+
+export type ApiImageQuality = {
+  image_count: number;
+  issues: ApiImageQualityIssue[];
+  has_blocking_issues: boolean;
+};
+
+export type ApiPartnerListingQuality = {
+  property_id: number;
+  completeness: ApiTrustCompleteness;
+  missing_field_suggestions: string[];
+  image_quality: ApiImageQuality;
+  availability_confirmed_at: string | null;
+};
+
+// Mediator-authenticated, ownership-checked — only ever called for the
+// partner's own listing, and only once the listing has an id (a brand-new,
+// not-yet-saved draft has nothing to call this against; see
+// PartnerListingQualityPanel in routes/partner.tsx for the client-side
+// estimate shown before that point).
+export function fetchPartnerListingQuality(propertyId: number) {
+  return requestJson<ApiPartnerListingQuality>(`/partner/properties/${propertyId}/quality`);
+}
+
+export type ApiPartnerAvailabilityConfirm = {
+  property_id: number;
+  availability_confirmed_at: string;
+};
+
+export function confirmPartnerListingAvailability(propertyId: number) {
+  return requestJson<ApiPartnerAvailabilityConfirm>(
+    `/partner/properties/${propertyId}/confirm-availability`,
+    { method: "POST" },
+  );
+}
+
+export type ApiPartnerImproveWithAi = {
+  property_id: number;
+  suggested_title: string | null;
+  suggested_description: string | null;
+  generated_by: "ai" | "fallback";
+  note: string;
+};
+
+// Returns a suggestion only — the caller must show it to the partner for
+// explicit approval and, if approved, apply it to the (unsaved) form state
+// themselves. This function never writes to the property; the backend
+// endpoint it calls doesn't either.
+export function improvePartnerListingWithAi(
+  propertyId: number,
+  body: { focus?: "title" | "description" | "both"; language?: "en" | "ar" } = {},
+) {
+  return requestJson<ApiPartnerImproveWithAi>(`/partner/properties/${propertyId}/improve-with-ai`, {
+    method: "POST",
+    body: JSON.stringify({ focus: body.focus ?? "both", language: body.language ?? "en" }),
   });
 }
 
@@ -922,6 +998,269 @@ export function fetchAreaIntelligence(areaName: string, city?: string) {
   );
 }
 
+// ── Property Intelligence ───────────────────────────────────────────────────
+// GET /properties/{id}/intelligence — assembles the deterministic Decision
+// Score / Price Intelligence / Comparables / Data Confidence / Personalized
+// Fit / Highlights / Smart Questions / Negotiation Insight services into one
+// payload. See backend/app/schemas/property_intelligence.py (source of
+// truth for this shape) and docs/implementation/mymakan-property-intelligence.md.
+
+export type ApiDimensionScore = { score: number; reason: string };
+
+export type ApiDataConfidence = { level: "High" | "Moderate"; reason: string };
+
+export type ApiPriceIntelligence = {
+  type: "rent" | "buy";
+  sufficient_data: boolean;
+  asking_price: number | null;
+  fair_range_low: number | null;
+  fair_range_high: number | null;
+  market_midpoint: number | null;
+  price_per_sqm: number | null;
+  comparable_median_price_per_sqm: number | null;
+  estimated_value_low: number | null;
+  estimated_value_high: number | null;
+  percent_difference: number | null;
+  classification: string | null;
+  factors_used: string[];
+  comparable_count: number;
+  explanation: string | null;
+};
+
+export type ApiComparablePropertySummary = {
+  property_id: number;
+  title: string;
+  image_url: string | null;
+  price: number | null;
+  price_difference: number | null;
+  price_per_sqm: number | null;
+  match_similarity_percent: number;
+  value_label: string | null;
+};
+
+export type ApiComparableSummary = {
+  count: number;
+  items: ApiComparablePropertySummary[];
+};
+
+export type ApiPersonalizedFitRow = { label: string; status: "match" | "moderate" | "miss"; detail: string };
+
+export type ApiPersonalizedFit = {
+  rows: ApiPersonalizedFitRow[];
+  priorities_matched: number;
+  priorities_total: number;
+  summary: string;
+};
+
+export type ApiNegotiationInsight = {
+  asking_price: number;
+  market_midpoint: number;
+  discussion_range_low: number;
+  discussion_range_high: number;
+  approach: string;
+};
+
+export type ApiAreaIntelligenceRef = {
+  area_name: string;
+  city: string;
+  area_score: number | null;
+  summary: string | null;
+};
+
+export type ApiPropertyIntelligence = {
+  decision_score: number;
+  component_scores: Record<string, ApiDimensionScore>;
+  omitted_score_dimensions: string[];
+  data_confidence: ApiDataConfidence;
+  price_intelligence: ApiPriceIntelligence;
+  comparable_summary: ApiComparableSummary;
+  strengths: string[];
+  considerations: string[];
+  things_to_verify: string[];
+  personalized_fit: ApiPersonalizedFit | null;
+  smart_questions: string[];
+  negotiation_intelligence: ApiNegotiationInsight | null;
+  area_intelligence: ApiAreaIntelligenceRef | null;
+};
+
+export type PropertyIntelligenceCriteria = {
+  maxPrice?: number;
+  minPrice?: number;
+  bedrooms?: number;
+  districts?: string[];
+  requiredAmenities?: string[];
+};
+
+export function fetchPropertyIntelligence(propertyId: number, criteria?: PropertyIntelligenceCriteria) {
+  const params = new URLSearchParams();
+  if (criteria?.maxPrice != null) params.set("max_price", String(criteria.maxPrice));
+  if (criteria?.minPrice != null) params.set("min_price", String(criteria.minPrice));
+  if (criteria?.bedrooms != null) params.set("bedrooms", String(criteria.bedrooms));
+  for (const d of criteria?.districts ?? []) params.append("districts", d);
+  for (const a of criteria?.requiredAmenities ?? []) params.append("required_amenities", a);
+  const qs = params.toString();
+  return requestJson<ApiPropertyIntelligence>(`/properties/${propertyId}/intelligence${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchPropertyAiSummary(
+  propertyId: number,
+  language: "en" | "ar",
+  variant: "summary" | "negotiation_message" = "summary",
+  // Prompt 8: grounds a "Draft with AI" call made from the Negotiation
+  // Detail screen's Counter Again panel in that negotiation's own real
+  // numbers — see backend/app/api/routes/properties.py's
+  // PropertyAiSummaryRequest.negotiation_id (Prompt 6). Omitted entirely
+  // when undefined, leaving the pre-existing Property Detail call path
+  // (Prompt 7's MakeOfferModal draft, before any negotiation exists)
+  // unchanged.
+  negotiationId?: number,
+) {
+  return requestJson<{ summary: string; generated_by: "ai" | "fallback" }>(
+    `/properties/${propertyId}/ai-summary`,
+    {
+      method: "POST",
+      body: JSON.stringify({ language, variant, ...(negotiationId != null ? { negotiation_id: negotiationId } : {}) }),
+    },
+  );
+}
+
+// ── Trust Center (Prompt 7 — Property Verification & Trust Center) ─────────
+// Types mirror backend/app/schemas/trust.py, trust_summary.py, duplicate.py,
+// property_report.py exactly — see docs/implementation/mymakan-trust-center.md
+// "Full API surface (Prompts 2-6)" for the authoritative shape reference.
+
+export type ApiTrustCompleteness = {
+  score: number;
+  present_fields: string[];
+  missing_fields: string[];
+  missing_required: string[];
+  tier_breakdown: Record<string, { present: number; total: number }>;
+};
+
+export type ApiTrustConsistencyIssue = {
+  code: string;
+  severity: "info" | "warning" | "blocking";
+  message: string;
+};
+
+export type ApiTrustConsistency = {
+  score: number;
+  issues: ApiTrustConsistencyIssue[];
+  has_blocking_issues: boolean;
+};
+
+export type ApiTrustMediatorTrust = {
+  score: number;
+  is_verified: boolean;
+  review_count: number;
+  avg_rating: number | null;
+  listing_count: number;
+  reason: string;
+};
+
+export type ApiTrustFreshness = {
+  score: number;
+  category: "Recently Confirmed" | "Recently Updated" | "Needs Reconfirmation" | "Potentially Stale";
+  days_since_reference: number;
+  reason: string;
+};
+
+export type ApiTrustMarketplaceConfidence = {
+  score: number;
+  level: "High" | "Moderate";
+  reason: string;
+};
+
+export type ApiTrustComponentScores = {
+  completeness: ApiTrustCompleteness | null;
+  consistency: ApiTrustConsistency | null;
+  mediator_trust: ApiTrustMediatorTrust | null;
+  freshness: ApiTrustFreshness | null;
+  marketplace_confidence: ApiTrustMarketplaceConfidence | null;
+};
+
+export type ApiTrustAssessment = {
+  property_id: number;
+  overall_score: number;
+  trust_level: "High" | "Good" | "Moderate" | "Limited Confidence";
+  component_scores: ApiTrustComponentScores;
+  omitted_components: string[];
+  positive_signals: string[];
+  missing_information: string[];
+  things_to_verify: string[];
+  data_confidence: ApiDataConfidence | null;
+};
+
+export function fetchPropertyTrust(propertyId: number) {
+  return requestJson<ApiTrustAssessment>(`/properties/${propertyId}/trust`);
+}
+
+export type ApiTrustSummary = {
+  property_id: number;
+  summary: string;
+  generated_by: "ai" | "fallback";
+};
+
+// Deliberately a separate call from fetchPropertyTrust — the deterministic
+// assessment must render instantly; this AI explanation is fetched
+// separately, after, so it never blocks the trust badge (mirrors the
+// existing fetchPropertyIntelligence / fetchPropertyAiSummary split above).
+export function fetchPropertyTrustSummary(propertyId: number, language: "en" | "ar" = "en") {
+  return requestJson<ApiTrustSummary>(`/properties/${propertyId}/trust-summary?language=${language}`);
+}
+
+export type ApiDuplicateMatch = {
+  property_id: number;
+  title: string;
+  reasons: string[];
+  match_score: number;
+};
+
+export type ApiDuplicateCheck = {
+  is_possible_duplicate: boolean;
+  confidence: "none" | "low" | "medium" | "high";
+  matches: ApiDuplicateMatch[];
+  reasons: string[];
+};
+
+export function fetchDuplicateCheck(propertyId: number) {
+  return requestJson<ApiDuplicateCheck>(`/properties/${propertyId}/duplicate-check`);
+}
+
+// Matches backend PROPERTY_REPORT_REASONS (app/models/property_report.py).
+export const PROPERTY_REPORT_REASONS = [
+  "duplicate_listing",
+  "incorrect_information",
+  "no_longer_available",
+  "fraudulent_or_scam",
+  "inappropriate_content",
+  "other",
+] as const;
+export type PropertyReportReason = (typeof PROPERTY_REPORT_REASONS)[number];
+
+export type ApiPropertyReport = {
+  id: number;
+  property_id: number;
+  reporter_user_id: number | null;
+  reason: string;
+  comment: string | null;
+  status: string;
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: number | null;
+  resolution_notes: string | null;
+};
+
+// Not called yet in Prompt 7's UI (the "Report a Concern" trigger is a stub
+// until Prompt 9 builds the actual report modal) — exported now so that
+// modal can wire straight into this without touching maskan.ts again.
+export function submitPropertyReport(propertyId: number, body: { reason: PropertyReportReason; comment?: string }) {
+  return requestJson<ApiPropertyReport>(`/properties/${propertyId}/reports`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 // ── Mediators ────────────────────────────────────────────────────────────────
 
 export type ApiPartnerArea = {
@@ -960,6 +1299,20 @@ export type ApiPartnerPublic = {
   total_leads_accepted: number;
   created_at: string;
   areas: ApiPartnerArea[];
+  // Trust & Activity (Prompt 4 — Property Verification & Trust Center,
+  // spec section 11; consumed by Prompt 9's mediator profile page).
+  // Mirrors schemas/mediator.py::MediatorPublicOut's added fields exactly.
+  // `verification_label` is either the single allowed
+  // "✓ Verified by myMakan" phrase or null — never a different claim.
+  verification_label: string | null;
+  avg_rating: number | null;
+  review_count: number;
+  active_listing_count: number;
+  rental_listing_count: number;
+  sale_listing_count: number;
+  member_since: string | null;
+  response_rate: number | null;
+  avg_response_time_hours: number | null;
 };
 
 export function fetchPublicPartners(city?: string) {
@@ -973,6 +1326,31 @@ export function fetchPublicPartner(id: number) {
 
 export function fetchPropertiesByMediator(mediatorId: number) {
   return requestJson<ApiProperty[]>(`/properties/?mediator_id=${mediatorId}&limit=50`);
+}
+
+// AI-generated mediator Review Summary (Prompt 4/9 — Property Verification &
+// Trust Center's "Review Summary" block, spec section 12). Deliberately a
+// distinct name/type from ApiReviewSummary below (the deterministic rating
+// distribution from GET /reviews/mediator/{id}/summary, used by the
+// pre-existing aggregate card on this page) — this hits a different
+// endpoint (GET /mediators/{id}/review-summary) that AI-summarizes review
+// TEXT into positive themes/considerations, gated behind a minimum review
+// count with a deterministic {avg_rating, review_count, note} fallback
+// below it. Mirrors schemas/review_summary.py::ReviewSummaryOut.
+export type ApiMediatorAiReviewSummary = {
+  mediator_id: number;
+  avg_rating: number | null;
+  review_count: number;
+  positive_themes: string[];
+  considerations: string[];
+  generated_by: "ai" | "fallback";
+  note: string | null;
+};
+
+export function fetchMediatorAiReviewSummary(mediatorId: number, language: "en" | "ar" = "en") {
+  return requestJson<ApiMediatorAiReviewSummary>(
+    `/mediators/${mediatorId}/review-summary?language=${language}`,
+  );
 }
 
 // ── Reviews ───────────────────────────────────────────────────────────────────
@@ -1230,9 +1608,474 @@ export function sendLeadMessage(lead_id: number, content: string) {
   });
 }
 
+// ── Visit & Viewing Management (Prompt 7) ───────────────────────────────────
+// Types mirror backend/app/schemas/property_viewing.py exactly — see
+// docs/implementation/mymakan-viewings.md "APIs" for the full endpoint list.
+
+export type ApiPropertyViewing = {
+  id: number;
+  property_id: number;
+  customer_user_id: number;
+  mediator_id: number | null;
+  lead_id: number | null;
+  requested_start_at: string;
+  requested_end_at: string;
+  confirmed_start_at: string | null;
+  confirmed_end_at: string | null;
+  timezone: string;
+  status: string;
+  customer_note: string | null;
+  mediator_note: string | null;
+  cancellation_reason: string | null;
+  cancelled_by: string | null;
+  proposed_start_at: string | null;
+  proposed_end_at: string | null;
+  proposed_by: string | null;
+  interest_level: string | null;
+  feedback_reason: string | null;
+  feedback_note: string | null;
+  created_at: string;
+  updated_at: string;
+  confirmed_at: string | null;
+  cancelled_at: string | null;
+  completed_at: string | null;
+  property_title: string | null;
+  property_image_url: string | null;
+  property_area: string | null;
+  property_city: string | null;
+  mediator_agent_name: string | null;
+  // Only present on the customer-facing detail response
+  // (GET/PATCH /viewings/{id}, PropertyViewingDetailOut on the backend) —
+  // undefined on list responses (PropertyViewingOut, no checklist embedded
+  // there) and never present at all on the mediator-facing schema (Prompt 5:
+  // private_notes/checklist are customer-only).
+  checklist?: ApiViewingChecklist | null;
+  private_notes?: ApiViewingPrivateNote[];
+};
+
+export type ApiViewingChecklistItem = {
+  id: string;
+  text: string;
+  why_it_matters: string | null;
+};
+
+export type ApiViewingChecklistSection = {
+  key: string;
+  title: string;
+  items: ApiViewingChecklistItem[];
+};
+
+export type ApiViewingChecklist = {
+  sections: ApiViewingChecklistSection[];
+  visit_plan_summary: string | null;
+  generated_by: "ai" | "deterministic";
+  checked: Record<string, boolean>;
+};
+
+export type ApiViewingPrivateNote = {
+  text: string;
+  created_at: string;
+};
+
+// Statuses that mean "no longer active" — mirrors the backend's
+// PROPERTY_VIEWING_INACTIVE_STATUSES (app/models/property_viewing.py).
+export const VIEWING_INACTIVE_STATUSES = [
+  "cancelled_by_customer",
+  "cancelled_by_mediator",
+  "completed",
+  "no_show_customer",
+  "no_show_mediator",
+] as const;
+
+export function createViewing(payload: {
+  property_id: number;
+  requested_start_at: string;
+  requested_end_at: string;
+  timezone?: string;
+  customer_note?: string;
+}) {
+  return requestJson<ApiPropertyViewing>("/viewings", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function fetchMyViewings(status?: string) {
+  const q = status ? `?status=${encodeURIComponent(status)}` : "";
+  return requestJson<ApiPropertyViewing[]>(`/viewings${q}`);
+}
+
+export function fetchViewing(id: number) {
+  return requestJson<ApiPropertyViewing>(`/viewings/${id}`);
+}
+
+export function cancelViewing(id: number, reason: string, note?: string) {
+  return requestJson<ApiPropertyViewing>(`/viewings/${id}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ reason, note }),
+  });
+}
+
+export function proposeViewingTime(id: number, payload: { start_at: string; end_at: string; note?: string }) {
+  return requestJson<ApiPropertyViewing>(`/viewings/${id}/propose-time`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function acceptViewingReschedule(id: number) {
+  return requestJson<ApiPropertyViewing>(`/viewings/${id}/accept-reschedule`, { method: "POST" });
+}
+
+export const VIEWING_CUSTOMER_CANCEL_REASONS = [
+  "Plans changed",
+  "Found another property",
+  "Time no longer works",
+  "Other",
+] as const;
+
+// ── AI Viewing Checklist + post-viewing feedback/next-steps (Prompt 9) ─────
+// No dedicated GET-checklist endpoint — the backend embeds `checklist` +
+// `private_notes` straight onto GET /viewings/{id}'s response
+// (PropertyViewingDetailOut), so `fetchViewing` above already returns it;
+// nothing extra to fetch here beyond that.
+
+export function updateViewingChecklist(id: number, patch: { checked?: Record<string, boolean>; note?: string }) {
+  return requestJson<ApiPropertyViewing>(`/viewings/${id}/checklist`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export const VIEWING_INTEREST_LEVELS = ["Very Interested", "Maybe", "Not Interested"] as const;
+export const VIEWING_FEEDBACK_REASONS = ["Price", "Location", "Size", "Condition", "Amenities", "Other"] as const;
+
+export function submitViewingFeedback(id: number, payload: { interest_level: string; note?: string; reason?: string }) {
+  return requestJson<ApiPropertyViewing>(`/viewings/${id}/feedback`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchViewingNextSteps(id: number) {
+  return requestJson<{ visit_summary: string; next_steps: string[]; generated_by: "ai" | "fallback" }>(
+    `/viewings/${id}/ai-next-steps`,
+    { method: "POST" },
+  );
+}
+
+// ── Partner portal viewing requests (Prompt 10) ─────────────────────────────
+// Mirrors backend/app/api/routes/partner_viewings.py exactly — see
+// docs/implementation/mymakan-viewings.md "APIs" for the full endpoint list.
+
+export type ApiPartnerPropertyViewing = ApiPropertyViewing & {
+  customer_name: string | null;
+  customer_phone: string | null;
+  customer_email: string | null;
+};
+
+export const VIEWING_MEDIATOR_CANCEL_REASONS = [
+  "Property unavailable",
+  "Owner unavailable",
+  "Schedule conflict",
+  "Other",
+] as const;
+
+export function fetchPartnerViewings(status?: string) {
+  const q = status ? `?status_filter=${encodeURIComponent(status)}` : "";
+  return requestJson<ApiPartnerPropertyViewing[]>(`/partner/viewings${q}`);
+}
+
+export function fetchPartnerViewing(id: number) {
+  return requestJson<ApiPartnerPropertyViewing>(`/partner/viewings/${id}`);
+}
+
+export function confirmViewing(id: number, mediatorNote?: string) {
+  return requestJson<ApiPartnerPropertyViewing>(`/partner/viewings/${id}/confirm`, {
+    method: "POST",
+    body: JSON.stringify({ mediator_note: mediatorNote }),
+  });
+}
+
+export function proposeViewingTimeAsPartner(id: number, payload: { start_at: string; end_at: string; note?: string }) {
+  return requestJson<ApiPartnerPropertyViewing>(`/partner/viewings/${id}/propose-time`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function cancelViewingAsPartner(id: number, reason: string, note?: string) {
+  return requestJson<ApiPartnerPropertyViewing>(`/partner/viewings/${id}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ reason, note }),
+  });
+}
+
+export function completeViewing(id: number) {
+  return requestJson<ApiPartnerPropertyViewing>(`/partner/viewings/${id}/complete`, { method: "POST" });
+}
+
+export function markViewingNoShow(id: number, who: "customer" | "mediator") {
+  return requestJson<ApiPartnerPropertyViewing>(`/partner/viewings/${id}/no-show`, {
+    method: "POST",
+    body: JSON.stringify({ who }),
+  });
+}
+
 export function markLeadMessagesRead(lead_id: number) {
   return requestJson<{ marked_read: number }>(`/leads/${lead_id}/messages/read`, {
     method: "POST",
+  });
+}
+
+// ── AI Negotiation & Offer Management (Prompt 7) ────────────────────────────
+// Mirrors backend/app/schemas/property_negotiation.py exactly — see
+// docs/implementation/mymakan-negotiations.md "Models"/"APIs" for the
+// authoritative shape reference. `ApiNegotiationInsight` (defined above,
+// under "Property Intelligence") already matches NegotiationInsightOut's
+// shape field-for-field, so it's reused here rather than redeclared.
+
+// NOTE on amount fields: the backend declares these `Decimal` (not `float`,
+// unlike e.g. Property.monthly_rent/sale_price) — pydantic v2 serializes
+// Decimal to a JSON STRING by default to avoid float precision loss, unlike
+// Property's plain-float price fields. Verified against a live dev-server
+// response (`"current_offer_amount":"13500.00"`, quoted). Always wrap these
+// in `Number(...)` before doing arithmetic/formatting.
+export type ApiNegotiationOffer = {
+  id: number;
+  negotiation_id: number;
+  offered_by_user_id: number | null;
+  amount: string;
+  message: string | null;
+  offer_type: "customer_offer" | "mediator_counter" | "customer_counter";
+  status: "pending" | "accepted" | "rejected" | "superseded";
+  expires_at: string | null;
+  created_at: string;
+};
+
+export type ApiPropertyNegotiation = {
+  id: number;
+  property_id: number;
+  customer_user_id: number;
+  mediator_id: number | null;
+  lead_id: number | null;
+  viewing_id: number | null;
+  transaction_type: string;
+  status: "submitted" | "countered" | "accepted" | "rejected" | "withdrawn" | "closed";
+  current_offer_amount: string;
+  original_listing_amount: string;
+  created_at: string;
+  updated_at: string;
+  accepted_at: string | null;
+  rejected_at: string | null;
+  closed_at: string | null;
+  cancellation_reason: string | null;
+  cancelled_by: string | null;
+  // Denormalized by the backend so list/detail screens don't need N+1 fetches.
+  property_title: string | null;
+  property_image_url: string | null;
+  property_area: string | null;
+  property_district: string | null;
+  property_listing_amount: string | null;
+  mediator_agent_name: string | null;
+  // Added in Prompt 12 — now populated on list/create/action responses too
+  // (previously detail-only), so the My Negotiations / partner inbox list
+  // cards can render the same strength badge the detail screens already do.
+  negotiation_signal: ApiNegotiationSignal | null;
+};
+
+export type ApiAgreementSummary = {
+  property_id: number;
+  property_title: string | null;
+  customer_name: string | null;
+  mediator_agent_name: string | null;
+  transaction_type: string;
+  original_listing_amount: string;
+  final_agreed_amount: string;
+  agreed_at: string | null;
+  negotiation_reference: string;
+};
+
+// Echo of backend/app/services/negotiation_signals.py::NegotiationSignal —
+// the real deterministic strength classification (see
+// negotiations.$id.tsx, which used to approximate this client-side before
+// the backend started embedding it).
+export type ApiNegotiationSignal = {
+  signal:
+    | "within_market_range"
+    | "below_market_range"
+    | "above_market_range"
+    | "close_to_asking_price"
+    | "significant_discount_requested"
+    | "limited_comparable_data";
+  label: string;
+};
+
+export type ApiPropertyNegotiationDetail = ApiPropertyNegotiation & {
+  offers: ApiNegotiationOffer[];
+  negotiation_insight: ApiNegotiationInsight | null;
+  // negotiation_signal itself now comes from the base ApiPropertyNegotiation
+  // (Prompt 12 — see that type).
+  summary_text: string;
+  agreement_summary: ApiAgreementSummary | null;
+};
+
+// POST /properties/{id}/negotiations — creates a negotiation from the
+// customer's first offer. `viewing_id` is only trusted server-side after the
+// service layer verifies it belongs to this customer + property and is
+// `completed` — see create_negotiation()'s docstring.
+export function createNegotiation(
+  propertyId: number,
+  payload: { amount: number; message?: string; viewing_id?: number },
+) {
+  return requestJson<ApiPropertyNegotiation>(`/properties/${propertyId}/negotiations`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchMyNegotiations(status?: string) {
+  const q = status ? `?status=${encodeURIComponent(status)}` : "";
+  return requestJson<ApiPropertyNegotiation[]>(`/negotiations${q}`);
+}
+
+// GET /negotiations/{id} — full detail (offer history, negotiation_insight,
+// the deterministic myMakan Summary, and — once accepted — the Agreement
+// Summary). `language` only affects the deterministic `summary_text` field.
+export function fetchNegotiation(id: number, language?: "en" | "ar") {
+  const q = language ? `?language=${language}` : "";
+  return requestJson<ApiPropertyNegotiationDetail>(`/negotiations/${id}${q}`);
+}
+
+// GET /properties/{id}/negotiations/active — 404s (thrown as an Error by
+// requestJson) when the caller has no active negotiation for this property;
+// callers are expected to `.catch(() => null)` this, same idiom as
+// fetchAreaIntelligence/fetchPropertyIntelligence's own soft-fail calls.
+export function fetchActiveNegotiation(propertyId: number) {
+  return requestJson<ApiPropertyNegotiation>(`/properties/${propertyId}/negotiations/active`);
+}
+
+// ── Negotiation Detail actions (Prompt 8) ───────────────────────────────────
+// Counter Again / Accept / Withdraw / Ask myMakan, backing
+// frontend/src/routes/negotiations.$id.tsx. All four mutating actions return
+// only PropertyNegotiationOut (no offers/summary_text/negotiation_insight —
+// see backend/app/api/routes/negotiations.py's response_model on each
+// route), so callers re-fetch via fetchNegotiation() after a successful call
+// to refresh the timeline/signal/summary rather than trying to merge a
+// partial response into local state.
+
+// POST /negotiations/{id}/offer — customer's "Counter Again" action.
+export function submitCounterOffer(id: number, payload: { amount: number; message?: string }) {
+  return requestJson<ApiPropertyNegotiation>(`/negotiations/${id}/offer`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// POST /negotiations/{id}/accept — customer accepting the mediator's latest
+// counter. 409 (surfaced as a thrown Error by requestJson) if there's no
+// pending offer to accept, or if the latest pending offer was placed by this
+// same customer (self-accept blocked — see tracking doc "Status flow").
+export function acceptNegotiation(id: number) {
+  return requestJson<ApiPropertyNegotiation>(`/negotiations/${id}/accept`, { method: "POST" });
+}
+
+// Closed reason list from brief §11 (customer withdrawal) — the backend
+// accepts any string (NegotiationWithdrawRequest.reason has no enum
+// validation), but the frontend is expected to offer this closed list, same
+// convention VIEWING_CUSTOMER_CANCEL_REASONS already established.
+export const NEGOTIATION_CUSTOMER_WITHDRAW_REASONS = [
+  "Changed mind",
+  "Found another property",
+  "Budget changed",
+  "Other",
+] as const;
+
+// POST /negotiations/{id}/withdraw
+export function withdrawNegotiation(id: number, reason: string) {
+  return requestJson<ApiPropertyNegotiation>(`/negotiations/${id}/withdraw`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+// POST /negotiations/{id}/ai-guidance — "Ask myMakan". Rate-limited on the
+// backend (20/10min per user) same as every other on-request AI endpoint;
+// `generated_by` is "ai" | "fallback" — never throws on an AI failure, the
+// backend degrades to a deterministic reply instead (see negotiation_ai.
+// generate_guidance's docstring).
+export function fetchNegotiationGuidance(id: number, question: string | undefined, language: "en" | "ar") {
+  return requestJson<{ guidance: string; generated_by: "ai" | "fallback" }>(`/negotiations/${id}/ai-guidance`, {
+    method: "POST",
+    body: JSON.stringify({ question: question || undefined, language }),
+  });
+}
+
+// ── Partner portal negotiations (Prompt 10) ─────────────────────────────────
+// Mirrors backend/app/api/routes/partner_negotiations.py exactly — see
+// docs/implementation/mymakan-negotiations.md "APIs" (Prompt 4) for the
+// authoritative endpoint list. Follows the exact same
+// extend-the-customer-type-with-denormalized-contact-fields shape
+// ApiPartnerPropertyViewing already established for viewings above
+// (PartnerNegotiationOut/PartnerNegotiationDetailOut in
+// backend/app/schemas/property_negotiation.py). Note:
+// PartnerNegotiationDetailOut does NOT declare summary_text/agreement_summary
+// (see that schema's docstring — Agreement Summary stayed customer-side-only
+// as of Prompt 6), so ApiPartnerNegotiationDetail intentionally omits them
+// too rather than declaring fields the backend will never send.
+
+export type ApiPartnerNegotiation = ApiPropertyNegotiation & {
+  customer_name: string | null;
+  customer_phone: string | null;
+  customer_email: string | null;
+};
+
+export type ApiPartnerNegotiationDetail = ApiPartnerNegotiation & {
+  offers: ApiNegotiationOffer[];
+  negotiation_insight: ApiNegotiationInsight | null;
+  // negotiation_signal comes from the base ApiPropertyNegotiation (Prompt 12).
+};
+
+export function fetchPartnerNegotiations(status?: string) {
+  const q = status ? `?status_filter=${encodeURIComponent(status)}` : "";
+  return requestJson<ApiPartnerNegotiation[]>(`/partner/negotiations${q}`);
+}
+
+export function fetchPartnerNegotiation(id: number) {
+  return requestJson<ApiPartnerNegotiationDetail>(`/partner/negotiations/${id}`);
+}
+
+// POST /partner/negotiations/{id}/counter — mediator's "Counter Offer"
+// action. 409 if the negotiation isn't currently submitted/countered, 422
+// for a non-positive amount (same rules as the customer's submitCounterOffer).
+export function counterNegotiationAsPartner(id: number, payload: { amount: number; message?: string }) {
+  return requestJson<ApiPartnerNegotiation>(`/partner/negotiations/${id}/counter`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// POST /partner/negotiations/{id}/accept — mediator accepting the customer's
+// latest offer/counter. 409 if there's no pending offer to accept, OR if the
+// latest pending offer was placed by this same mediator's own user account
+// (self-accept blocked — see tracking doc "Status flow").
+export function acceptNegotiationAsPartner(id: number) {
+  return requestJson<ApiPartnerNegotiation>(`/partner/negotiations/${id}/accept`, { method: "POST" });
+}
+
+// Closed reason list from brief §11 (mediator rejection) — mirrors
+// NEGOTIATION_CUSTOMER_WITHDRAW_REASONS' convention; the backend accepts any
+// string (NegotiationRejectRequest.reason has no enum validation).
+export const NEGOTIATION_MEDIATOR_REJECT_REASONS = [
+  "Offer too low",
+  "Property no longer available",
+  "Owner declined",
+  "Other",
+] as const;
+
+// POST /partner/negotiations/{id}/reject — mediator-only, no customer-side
+// equivalent. Valid from submitted/countered (409 otherwise).
+export function rejectNegotiationAsPartner(id: number, reason: string) {
+  return requestJson<ApiPartnerNegotiation>(`/partner/negotiations/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
   });
 }
 
@@ -2438,6 +3281,161 @@ export function adminModeratePropertyRequestResponse(
   );
 }
 
+// ── Admin: Trust & Moderation (Prompt 11 — Property Verification & Trust
+// Center). Backend: backend/app/api/routes/admin_trust.py (Prompt 6),
+// mounted at /admin/trust. Types mirror backend/app/schemas/admin_trust.py
+// exactly — see docs/implementation/mymakan-trust-center.md "Full API
+// surface (Prompts 2-6)". Reuses ApiTrustAssessment/ApiTrustCompleteness
+// (Prompt 7), ApiImageQuality (Prompt 8), ApiPartnerPublic (Prompt 9),
+// ApiPropertyReport (Prompt 7), and ApiPropertyIntelligence (pre-existing) —
+// the admin review-detail response wraps the identical backend shapes those
+// endpoints already return, so no separate types are redefined here. Gated
+// purely by the existing `user.is_admin` check (same as every other
+// admin_.*.tsx route) — no new permission system.
+
+export type ApiAdminTrustDashboard = {
+  listings_requiring_review: number;
+  low_completeness_listings: number;
+  stale_listings: number;
+  open_reports: number;
+  mediators_pending_verification: number;
+  recently_reported_properties: number;
+};
+
+export function fetchAdminTrustDashboard() {
+  return requestJson<ApiAdminTrustDashboard>("/admin/trust/dashboard");
+}
+
+export type ApiAdminModerationListItem = {
+  property_id: number;
+  title: string;
+  transaction_type: string;
+  city: string;
+  area: string;
+  status: string;
+  mediator_id: number | null;
+  mediator_name: string | null;
+  mediator_verified: boolean;
+  trust_score: number;
+  trust_level: "High" | "Good" | "Moderate" | "Limited Confidence";
+  completeness_score: number;
+  freshness_category: string;
+  open_report_count: number;
+  updated_at: string;
+};
+
+// Direct fetch (not requestJson) so the X-Total-Count header survives —
+// mirrors fetchAdminPropertyRequests's identical pattern above.
+export async function fetchAdminModerationProperties(params?: {
+  transactionType?: "rent" | "sale";
+  city?: string;
+  status?: string;
+  trustLevel?: string;
+  lowCompleteness?: boolean;
+  reported?: boolean;
+  stale?: boolean;
+  mediatorVerified?: boolean;
+  skip?: number;
+  limit?: number;
+}): Promise<{ data: ApiAdminModerationListItem[]; total: number }> {
+  const qs = buildQuery({
+    transaction_type: params?.transactionType,
+    city: params?.city,
+    status: params?.status,
+    trust_level: params?.trustLevel,
+    low_completeness: params?.lowCompleteness,
+    reported: params?.reported,
+    stale: params?.stale,
+    mediator_verified: params?.mediatorVerified,
+    skip: params?.skip,
+    limit: params?.limit,
+  });
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
+  const response = await fetch(`${API_BASE_URL}/admin/trust/properties${qs}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  const data = (await response.json()) as ApiAdminModerationListItem[];
+  const total = Number(response.headers.get("X-Total-Count") ?? data.length);
+  return { data, total };
+}
+
+export type ApiAdminDataQuality = {
+  completeness: ApiTrustCompleteness;
+  missing_field_suggestions: string[];
+  image_quality: ApiImageQuality;
+};
+
+export type ApiAdminModerationHistoryEntry = {
+  id: number;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  user_id: number | null;
+  extra_metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+// `mediator` reuses ApiPartnerPublic — backend's MediatorPublicOut (Prompt 4)
+// and ApiPartnerPublic (Prompt 9) are already field-for-field identical, so
+// no duplicate type is defined here.
+export type ApiAdminPropertyReviewDetail = {
+  property_id: number;
+  title: string;
+  transaction_type: string;
+  city: string;
+  area: string;
+  status: string;
+  trust: ApiTrustAssessment;
+  data_quality: ApiAdminDataQuality;
+  mediator: ApiPartnerPublic | null;
+  mediator_approval_status: string | null;
+  reports: ApiPropertyReport[];
+  property_intelligence: ApiPropertyIntelligence | null;
+  moderation_history: ApiAdminModerationHistoryEntry[];
+};
+
+export function fetchAdminPropertyReviewDetail(propertyId: number) {
+  return requestJson<ApiAdminPropertyReviewDetail>(`/admin/trust/properties/${propertyId}`);
+}
+
+export type ApiAdminModerationAction = { property_id: number; status: string };
+
+export function adminHideProperty(propertyId: number, reason?: string) {
+  return requestJson<ApiAdminModerationAction>(`/admin/trust/properties/${propertyId}/hide`, {
+    method: "POST",
+    body: JSON.stringify({ reason: reason || null }),
+  });
+}
+
+export function adminRestoreProperty(propertyId: number) {
+  return requestJson<ApiAdminModerationAction>(`/admin/trust/properties/${propertyId}/restore`, {
+    method: "POST",
+  });
+}
+
+export type ApiAdminReportResolve = {
+  id: number;
+  property_id: number;
+  status: string;
+  resolved_at: string | null;
+  resolved_by: number | null;
+  resolution_notes: string | null;
+};
+
+export function adminResolveReport(
+  reportId: number,
+  payload: { status: "Under Review" | "Resolved" | "Dismissed"; resolution_notes?: string },
+) {
+  return requestJson<ApiAdminReportResolve>(`/admin/trust/reports/${reportId}/resolve`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 // ── Short-term stay bookings ────────────────────────────────────────────────
 
 export type ApiBooking = {
@@ -2520,6 +3518,154 @@ export function fetchPricingSuggestion(payload: {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+// ── AI Home Finder ──────────────────────────────────────────────────────────
+// Backend: app/api/routes/home_finder.py + app/schemas/home_finder.py.
+// Interpretation/refinement go through the AI gateway server-side; search
+// itself is always the deterministic scoring engine — the frontend never
+// computes a match score, it only renders what the server already scored.
+
+export type ApiHomeFinderCriteria = {
+  transaction_type?: "rent" | "sale" | null;
+  city?: string | null;
+  districts: string[];
+  property_type?: string | null;
+  min_price?: number | null;
+  max_price?: number | null;
+  bedrooms?: number | null;
+  required_amenities: string[];
+  preferred_amenities: string[];
+  unsupported_requests: string[];
+  preferences: string[];
+  commute_destination?: string | null;
+};
+
+export const EMPTY_HOME_FINDER_CRITERIA: ApiHomeFinderCriteria = {
+  transaction_type: null,
+  city: null,
+  districts: [],
+  property_type: null,
+  min_price: null,
+  max_price: null,
+  bedrooms: null,
+  required_amenities: [],
+  preferred_amenities: [],
+  unsupported_requests: [],
+  preferences: [],
+  commute_destination: null,
+};
+
+export type ApiHomeFinderInterpretResponse = {
+  criteria: ApiHomeFinderCriteria;
+  ai_confidence: number;
+  missing_fields: string[];
+  clarifying_questions: string[];
+  generated_by: "ai" | "fallback";
+};
+
+export function interpretHomeFinderQuery(payload: {
+  text: string;
+  locale: "en" | "ar";
+  transaction_type_hint?: "rent" | "sale" | null;
+}) {
+  return requestJson<ApiHomeFinderInterpretResponse>("/ai/home-finder/interpret", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export type ApiHomeFinderCriteriaChange = { field: string; from: string; to: string };
+
+export type ApiHomeFinderRefineResponse = {
+  criteria: ApiHomeFinderCriteria;
+  changes: ApiHomeFinderCriteriaChange[];
+  generated_by: "ai" | "fallback";
+};
+
+export function refineHomeFinderCriteria(payload: {
+  criteria: ApiHomeFinderCriteria;
+  instruction: string;
+  locale: "en" | "ar";
+}) {
+  return requestJson<ApiHomeFinderRefineResponse>("/ai/home-finder/refine", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export type ApiHomeFinderResult = {
+  property: ApiProperty;
+  match_score: number;
+  dimension_scores: Record<string, number>;
+  reasons: string[];
+  trade_offs: string[];
+};
+
+export type ApiHomeFinderCategories = {
+  best_overall?: number | null;
+  best_value?: number | null;
+  best_location?: number | null;
+  best_family?: number | null;
+  best_investment?: number | null;
+};
+
+export type ApiHomeFinderEmptyResultSuggestion = {
+  label: string;
+  criteria_patch: ApiHomeFinderCriteria;
+  estimated_count: number;
+};
+
+export type ApiHomeFinderEmptyResult = {
+  message: string;
+  restrictive_reasons: string[];
+  suggestions: ApiHomeFinderEmptyResultSuggestion[];
+};
+
+export type ApiHomeFinderSearchResponse = {
+  results: ApiHomeFinderResult[];
+  categories: ApiHomeFinderCategories;
+  exact_match_count: number;
+  pool_count: number;
+  empty_result: ApiHomeFinderEmptyResult | null;
+};
+
+export function searchHomeFinder(payload: {
+  criteria: ApiHomeFinderCriteria;
+  limit?: number;
+  query_text?: string | null;
+}) {
+  return requestJson<ApiHomeFinderSearchResponse>("/ai/home-finder/search", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export type ApiHomeFinderExplainResponse = {
+  summary: string;
+  match_score: number;
+  reasons: string[];
+  trade_offs: string[];
+  generated_by: "ai" | "fallback";
+};
+
+export function explainHomeFinderMatch(payload: { criteria: ApiHomeFinderCriteria; property_id: number }) {
+  return requestJson<ApiHomeFinderExplainResponse>("/ai/home-finder/explain", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export type ApiHomeFinderHistoryItem = {
+  id: number;
+  query_text: string;
+  criteria: ApiHomeFinderCriteria;
+  result_count: number;
+  created_at: string;
+};
+
+export function fetchHomeFinderHistory() {
+  return requestJson<ApiHomeFinderHistoryItem[]>("/ai/home-finder/history");
 }
 
 // ── Rent financing interest waitlist (stub — no real payment integration) ──

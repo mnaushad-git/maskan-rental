@@ -13,7 +13,7 @@ import { useLanguage } from "@/lib/i18n/context";
 export const Route = createFileRoute("/estimate")({
   head: () => ({
     meta: [
-      { title: "TruEstimate™ — Rent Estimator | Maskan" },
+      { title: "TruEstimate™ — Rent Estimator | myMakan" },
       {
         name: "description",
         content:

@@ -58,13 +58,13 @@ import { allCategories, type ListingType } from "@/lib/listingCategories";
 export const Route = createFileRoute("/search")({
   head: () => ({
     meta: [
-      { title: "Search Rentals — Maskan" },
+      { title: "Search Rentals — myMakan" },
       {
         name: "description",
         content:
           "Search verified rental properties across Saudi Arabia. Filter by city, district, rent, bedrooms and amenities. Ranked by property score.",
       },
-      { property: "og:title", content: "Search Rentals — Maskan" },
+      { property: "og:title", content: "Search Rentals — myMakan" },
       {
         property: "og:description",
         content: "AI-powered rental search across Saudi Arabia.",

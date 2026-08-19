@@ -2,12 +2,27 @@
 creation, DB-level overlap prevention, and property/user listing. Follows this
 suite's conventions (see test_property_requests.py): ORM-level fixtures for
 setup, HTTP-level tests via `client` for API behavior.
+
+myMakan Phase-1 (see docs/implementation/mymakan-phase1.md) hides short-stay
+booking by default (`FEATURE_BOOKING=False`, backend/app/core/config.py) and
+`bookings.router` is only registered in app.main when that flag is on — so
+with the default local .env, every endpoint this file hits 404s. Skipped
+whole-module rather than deleted since the feature and its tests are meant to
+come back if a later phase re-enables the flag.
 """
 from datetime import date, timedelta
 
+import pytest
+
+from app.core.config import settings
 from app.models.mediator import Mediator
 from app.models.property import Property
 from app.models.user import User
+
+pytestmark = pytest.mark.skipif(
+    not settings.FEATURE_BOOKING,
+    reason="bookings.router isn't registered when FEATURE_BOOKING is off (myMakan Phase-1 default)",
+)
 
 
 def _signup(client, email) -> str:

@@ -13,7 +13,7 @@ import { formatSAR } from "@/lib/maskan-data";
 import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/my-leads")({
-  head: () => ({ meta: [{ title: "My Leads — Maskan" }] }),
+  head: () => ({ meta: [{ title: "My Leads — myMakan" }] }),
   component: MyLeadsPage,
 });
 

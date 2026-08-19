@@ -38,6 +38,24 @@ FLAGS = {
     "property_request_commute_matching": "FEATURE_PROPERTY_REQUEST_COMMUTE_MATCHING",
     "property_request_ai_explanations": "FEATURE_PROPERTY_REQUEST_AI_EXPLANATIONS",
     "property_request_admin_dashboard": "FEATURE_PROPERTY_REQUEST_ADMIN_DASHBOARD",
+    # myMakan Phase-1 scope flags (see docs/implementation/mymakan-phase1.md)
+    "rent": "FEATURE_RENT",
+    "buy": "FEATURE_BUY",
+    "ai_advisor": "FEATURE_AI_ADVISOR",
+    "ai_home_finder": "FEATURE_AI_HOME_FINDER",
+    "area_intelligence": "FEATURE_AREA_INTELLIGENCE",
+    "property_intelligence": "FEATURE_PROPERTY_INTELLIGENCE",
+    "saved_searches": "FEATURE_SAVED_SEARCHES",
+    "notifications": "FEATURE_NOTIFICATIONS",
+    "leads": "FEATURE_LEADS",
+    "projects": "FEATURE_PROJECTS",
+    "booking": "FEATURE_BOOKING",
+    "short_stay": "FEATURE_SHORT_STAY",
+    "financing": "FEATURE_FINANCING",
+    "property_management": "FEATURE_PROPERTY_MANAGEMENT",
+    "external_transaction": "FEATURE_EXTERNAL_TRANSACTION",
+    "visit_management": "FEATURE_VISIT_MANAGEMENT",
+    "negotiations": "FEATURE_NEGOTIATIONS",
 }
 
 

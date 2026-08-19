@@ -8,14 +8,7 @@ import { useLanguage } from "@/lib/i18n/context";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { colors } from "@/lib/colors";
-
-function scoreColor(score: number | null): string {
-  if (score == null) return colors.neutral400;
-  if (score >= 85) return colors.success;
-  if (score >= 70) return "#65A30D";
-  if (score >= 55) return "#B45309";
-  return colors.destructive;
-}
+import { scoreColor } from "@/lib/scoreBands";
 
 export default function AreasScreen() {
   const { t } = useLanguage();

@@ -17,7 +17,7 @@ import {
 import { fieldKeyLabel } from "@/lib/propertyRequestDisplay";
 
 export const Route = createFileRoute("/partner/requests")({
-  head: () => ({ meta: [{ title: "Property Request Marketplace — Maskan Partner" }] }),
+  head: () => ({ meta: [{ title: "Property Request Marketplace — myMakan Partner" }] }),
   component: PartnerRequestMarketplace,
 });
 

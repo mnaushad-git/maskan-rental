@@ -1,11 +1,11 @@
 """
-Nightly job: refresh area intelligence scores from Maskan's place data sources.
+Weekly job: refresh area intelligence scores from Maskan's place data sources
+(live Google Places + Distance Matrix APIs — GOOGLE_PLACES_API_KEY and
+GOOGLE_MAPS_API_KEY must be set in .env; falls back to mock data otherwise).
 
-Run via cron:  0 2 * * * python -m app.jobs.refresh_area_intelligence
-Or triggered on-demand via: POST /api/areas/{area_name}/intelligence/refresh
-
-TODO: Replace all MOCK_* functions with real data-source API calls.
-      Set GOOGLE_PLACES_API_KEY and GOOGLE_MAPS_API_KEY in .env to enable live data.
+Scheduled in app/main.py's lifespan (APScheduler, Asia/Riyadh) to run every
+Thursday at midnight. For a manual one-off run: python -m app.jobs.refresh_area_intelligence
+Or triggered on-demand for one district via: POST /api/areas/{area_name}/intelligence/refresh
 """
 import logging
 import math
@@ -280,25 +280,38 @@ def _refresh_district(row: AreaIntelligence, db) -> None:
 
 
 def refresh_all() -> None:
-    """Called nightly by cron. Refreshes all districts that have coordinates set."""
+    """Called weekly by cron. Refreshes districts that have coordinates set
+    and currently have at least one published listing on the platform —
+    no point spending Google API calls on districts nobody can search in."""
     from app.core.locks import pg_advisory_lock
+    from app.models.property import Property
 
     db = SessionLocal()
     try:
         with pg_advisory_lock(db, _LOCK_KEY) as acquired:
             if not acquired:
-                logger.info("Nightly refresh already running on another worker, skipping")
+                logger.info("Weekly refresh already running on another worker, skipping")
                 return
+
+            listed_pairs = (
+                db.query(Property.area, Property.city)
+                .filter(Property.status == "Published")
+                .distinct()
+                .all()
+            )
+            listed = {(area.strip().lower(), city.strip().lower()) for area, city in listed_pairs}
 
             rows = db.query(AreaIntelligence).filter(
                 AreaIntelligence.center_lat.isnot(None),
                 AreaIntelligence.center_lng.isnot(None),
             ).all()
-            logger.info(f"Starting nightly refresh for {len(rows)} districts")
+            rows = [r for r in rows if (r.area_name.strip().lower(), (r.city or "").strip().lower()) in listed]
+
+            logger.info(f"Starting weekly refresh for {len(rows)} districts with published listings")
             for row in rows:
                 _refresh_district(row, db)
                 time.sleep(0.5)  # respect Google API rate limits
-            logger.info("Nightly refresh complete")
+            logger.info("Weekly refresh complete")
     finally:
         db.close()
 

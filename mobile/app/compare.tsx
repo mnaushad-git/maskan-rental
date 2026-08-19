@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, Modal, TextInput, FlatList, ActivityIndicator, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack } from "expo-router";
-import { Plus, X, Search, BedDouble, Bath, Maximize, Sparkles, Trophy } from "lucide-react-native";
-import { fetchProperties, mapApiSearchProperty, mapApiProperty, type ApiProperty } from "@/lib/api/maskan";
+import { useRouter, Stack, Link } from "expo-router";
+import { Plus, X, Search, BedDouble, Bath, Maximize, Sparkles, Trophy, Gauge, PiggyBank, MapPin } from "lucide-react-native";
+import {
+  fetchProperties,
+  mapApiSearchProperty,
+  mapApiProperty,
+  fetchPropertyIntelligence,
+  type ApiProperty,
+  type ApiPropertyIntelligence,
+} from "@/lib/api/maskan";
 import { formatSAR } from "@/lib/maskan-data";
 import { useLanguage } from "@/lib/i18n/context";
+import { Badge } from "@/components/Badges";
 import { colors } from "@/lib/colors";
 
 type Scored = {
@@ -55,6 +63,10 @@ export default function CompareScreen() {
   const [loading, setLoading] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // Prompt 11: myMakan Property Intelligence per compared property — bounded
+  // to the page's ≤3 selection cap, fetched once per id and cached (mirrors
+  // the web app's compare.tsx `intelMap`).
+  const [intelMap, setIntelMap] = useState<Record<string, ApiPropertyIntelligence | null>>({});
 
   useEffect(() => {
     fetchProperties()
@@ -62,6 +74,17 @@ export default function CompareScreen() {
       .catch(() => setAll([]))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    selected.forEach((p) => {
+      if (!(p.id in intelMap)) {
+        fetchPropertyIntelligence(Number(p.id))
+          .then((intel) => setIntelMap((prev) => ({ ...prev, [p.id]: intel })))
+          .catch(() => setIntelMap((prev) => ({ ...prev, [p.id]: null })));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   const topPickId = useMemo(() => {
     if (selected.length < 2) return null;
@@ -162,6 +185,44 @@ export default function CompareScreen() {
           </View>
         )}
 
+        {/* myMakan Intelligence (Prompt 11) */}
+        {selected.length >= 2 && (
+          <View className="gap-2">
+            <View className="flex-row items-center gap-1.5 px-1">
+              <Gauge size={14} color={colors.foreground} />
+              <Text className="text-xs font-bold uppercase tracking-wide text-foreground">{t("compare.categories.myMakanIntelligence")}</Text>
+            </View>
+            <View className="gap-0 rounded-xl border border-border">
+              <MetricRow
+                label={t("compare.rows.decisionScore")}
+                values={selected.map((p) => (intelMap[p.id] ? `${intelMap[p.id]!.decision_score}/100` : "—"))}
+                highlight={selected.map(
+                  (p) =>
+                    !!intelMap[p.id] &&
+                    intelMap[p.id]!.decision_score === Math.max(...selected.map((s) => intelMap[s.id]?.decision_score ?? -1)),
+                )}
+              />
+              <MetricRow label={t("compare.rows.matchScore")} values={selected.map((p) => `${p.matchScore}/100`)} />
+              <MetricRow
+                label={t("compare.rows.priceClassification")}
+                values={selected.map((p) => intelMap[p.id]?.price_intelligence.classification ?? t("compare.notAvailable"))}
+              />
+              <MetricRow
+                label={t("compare.rows.dataConfidence")}
+                values={selected.map((p) => intelMap[p.id]?.data_confidence.level ?? "—")}
+                last
+              />
+            </View>
+          </View>
+        )}
+
+        {/* myMakan Recommendation (Prompt 11) — distinct from the AI
+            recommendation below: that one picks a single overall winner from
+            a client-side composite; this one picks three separate category
+            winners straight from real Property Intelligence data, with a
+            deterministic "why" per winner — AI never chooses the winner. */}
+        {selected.length >= 2 && <MyMakanRecommendation selected={selected} intelMap={intelMap} />}
+
         {/* AI recommendation */}
         {topPick && (
           <View className="gap-2 rounded-2xl border p-4" style={{ borderColor: colors.primary, backgroundColor: "rgba(194,65,12,0.05)" }}>
@@ -225,6 +286,78 @@ export default function CompareScreen() {
         </Pressable>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+const CLASSIFICATION_RANK: Record<string, number> = {
+  "Excellent Value": 5,
+  "Good Value": 4,
+  Fair: 3,
+  "Above Market": 2,
+  "Significantly Above Market": 1,
+};
+
+type RecoEntry = { id: string; title: string; decisionScore: number | null; classification: string | null; areaScore: number | null };
+
+function pickIntelligenceRecommendations(entries: RecoEntry[]) {
+  const withScore = entries.filter((e) => e.decisionScore != null);
+  const bestOverall = withScore.length ? withScore.reduce((a, b) => (b.decisionScore! > a.decisionScore! ? b : a)) : null;
+
+  const withClass = entries.filter((e) => e.classification != null && e.classification in CLASSIFICATION_RANK);
+  const bestValue = withClass.length
+    ? withClass.reduce((a, b) => (CLASSIFICATION_RANK[b.classification!] > CLASSIFICATION_RANK[a.classification!] ? b : a))
+    : null;
+
+  const withArea = entries.filter((e) => e.areaScore != null);
+  const bestLocation = withArea.length ? withArea.reduce((a, b) => (b.areaScore! > a.areaScore! ? b : a)) : null;
+
+  return { bestOverall, bestValue, bestLocation };
+}
+
+function MyMakanRecommendation({ selected, intelMap }: { selected: Scored[]; intelMap: Record<string, ApiPropertyIntelligence | null> }) {
+  const { t } = useLanguage();
+  const entries: RecoEntry[] = selected.map((p) => {
+    const intel = intelMap[p.id];
+    return {
+      id: p.id,
+      title: p.title,
+      decisionScore: intel?.decision_score ?? null,
+      classification: intel?.price_intelligence.classification ?? null,
+      areaScore: intel?.area_intelligence?.area_score ?? null,
+    };
+  });
+  const { bestOverall, bestValue, bestLocation } = pickIntelligenceRecommendations(entries);
+  if (!bestOverall && !bestValue && !bestLocation) return null;
+
+  const rows: { key: string; icon: React.ReactNode; entry: RecoEntry | null; why: (e: RecoEntry) => string }[] = [
+    { key: "bestOverall", icon: <Trophy size={13} color={colors.ai} />, entry: bestOverall, why: (e) => t("compare.myMakanReco.whyOverall", { score: e.decisionScore ?? 0 }) },
+    { key: "bestValue", icon: <PiggyBank size={13} color={colors.ai} />, entry: bestValue, why: (e) => t("compare.myMakanReco.whyValue", { classification: e.classification ?? "" }) },
+    { key: "bestLocation", icon: <MapPin size={13} color={colors.ai} />, entry: bestLocation, why: (e) => t("compare.myMakanReco.whyLocation", { score: Math.round(e.areaScore ?? 0) }) },
+  ];
+
+  return (
+    <View className="gap-3 rounded-2xl border p-4" style={{ borderColor: "rgba(124,58,237,0.3)", backgroundColor: "rgba(124,58,237,0.05)" }}>
+      <View className="flex-row items-center gap-1.5">
+        <Sparkles size={14} color={colors.ai} />
+        <Text className="text-xs font-bold" style={{ color: colors.ai }}>{t("compare.myMakanReco.title")}</Text>
+      </View>
+      <View className="gap-2">
+        {rows
+          .filter((r) => r.entry)
+          .map((r) => (
+            <View key={r.key} className="rounded-xl border border-border bg-card p-3">
+              <Badge tone="ai" icon={r.icon}>{t(`compare.myMakanReco.${r.key}`)}</Badge>
+              <Text className="mt-1.5 text-sm font-semibold text-foreground" numberOfLines={1}>{r.entry!.title}</Text>
+              <Text className="mt-0.5 text-xs text-muted-foreground">{r.why(r.entry!)}</Text>
+              <Link href={`/property/${r.entry!.id}`} asChild>
+                <Pressable className="mt-1.5">
+                  <Text className="text-xs font-semibold text-primary">{t("compare.myMakanReco.view")}</Text>
+                </Pressable>
+              </Link>
+            </View>
+          ))}
+      </View>
+    </View>
   );
 }
 

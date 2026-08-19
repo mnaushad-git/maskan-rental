@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 // KpiCard/Panel/ConfirmButton primitives rather than sharing code across the
 // two large admin route files.
 export const Route = createFileRoute("/admin_/property-requests")({
-  head: () => ({ meta: [{ title: "Property Requests — Maskan Admin" }] }),
+  head: () => ({ meta: [{ title: "Property Requests — myMakan Admin" }] }),
   component: AdminPropertyRequestsPage,
 });
 

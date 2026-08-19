@@ -6,21 +6,31 @@ import { useAuth } from "@/lib/auth-context";
 import { useLanguage, type Language } from "@/lib/i18n/context";
 import { cn } from "@/lib/utils";
 
+// myMakan Phase-1 nav: Home, Rent, Buy, Map, AI Advisor, Area Intelligence,
+// Saved, My Leads, Profile (Profile = the account avatar/dropdown in
+// NavAuthButton, not a separate link here). Hide-Phase1 items (Projects,
+// Partners, Compare — see docs/implementation/mymakan-phase1.md "Navigation
+// changed") are dropped from top-nav only; their route files are untouched
+// and still reachable directly.
 function useNavLinks() {
   const { t } = useLanguage();
   const NAV_LINKS = [
-    { label: t("nav.search"), to: "/search" },
-    { label: t("nav.projects"), to: "/projects" },
-    { label: t("nav.exploreAreas"), to: "/areas" },
-    { label: t("nav.partners"), to: "/partners" },
-    { label: t("nav.aiAdvisor"), to: "/advisor" },
-    { label: t("nav.saved"), to: "/saved" },
-    { label: t("nav.compare"), to: "/compare" },
+    { label: t("nav.home"), to: "/", search: undefined },
+    { label: t("nav.rent"), to: "/search", search: { listingType: "rent" } },
+    { label: t("nav.buy"), to: "/search", search: { listingType: "sale" } },
+    { label: t("nav.map"), to: "/search", search: undefined },
+    { label: t("nav.aiAdvisor"), to: "/advisor", search: undefined },
+    { label: t("nav.areaIntelligence"), to: "/areas", search: undefined },
+    { label: t("nav.saved"), to: "/saved", search: undefined },
   ] as const;
   // Only relevant once a lead can exist for the account, so it's shown in the
   // persistent nav (not just buried in the account dropdown) when signed in.
-  const MY_LEADS_LINK = { label: t("nav.myLeads"), to: "/my-leads" } as const;
-  return { NAV_LINKS, MY_LEADS_LINK };
+  const MY_LEADS_LINK = { label: t("nav.myLeads"), to: "/my-leads", search: undefined } as const;
+  // Same rationale, same sibling placement as MY_LEADS_LINK (AI Negotiation &
+  // Offer Management, Prompt 9) — reachable from the persistent nav once
+  // signed in, not just buried in the account dropdown.
+  const MY_NEGOTIATIONS_LINK = { label: t("nav.myNegotiations"), to: "/negotiations", search: undefined } as const;
+  return { NAV_LINKS, MY_LEADS_LINK, MY_NEGOTIATIONS_LINK };
 }
 
 export function Logo() {
@@ -92,8 +102,8 @@ export function LanguageSwitcher({ className }: { className?: string }) {
 
 export function TopNav() {
   const { user } = useAuth();
-  const { NAV_LINKS, MY_LEADS_LINK } = useNavLinks();
-  const navLinks = user ? [...NAV_LINKS, MY_LEADS_LINK] : NAV_LINKS;
+  const { NAV_LINKS, MY_LEADS_LINK, MY_NEGOTIATIONS_LINK } = useNavLinks();
+  const navLinks = user ? [...NAV_LINKS, MY_LEADS_LINK, MY_NEGOTIATIONS_LINK] : NAV_LINKS;
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
@@ -107,8 +117,9 @@ export function TopNav() {
           <nav className="hidden items-center gap-6 lg:flex">
             {navLinks.map((l) => (
               <Link
-                key={l.to}
+                key={l.label}
                 to={l.to}
+                search={l.search}
                 className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
                 activeProps={{ className: "text-foreground" }}
               >
@@ -136,8 +147,9 @@ export function TopNav() {
           const isActive = pathname === l.to || pathname.startsWith(`${l.to}/`);
           return (
             <Link
-              key={l.to}
+              key={l.label}
               to={l.to}
+              search={l.search}
               className={cn(
                 "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
                 isActive

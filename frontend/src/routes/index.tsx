@@ -40,13 +40,13 @@ import { useLanguage } from "@/lib/i18n/context";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Maskan — Find the Right Home with AI Rental Intelligence" },
+      { title: "myMakan — Find the Right Home with AI Rental Intelligence" },
       {
         name: "description",
         content:
-          "Discover rental properties across Saudi Arabia. Compare areas, evaluate rental value, and find homes that match your lifestyle with Maskan's AI advisor.",
+          "Discover rental properties across Saudi Arabia. Compare areas, evaluate rental value, and find homes that match your lifestyle with myMakan's AI advisor.",
       },
-      { property: "og:title", content: "Maskan — AI Rental Intelligence" },
+      { property: "og:title", content: "myMakan — AI Rental Intelligence" },
       {
         property: "og:description",
         content:
@@ -167,7 +167,77 @@ function HomeSearchSection({
           </button>
         </div>
 
+        <div className="mb-6 max-w-2xl">
+          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
+            {t("home.hero.title")}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+            {t("home.hero.subtitle")}
+          </p>
+        </div>
+
         <SearchBar onSearch={onSearch} onListingTypeChange={onListingTypeChange} />
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            to="/search"
+            search={{ listingType: "rent" }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-card transition-colors hover:bg-surface"
+          >
+            <Home className="size-3.5 text-primary" /> {t("home.quickLinks.rent")}
+          </Link>
+          <Link
+            to="/search"
+            search={{ listingType: "sale" }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-card transition-colors hover:bg-surface"
+          >
+            <Building2 className="size-3.5 text-primary" /> {t("home.quickLinks.buy")}
+          </Link>
+          <Link
+            to="/search"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-card transition-colors hover:bg-surface"
+          >
+            <Map className="size-3.5 text-primary" /> {t("home.quickLinks.map")}
+          </Link>
+          <Link
+            to="/advisor"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-card transition-colors hover:bg-surface"
+          >
+            <Sparkles className="size-3.5 text-primary" /> {t("home.quickLinks.aiAdvisor")}
+          </Link>
+        </div>
+
+        {/* AI Home Finder — a second, equally prominent path alongside the
+            search bar above: describe what you want in plain language
+            instead of using filters. Example prompts deep-link straight into
+            /home-finder?q=... so the AI interpretation kicks off immediately. */}
+        <div className="mt-4 rounded-2xl border border-ai/25 bg-ai-soft p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="inline-flex items-center gap-1.5 text-sm font-bold text-ai">
+                <Sparkles className="size-4" /> {t("homeFinder.entryTitle")}
+              </p>
+              <p className="mt-1 max-w-md text-xs text-muted-foreground">{t("homeFinder.entrySubtitle")}</p>
+            </div>
+            <Button variant="ai" size="sm" asChild>
+              <Link to="/home-finder">
+                <Sparkles className="size-3.5" /> {t("home.quickLinks.aiHomeFinder")}
+              </Link>
+            </Button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[t("homeFinder.examples.rent1"), t("homeFinder.examples.sale1")].map((ex) => (
+              <Link
+                key={ex}
+                to="/home-finder"
+                search={{ q: ex }}
+                className="rounded-full border border-ai/30 bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-card transition-colors hover:bg-surface"
+              >
+                {ex}
+              </Link>
+            ))}
+          </div>
+        </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">

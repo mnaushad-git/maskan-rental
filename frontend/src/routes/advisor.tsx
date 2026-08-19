@@ -29,11 +29,11 @@ export const Route = createFileRoute("/advisor")({
   }),
   head: () => ({
     meta: [
-      { title: "AI Advisor — Maskan" },
+      { title: "AI Advisor — myMakan" },
       {
         name: "description",
         content:
-          "Chat with Maskan's AI Advisor for personalized Saudi rental insights, area comparisons, and fair-rent analysis.",
+          "Chat with myMakan's AI Advisor for personalized Saudi rental insights, area comparisons, and fair-rent analysis.",
       },
     ],
   }),
