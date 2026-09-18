@@ -20,7 +20,7 @@ import { colors } from "@/lib/colors";
 
 function formatDate(iso: string, lang: Language): string {
   try {
-    return new Intl.DateTimeFormat(lang === "ar" ? "ar-SA" : "en-US", {
+    return new Intl.DateTimeFormat(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",

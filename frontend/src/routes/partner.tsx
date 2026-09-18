@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { NotFoundComponent } from "@/routes/__root";
 import {
   AlertTriangle,
   Briefcase,
@@ -11,6 +12,7 @@ import {
   CreditCard,
   Eye,
   EyeOff,
+  FileCheck2,
   Handshake,
   History,
   Home,
@@ -63,6 +65,7 @@ import {
   fetchMediatorReviews,
   fetchMediatorReviewSummary,
   subscribePartnerMock,
+  renewPartnerSubscription,
   type ApiAreaSummary,
   type ApiPartner,
   type ApiLeadDetail,
@@ -85,6 +88,16 @@ import { useLanguage } from "@/lib/i18n/context";
 export const Route = createFileRoute("/partner")({
   head: () => ({ meta: [{ title: "Partner Dashboard — myMakan" }] }),
   component: PartnerDashboard,
+  // P15: several partner "tabs" (Leads, My Properties, Messages, Profile,
+  // Reviews, Area Coverage, Subscription) are internal `view` state within
+  // PartnerDashboard, not real child routes — only Negotiations/Viewings/
+  // Transactions/Requests got their own route files. A directly-typed or
+  // bookmarked URL like /partner/leads therefore has no matching route, and
+  // without this, TanStack Router fell through to its own bare, unstyled
+  // "Not Found" fallback instead of the app's styled 404 page (confirmed
+  // live — the root route's own notFoundComponent did not apply here).
+  // Reusing the same component keeps this a one-line, low-risk fix.
+  notFoundComponent: NotFoundComponent,
 });
 
 // "properties" is the single reused listings table for My Properties / Rental
@@ -170,6 +183,16 @@ function PartnerDashboard() {
   }, [user, pathname]);
 
   useEffect(() => {
+    // Gate on `user` the same way the profile/leads effect above does — this
+    // effect previously fired unconditionally on mount (before the auth
+    // context/token had settled right after a fresh login), sending an
+    // unauthenticated `GET /properties/partner/mine` that 401'd and left
+    // `listings` permanently empty for the rest of the session (silently
+    // swallowed by `.catch(() => {})`, never retried since the effect only
+    // re-runs on `[view]` changes) — visible as a real, wrong "0 My
+    // properties" tile on the Dashboard's very first render after login,
+    // even when the mediator genuinely owns properties (see P10-001).
+    if (!user) return;
     if ((view === "properties" || view === "dashboard") && !loadingListings) {
       setLoadingListings(true);
       fetchPartnerListings()
@@ -184,7 +207,7 @@ function PartnerDashboard() {
         .catch(() => {})
         .finally(() => setLoadingProjects(false));
     }
-  }, [view]);
+  }, [view, user]);
 
   async function handleConfirmAccept(leadId: number) {
     setAcceptingId(leadId);
@@ -381,6 +404,16 @@ function PartnerDashboard() {
       label: t("partnerNegotiations.heading"),
       active: false,
       onClick: () => navigate({ to: "/partner/negotiations" }),
+    },
+    {
+      // Separate route (/partner/transactions), mirrors the "negotiations"
+      // entry above exactly — see docs/implementation/
+      // mymakan-transaction-workspace.md "Screens" (Prompt 10).
+      key: "transactions",
+      icon: FileCheck2,
+      label: t("partnerTransactions.heading"),
+      active: false,
+      onClick: () => navigate({ to: "/partner/transactions" }),
     },
     {
       key: "messages",
@@ -777,7 +810,7 @@ function PartnerDashboard() {
                           {lead.closed_at && (
                             <span className="text-xs text-muted-foreground">
                               {new Date(lead.closed_at).toLocaleDateString(
-                                lang === "ar" ? "ar-SA" : "en-SA",
+                                lang === "ar" ? "ar-SA-u-nu-latn" : "en-SA",
                                 { day: "numeric", month: "short", year: "numeric" },
                               )}
                             </span>
@@ -1001,7 +1034,7 @@ function PartnerListingsView({
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold truncate">{l.title}</span>
+                      <span dir="auto" className="font-semibold truncate">{l.title}</span>
                       <ListingStatusBadge status={l.status} />
                       <Badge tone="neutral">
                         {l.listing_type === "sale"
@@ -1862,7 +1895,7 @@ function PartnerListingQualityPanel({
                 {quality.availability_confirmed_at
                   ? t("partnerDashboard.listingForm.quality.availability.confirmedOn", {
                       date: new Date(quality.availability_confirmed_at).toLocaleDateString(
-                        lang === "ar" ? "ar-SA" : "en-SA",
+                        lang === "ar" ? "ar-SA-u-nu-latn" : "en-SA",
                         { day: "numeric", month: "short", year: "numeric" },
                       ),
                     })
@@ -2037,7 +2070,7 @@ function DuplicateWarningModal({ result, onDismiss }: { result: ApiDuplicateChec
           <div className="mt-3 space-y-2">
             {result.matches.slice(0, 3).map((m) => (
               <div key={m.property_id} className="rounded-lg border border-border bg-surface px-3 py-2">
-                <p className="truncate text-sm font-medium">{m.title}</p>
+                <p dir="auto" className="truncate text-sm font-medium">{m.title}</p>
                 {m.reasons.length > 0 && <p className="text-xs text-muted-foreground">{m.reasons.join(" · ")}</p>}
               </div>
             ))}
@@ -2189,7 +2222,7 @@ function PartnerMessagesView({
                   {lead.area_name}, {lead.city}
                 </span>
               </div>
-              <p className="mt-1 truncate text-sm text-muted-foreground">{lead.customer_name}</p>
+              <p dir="auto" className="mt-1 truncate text-sm text-muted-foreground">{lead.customer_name}</p>
             </div>
             <span className="shrink-0 text-xs font-medium text-primary">
               {t("partnerDashboard.messages.open")}
@@ -2467,9 +2500,12 @@ function PartnerAreaCoverageView({
 }
 
 // ── Subscription ─────────────────────────────────────────────────────────────
-// Reuses the existing mock subscribe/renew endpoint (subscribePartnerMock →
-// POST /mediators/me/subscribe, the same one activated from partner.register.tsx)
-// — no new payment flow.
+// Reuses the existing mock subscribe/renew endpoints — subscribePartnerMock
+// (POST /mediators/me/subscribe, the same one activated from
+// partner.register.tsx) for a not-yet-subscribed mediator, and
+// renewPartnerSubscription (POST /mediators/me/renew) for an already-active
+// one, since the backend rejects a /subscribe call once already active (see
+// P10-003) — no new payment flow either way.
 
 function PartnerSubscriptionView({
   partner,
@@ -2487,8 +2523,26 @@ function PartnerSubscriptionView({
     setRenewing(true);
     setError(null);
     try {
-      const res = await subscribePartnerMock();
-      onRenewed({ subscription_status: res.status, subscription_expires_at: res.subscription_expires_at });
+      // Two genuinely different backend actions behind one button, per the
+      // active/not-active branch already used for the button's own label
+      // just below (renewCta vs subscribeCta): an already-active mediator
+      // must hit /me/renew (extends subscription_expires_at by 30 days) —
+      // /me/subscribe rejects that case with a 400 "already active" error
+      // and never touches the expiry date. A not-yet-subscribed mediator
+      // still goes through /me/subscribe, unchanged. See P10-003.
+      //
+      // /me/renew's `status` field is an action-result label ("renewed"),
+      // not the mediator's own `subscription_status` enum value the rest of
+      // this screen reads (active/inactive) — passing it straight through
+      // would flip `active` to false right after a successful renewal (the
+      // badge/button would misreport a just-renewed subscription as not
+      // active). /me/subscribe's `status` ("active") IS already the right
+      // enum value, so only the renew branch needs the override.
+      const res = active ? await renewPartnerSubscription() : await subscribePartnerMock();
+      onRenewed({
+        subscription_status: active ? "active" : res.status,
+        subscription_expires_at: res.subscription_expires_at,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : t("partnerDashboard.subscriptionView.failed"));
     } finally {
@@ -2519,7 +2573,7 @@ function PartnerSubscriptionView({
             </span>
             <span className="text-sm font-medium">
               {new Date(partner.subscription_expires_at).toLocaleDateString(
-                lang === "ar" ? "ar-SA" : "en-SA",
+                lang === "ar" ? "ar-SA-u-nu-latn" : "en-SA",
               )}
             </span>
           </div>
@@ -2594,7 +2648,7 @@ function PartnerProjectsView({
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold truncate">{p.title}</span>
+                      <span dir="auto" className="font-semibold truncate">{p.title}</span>
                       <ListingStatusBadge status={p.listing_status} />
                     </div>
                     <p className="text-sm text-muted-foreground">

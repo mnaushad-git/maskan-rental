@@ -42,7 +42,7 @@ const STATUS_TONE: Record<string, "success" | "warning" | "info" | "neutral" | "
 };
 
 function formatDateTime(iso: string, lang: string): string {
-  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA" : "en-US", {
+  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -173,7 +173,7 @@ function PartnerNegotiationDetailPage() {
                   <img src={negotiation.property_image_url} alt="" className="size-16 shrink-0 rounded-xl object-cover" />
                 )}
                 <div className="min-w-0">
-                  <div className="truncate font-semibold">{negotiation.property_title ?? `#${negotiation.property_id}`}</div>
+                  <div dir="auto" className="truncate font-semibold">{negotiation.property_title ?? `#${negotiation.property_id}`}</div>
                   {negotiation.property_district && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <MapPin className="size-3.5" /> {negotiation.property_district}
@@ -393,7 +393,7 @@ function CounterModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm px-4" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-background p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-background p-6 shadow-2xl" onClick={(e) => e.stopPropagation()} data-testid="partner-counter-modal">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h2 className="text-lg font-bold">{t("partnerNegotiations.detail.counterModal.title")}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -408,6 +408,7 @@ function CounterModal({
               min={1}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              data-testid="partner-counter-amount-input"
               className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
             />
           </div>

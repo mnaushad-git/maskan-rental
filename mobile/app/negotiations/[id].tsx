@@ -10,6 +10,7 @@ import {
   withdrawNegotiation,
   fetchNegotiationGuidance,
   fetchPropertyAiSummary,
+  fetchMyTransactions,
   NEGOTIATION_CUSTOMER_WITHDRAW_REASONS,
   type ApiPropertyNegotiationDetail,
 } from "@/lib/api/maskan";
@@ -78,6 +79,7 @@ export default function NegotiationDetailScreen() {
   const [showAsk, setShowAsk] = useState(() => ask === "1");
   const [accepting, setAccepting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [openingTransaction, setOpeningTransaction] = useState(false);
 
   const negotiationId = Number(id);
 
@@ -113,6 +115,31 @@ export default function NegotiationDetailScreen() {
       setActionError(err instanceof Error ? err.message : t("negotiationDetail.actions.acceptFailed"));
     } finally {
       setAccepting(false);
+    }
+  }
+
+  // "Continue Transaction" (brief §10/Prompt 8, mobile wiring Prompt 11) —
+  // the PropertyTransaction row is already auto-created server-side the
+  // instant this negotiation was accepted, so there's nothing to create
+  // here: just locate the caller's own transaction whose negotiation_id
+  // matches this negotiation and navigate to its real id. Mirrors web's
+  // negotiations.$id.tsx handleContinueTransaction() exactly — this screen
+  // previously linked straight to `/transaction/${negotiation.id}`, which
+  // only "worked" because that route was a placeholder that ignored its id
+  // param; now that it's a real screen, the actual transaction id is required.
+  async function handleContinueTransaction() {
+    if (!negotiation) return;
+    setOpeningTransaction(true);
+    setActionError(null);
+    try {
+      const transactions = await fetchMyTransactions();
+      const match = transactions.find((tx) => tx.negotiation_id === negotiation.id);
+      if (!match) throw new Error(t("negotiationDetail.agreed.continueTransactionFailed"));
+      router.push(`/transaction/${match.id}`);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t("negotiationDetail.agreed.continueTransactionFailed"));
+    } finally {
+      setOpeningTransaction(false);
     }
   }
 
@@ -353,11 +380,14 @@ export default function NegotiationDetailScreen() {
                   </Button>
                 </Link>
               )}
-              <Link href={`/transaction/${negotiation.id}`} asChild>
-                <Button variant="outline" icon={<MoveRight size={16} color={colors.foreground} />}>
-                  {t("negotiationDetail.agreed.continueTransaction")}
-                </Button>
-              </Link>
+              <Button
+                variant="outline"
+                icon={<MoveRight size={16} color={colors.foreground} />}
+                onPress={() => void handleContinueTransaction()}
+                loading={openingTransaction}
+              >
+                {openingTransaction ? t("negotiationDetail.agreed.openingTransaction") : t("negotiationDetail.agreed.continueTransaction")}
+              </Button>
             </>
           )}
           <Pressable

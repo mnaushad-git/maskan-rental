@@ -30,7 +30,7 @@ export const Route = createFileRoute("/partner/requests/$id")({
 
 function formatDate(iso: string | null, lang: string): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", {
+  return new Date(iso).toLocaleDateString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
     day: "numeric",
     month: "short",
     year: "numeric",

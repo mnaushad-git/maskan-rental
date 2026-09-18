@@ -50,7 +50,7 @@ const STATUS_TONE: Record<string, "success" | "warning" | "info" | "neutral"> = 
 };
 
 function formatDateTime(iso: string, lang: string): string {
-  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA" : "en-US", {
+  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -214,7 +214,7 @@ function ViewingCard({
         )}
         <div className="flex flex-1 flex-col gap-2 p-5">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="truncate text-sm font-semibold">{viewing.property_title ?? `#${viewing.property_id}`}</h3>
+            <h3 dir="auto" className="truncate text-sm font-semibold">{viewing.property_title ?? `#${viewing.property_id}`}</h3>
             <Badge tone={tone}>{t(`myViewings.status.${viewing.status}`)}</Badge>
           </div>
           {viewing.property_area && (

@@ -1,4 +1,4 @@
-import { Image, type ImageSourcePropType } from "react-native";
+import { Image, Platform, type ImageSourcePropType } from "react-native";
 import type { Property as UiProperty, Project as UiProject } from "@/lib/maskan-data";
 import type { SearchProperty as UiSearchProperty } from "@/lib/maskan-search-data";
 import { readStoredToken, clearStoredAuth } from "@/lib/auth-storage";
@@ -914,6 +914,217 @@ export function fetchNegotiationGuidance(id: number, question: string | undefine
     method: "POST",
     body: JSON.stringify({ question: question || undefined, language }),
   });
+}
+
+// ── Transaction Workspace (Prompt 11) ───────────────────────────────────────
+// Mirrors frontend/src/lib/api/maskan.ts's own "Transaction Workspace —
+// customer (Prompt 8)" section field-for-field — see
+// docs/implementation/mymakan-transaction-workspace.md "APIs" for the
+// authoritative backend shape. A `PropertyTransaction` is auto-created the
+// instant a negotiation is accepted, so there's no createTransaction() call
+// here — see mobile's own app/negotiations/[id].tsx "Continue Transaction"
+// handler, which locates the already-existing row via fetchMyTransactions()
+// rather than creating anything (same pattern web's negotiations.$id.tsx uses).
+
+export type ApiChecklistStep = {
+  key: string;
+  label: string;
+  status: "done" | "in_progress" | "pending" | string;
+  detail: string | null;
+};
+
+export type ApiNextBestAction = {
+  key: string;
+  message: string;
+};
+
+export type ApiTransactionDocument = {
+  id: number;
+  transaction_id: number;
+  document_type: string;
+  label: string;
+  required: boolean;
+  status: "not_uploaded" | "uploaded" | "accepted" | "needs_update" | string;
+  file_reference: string | null;
+  uploaded_at: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ApiCustomerInfo = {
+  email: string;
+  full_name: string | null;
+  phone: string | null;
+};
+
+export type ApiTermsSnapshot = {
+  property_id: number;
+  property_title: string | null;
+  customer_name: string | null;
+  mediator_agent_name: string | null;
+  transaction_type: string;
+  original_listing_amount: string | null;
+  final_agreed_amount: string;
+  agreed_at: string | null;
+  negotiation_reference: string;
+};
+
+export type ApiPropertyTransaction = {
+  id: number;
+  reference: string;
+  property_id: number;
+  transaction_type: "rent" | "sale";
+  customer_user_id: number;
+  mediator_id: number | null;
+  lead_id: number | null;
+  negotiation_id: number;
+  viewing_id: number | null;
+  agreed_amount: string;
+  currency: string;
+  status: string;
+  progress_percentage: number;
+  customer_info_confirmed_at: string | null;
+  mediator_info_confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  ready_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
+  cancelled_by: string | null;
+  property_title: string | null;
+  property_image_url: string | null;
+  property_area: string | null;
+  mediator_agent_name: string | null;
+  next_best_action: ApiNextBestAction;
+  readiness_label: string;
+};
+
+export type ApiPropertyTransactionDetail = ApiPropertyTransaction & {
+  checklist: ApiChecklistStep[];
+  documents: ApiTransactionDocument[];
+  customer_info: ApiCustomerInfo;
+  terms_snapshot: ApiTermsSnapshot | null;
+};
+
+// GET /transactions — `status` accepts "active" (everything not
+// completed/cancelled), "completed", or "cancelled"; omitted returns
+// everything.
+export function fetchMyTransactions(status?: "active" | "completed" | "cancelled") {
+  const q = status ? `?status=${status}` : "";
+  return requestJson<ApiPropertyTransaction[]>(`/transactions${q}`);
+}
+
+export function fetchTransaction(id: number) {
+  return requestJson<ApiPropertyTransactionDetail>(`/transactions/${id}`);
+}
+
+// PATCH /transactions/{id}/customer-information — `undefined` fields are
+// left unchanged (never cleared).
+export function updateTransactionCustomerInformation(id: number, payload: { full_name?: string; phone?: string }) {
+  return requestJson<ApiPropertyTransactionDetail>(`/transactions/${id}/customer-information`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+// POST /transactions/{id}/documents — multipart (document_id + file), picked
+// via expo-document-picker's DocumentPickerAsset. React Native's fetch
+// expects a `{ uri, name, type }` object appended to FormData (not a real
+// Blob/File) — this is the standard RN idiom, distinct from web's
+// File-object-based uploadTransactionDocument().
+export async function uploadTransactionDocument(
+  id: number,
+  documentId: number,
+  asset: { uri: string; name: string; mimeType?: string | null },
+) {
+  const token = await readStoredToken();
+  const form = new FormData();
+  form.append("document_id", String(documentId));
+  if (Platform.OS === "web") {
+    // react-native-web's FormData is a thin wrapper around the browser's
+    // real FormData, which does NOT understand RN's native {uri,name,type}
+    // object idiom (that shape is only special-cased by RN's own native
+    // fetch bridge) — appending it directly silently stringifies it into a
+    // harmless-looking text field with no real file bytes, so the backend
+    // never sees a valid multipart file part and 422s on content_type
+    // validation (see docs/testing/mymakan-e2e-test-report.md P9-006).
+    // expo-document-picker's web implementation returns a `blob:` uri for
+    // `asset.uri`; fetch it back into a real Blob so web gets a real file
+    // part, exactly like the browser's native <input type="file"> would.
+    const blob = await fetch(asset.uri).then((r) => r.blob());
+    form.append("file", blob, asset.name);
+  } else {
+    // @ts-expect-error React Native's FormData accepts a {uri,name,type} object, not a real Blob/File.
+    form.append("file", { uri: asset.uri, name: asset.name, type: asset.mimeType || "application/octet-stream" });
+  }
+  const response = await fetch(`${API_BASE_URL}/transactions/${id}/documents`, {
+    method: "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: form,
+  });
+  if (!response.ok) {
+    let detail = `Request failed (${response.status})`;
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (typeof body.detail === "string") detail = body.detail;
+    } catch {
+      /* ignore parse errors */
+    }
+    throw new Error(detail);
+  }
+  return response.json() as Promise<ApiPropertyTransactionDetail>;
+}
+
+export function deleteTransactionDocument(id: number, documentId: number) {
+  return requestJson<ApiPropertyTransactionDetail>(`/transactions/${id}/documents/${documentId}`, {
+    method: "DELETE",
+  });
+}
+
+// POST /transactions/{id}/confirm-information — sets the customer
+// confirmation timestamp. NOT a signature (wording rule: labeled
+// "Information Confirmation", never "Sign Contract").
+export function confirmTransactionInformation(id: number) {
+  return requestJson<ApiPropertyTransactionDetail>(`/transactions/${id}/confirm-information`, { method: "POST" });
+}
+
+export function cancelTransaction(id: number, reason: string) {
+  return requestJson<ApiPropertyTransactionDetail>(`/transactions/${id}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+// Closed reason list — mirrors NEGOTIATION_CUSTOMER_WITHDRAW_REASONS'
+// convention; the backend accepts any free-text string.
+export const TRANSACTION_CUSTOMER_CANCEL_REASONS = [
+  "Changed mind",
+  "Found another property",
+  "Financing fell through",
+  "Issue with documents",
+  "Other",
+] as const;
+
+// Customer quick-action vocabulary — mirrors
+// app/services/transaction_ai.py::CUSTOMER_QUICK_ACTIONS exactly.
+export const TRANSACTION_CUSTOMER_QUICK_ACTIONS = [
+  "whats_next",
+  "whats_missing",
+  "explain_step",
+  "what_to_prepare",
+  "summarize",
+  "what_to_ask_mediator",
+] as const;
+
+// POST /transactions/{id}/ai-assistant — "Ask myMakan" quick actions.
+export function fetchTransactionAssistant(id: number, quickAction: string, language: "en" | "ar") {
+  return requestJson<{ quick_action: string; reply: string; generated_by: "ai" | "fallback" }>(
+    `/transactions/${id}/ai-assistant`,
+    { method: "POST", body: JSON.stringify({ quick_action: quickAction, language }) },
+  );
 }
 
 // ── Area intelligence / averages ──────────────────────────────────────────────

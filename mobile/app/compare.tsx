@@ -23,6 +23,7 @@ type Scored = {
   district: string;
   city: string;
   price: number;
+  isSale: boolean;
   image: string;
   bedrooms: number;
   bathrooms: number;
@@ -44,6 +45,7 @@ function score(raw: ApiProperty): Scored {
     district: ui.district,
     city: ui.city,
     price: ui.price,
+    isSale: raw.listing_type === "sale",
     image: ui.image,
     bedrooms: s.bedrooms,
     bathrooms: s.bathrooms,
@@ -53,6 +55,19 @@ function score(raw: ApiProperty): Scored {
     matchScore: s.matchScore,
     composite,
   };
+}
+
+// A SALE property's price has no rent-ratio concept to score against — see
+// docs/testing/mymakan-e2e-test-report.md P9-001 (mirrors web's already-fixed
+// P8-004). Once real Property Intelligence has loaded for a sale property,
+// use its actual Decision Score instead of the fallback rent-ratio estimate
+// baked into `rentalScore` by `mapApiSearchProperty` at initial load.
+function displayRentalScore(p: Scored, intelMap: Record<string, ApiPropertyIntelligence | null>): number {
+  if (p.isSale) {
+    const decisionScore = intelMap[p.id]?.decision_score;
+    if (decisionScore != null) return decisionScore;
+  }
+  return p.rentalScore;
 }
 
 export default function CompareScreen() {
@@ -174,13 +189,21 @@ export default function CompareScreen() {
         {/* Comparison rows */}
         {selected.length >= 2 && (
           <View className="gap-0 rounded-xl border border-border">
-            <MetricRow label={t("compare.rows.annualRent")} values={selected.map((p) => `SAR ${formatSAR(p.price)}`)} />
+            <MetricRow label={t("compare.rows.price")} values={selected.map((p) => `SAR ${formatSAR(p.price)}`)} />
             <MetricRow label={t("compare.rows.bedrooms")} values={selected.map((p) => String(p.bedrooms))} icon={<BedDouble size={13} color={colors.mutedForeground} />} />
             <MetricRow label={t("compare.rows.bathrooms")} values={selected.map((p) => String(p.bathrooms))} icon={<Bath size={13} color={colors.mutedForeground} />} />
             <MetricRow label={t("compare.rows.area")} values={selected.map((p) => `${p.area} m²`)} icon={<Maximize size={13} color={colors.mutedForeground} />} />
             <MetricRow label={t("compare.rows.pricePerSqm")} values={selected.map((p) => `${formatSAR(Math.round(p.price / Math.max(1, p.area)))}`)} />
             <MetricRow label={t("compare.rows.areaScore")} values={selected.map((p) => String(p.areaScore))} highlight={selected.map((p) => p.areaScore === Math.max(...selected.map((x) => x.areaScore)))} />
-            <MetricRow label={t("compare.rentalLabel")} values={selected.map((p) => String(p.rentalScore))} highlight={selected.map((p) => p.rentalScore === Math.max(...selected.map((x) => x.rentalScore)))} />
+            <MetricRow
+              label={t("compare.rentalLabel")}
+              values={selected.map((p) => String(displayRentalScore(p, intelMap)))}
+              highlight={selected.map(
+                (p) =>
+                  displayRentalScore(p, intelMap) ===
+                  Math.max(...selected.map((x) => displayRentalScore(x, intelMap))),
+              )}
+            />
             <MetricRow label={t("compare.propertyScoreLabel")} values={selected.map((p) => String(p.composite))} highlight={selected.map((p) => p.id === topPickId)} last />
           </View>
         )}
@@ -234,7 +257,7 @@ export default function CompareScreen() {
               {t("compare.aiReco.strongestMatch", { title: topPick.title })}
             </Text>
             <Text className="text-sm leading-5 text-muted-foreground">
-              {t("compare.aiReco.description", {
+              {t(topPick.isSale ? "compare.aiReco.descriptionSale" : "compare.aiReco.description", {
                 district: topPick.district,
                 score: topPick.composite,
                 price: formatSAR(topPick.price),

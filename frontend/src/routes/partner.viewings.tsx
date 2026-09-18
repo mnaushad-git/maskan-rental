@@ -45,7 +45,7 @@ const STATUS_TONE: Record<string, "success" | "warning" | "info" | "neutral"> = 
 };
 
 function formatDateTime(iso: string, lang: string): string {
-  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA" : "en-US", {
+  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",

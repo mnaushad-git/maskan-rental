@@ -125,7 +125,7 @@ function MyLeadsPage() {
                       </div>
                     </div>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {new Date(lead.created_at).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-SA", { day: "numeric", month: "short", year: "numeric" })}
+                      {new Date(lead.created_at).toLocaleDateString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-SA", { day: "numeric", month: "short", year: "numeric" })}
                     </span>
                   </div>
                 </Link>

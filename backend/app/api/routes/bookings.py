@@ -90,7 +90,7 @@ def property_booking_insights(
         if platform_sample >= _MIN_INSIGHT_SAMPLE and platform_avg_days is not None:
             weeks = max(1, round(platform_avg_days / 7))
             note = (
-                f"Not enough booking history for this property yet — renters on Maskan typically book "
+                f"Not enough booking history for this property yet — renters on myMakan typically book "
                 f"about {weeks} week{'s' if weeks != 1 else ''} ahead."
             )
         else:

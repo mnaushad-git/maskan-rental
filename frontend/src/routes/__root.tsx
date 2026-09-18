@@ -15,7 +15,7 @@ import { AuthProvider } from "../lib/auth-context";
 import { LanguageProvider, useLanguage } from "../lib/i18n/context";
 import { Toaster } from "@/components/ui/sonner";
 
-function NotFoundComponent() {
+export function NotFoundComponent() {
   const { t } = useLanguage();
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">

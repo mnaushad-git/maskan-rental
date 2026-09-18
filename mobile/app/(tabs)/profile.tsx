@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { LogOut, Globe, FileText, ChevronRight, Map, BookOpen, Scale, Calculator, Bell, BellRing, Settings, SearchCheck, ShieldCheck, Sparkles, Search, Heart, ClipboardList, CalendarClock, Handshake } from "lucide-react-native";
+import { LogOut, Globe, FileText, FileCheck2, ChevronRight, Map, BookOpen, Scale, Calculator, Bell, BellRing, Settings, SearchCheck, ShieldCheck, Sparkles, Search, Heart, ClipboardList, CalendarClock, Handshake } from "lucide-react-native";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { colors } from "@/lib/colors";
@@ -103,6 +103,15 @@ export default function ProfileScreen() {
           >
             <Handshake size={18} color={colors.foreground} />
             <Text className="flex-1 text-sm font-medium text-foreground">{t("nav.myNegotiations")}</Text>
+            <ChevronRight size={18} color={colors.neutral400} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/my-transactions")}
+            className="flex-row items-center gap-3 rounded-xl border border-border px-4 py-3"
+          >
+            <FileCheck2 size={18} color={colors.foreground} />
+            <Text className="flex-1 text-sm font-medium text-foreground">{t("nav.myTransactions")}</Text>
             <ChevronRight size={18} color={colors.neutral400} />
           </Pressable>
 

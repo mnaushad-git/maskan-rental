@@ -74,7 +74,7 @@ const QUIET_TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
 function formatNextDigest(iso: string | null, lang: Language, t: T): string {
   if (!iso) return t("notificationSettings.digest.noneScheduled");
   try {
-    return new Intl.DateTimeFormat(lang === "ar" ? "ar-SA" : "en-US", {
+    return new Intl.DateTimeFormat(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
       month: "short",
       day: "numeric",
       hour: "numeric",

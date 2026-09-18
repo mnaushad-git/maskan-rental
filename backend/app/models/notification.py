@@ -38,6 +38,13 @@ NOTIFICATION_TYPES = (
     "negotiation_accepted",
     "negotiation_rejected",
     "negotiation_withdrawn",
+    "transaction_created",
+    "transaction_action_required",
+    "document_uploaded",
+    "document_update_requested",
+    "document_accepted",
+    "transaction_ready",
+    "transaction_cancelled",
 )
 
 

@@ -154,7 +154,7 @@ export function NotificationBell() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline justify-between gap-1">
-                          <span className="text-xs font-semibold truncate">{n.title}</span>
+                          <span dir="auto" className="text-xs font-semibold truncate">{n.title}</span>
                           <span className="shrink-0 text-[10px] text-muted-foreground">
                             {formatTime(n.created_at)}
                           </span>

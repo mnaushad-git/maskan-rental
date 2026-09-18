@@ -17,7 +17,7 @@ def test_get_prompt_returns_registered_definition():
     prompt = get_prompt("customer_advisor")
     assert prompt is CUSTOMER_ADVISOR
     assert prompt.version == 1
-    assert "Maskan AI" in prompt.template
+    assert "myMakan AI" in prompt.template
 
 
 def test_get_prompt_unknown_name_raises():

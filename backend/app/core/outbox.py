@@ -72,6 +72,14 @@ class EventType:
     NEGOTIATION_ACCEPTED = "negotiation.accepted"
     NEGOTIATION_REJECTED = "negotiation.rejected"
     NEGOTIATION_WITHDRAWN = "negotiation.withdrawn"
+    # ── Transaction Workspace ────────────────────────────────────────────────
+    TRANSACTION_CREATED = "transaction.created"
+    TRANSACTION_ACTION_REQUIRED = "transaction.action_required"
+    TRANSACTION_DOCUMENT_UPLOADED = "document.uploaded"
+    TRANSACTION_DOCUMENT_UPDATE_REQUESTED = "document.update_requested"
+    TRANSACTION_DOCUMENT_ACCEPTED = "document.accepted"
+    TRANSACTION_READY = "transaction.ready"
+    TRANSACTION_CANCELLED = "transaction.cancelled"
 
 
 def record_event(

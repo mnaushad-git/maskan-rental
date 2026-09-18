@@ -20,6 +20,14 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Playwright (Prompt 17 E2E suite)
+/test-results/
+/e2e-report/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/e2e/.auth/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

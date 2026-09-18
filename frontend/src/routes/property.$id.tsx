@@ -301,31 +301,37 @@ function PropertyDetail() {
 
   if (loading) {
     return (
-      <div className="container-page py-8">
-        <Skeleton className="aspect-[16/9] w-full rounded-2xl md:aspect-[21/9]" />
-        <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
-          <div className="space-y-4">
-            <Skeleton className="h-8 w-2/3" />
-            <Skeleton className="h-5 w-1/3" />
-            <div className="flex gap-4">
-              <Skeleton className="h-5 w-16" />
-              <Skeleton className="h-5 w-16" />
-              <Skeleton className="h-5 w-20" />
+      <div className="min-h-screen bg-background">
+        <TopNav />
+        <div className="container-page py-8">
+          <Skeleton className="aspect-[16/9] w-full rounded-2xl md:aspect-[21/9]" />
+          <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
+            <div className="space-y-4">
+              <Skeleton className="h-8 w-2/3" />
+              <Skeleton className="h-5 w-1/3" />
+              <div className="flex gap-4">
+                <Skeleton className="h-5 w-16" />
+                <Skeleton className="h-5 w-16" />
+                <Skeleton className="h-5 w-20" />
+              </div>
+              <Skeleton className="h-32 w-full rounded-xl" />
             </div>
-            <Skeleton className="h-32 w-full rounded-xl" />
+            <Skeleton className="h-64 w-full rounded-2xl" />
           </div>
-          <Skeleton className="h-64 w-full rounded-2xl" />
         </div>
       </div>
     );
   }
   if (error || !property) {
     return (
-      <div className="container-page py-12">
-        <p className="text-sm text-destructive">{error ?? tProp("notFound")}</p>
-        <Link to="/search" className="mt-4 inline-block text-sm text-primary">
-          {tProp("backToSearch")}
-        </Link>
+      <div className="min-h-screen bg-background">
+        <TopNav />
+        <div className="container-page py-12">
+          <p className="text-sm text-destructive">{error ?? tProp("notFound")}</p>
+          <Link to="/search" className="mt-4 inline-block text-sm text-primary">
+            {tProp("backToSearch")}
+          </Link>
+        </div>
       </div>
     );
   }
@@ -433,7 +439,7 @@ function PropertyDetail() {
           <AreaSummary property={property} />
           <NearbyPlaces areaIntel={areaIntel} district={property.district} />
           <ListingDetailsPanel property={property} />
-          <ComparableListings currentId={property.id} />
+          <ComparableListings currentId={property.id} isSale={isSale} />
           <AiSummary
             property={property}
             areaIntel={areaIntel}
@@ -526,7 +532,8 @@ function PropertyDetail() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-xl lg:hidden">
         <div className="flex items-center gap-2">
           <Button variant="hero" className="flex-1" onClick={() => openContact()}>
-            <Phone className="size-4" /> {tProp("actions.contactLandlord")}
+            <Phone className="size-4" />{" "}
+            {isSale ? tProp("actions.contactAgent") : tProp("actions.contactLandlord")}
           </Button>
           <Button
             variant="outline"
@@ -713,7 +720,7 @@ function Summary({ property }: { property: Property }) {
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {f.icon} {f.label}
             </div>
-            <div className="mt-1 truncate text-sm font-semibold">{f.value}</div>
+            <div dir="auto" className="mt-1 truncate text-sm font-semibold">{f.value}</div>
           </div>
         ))}
       </div>
@@ -907,7 +914,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="truncate text-sm font-semibold">{value}</div>
+      <div dir="auto" className="truncate text-sm font-semibold">{value}</div>
     </div>
   );
 }
@@ -1859,6 +1866,7 @@ function RentalIntelligence({
       bedrooms: property.bedrooms,
       area: property.district,
       city: property.city,
+      locale: lang,
     })
       .then((res) => {
         if (!cancelled) {
@@ -1872,7 +1880,7 @@ function RentalIntelligence({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [property.id]);
+  }, [property.id, lang]);
 
   const overall = aiScore?.score ?? fallbackScore;
 
@@ -2244,7 +2252,13 @@ function NearbyPlaces({
 }
 
 /* -------------------------- Comparable Listings -------------------------- */
-function ComparableListings({ currentId }: { currentId: string }) {
+function ComparableListings({
+  currentId,
+  isSale,
+}: {
+  currentId: string;
+  isSale: boolean;
+}) {
   const tProp = usePropT();
   const [comps, setComps] = useState<Property[]>([]);
 
@@ -2269,7 +2283,9 @@ function ComparableListings({ currentId }: { currentId: string }) {
           <h2 className="font-display text-2xl font-bold tracking-tight">
             {tProp("comparable.title")}
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">{tProp("comparable.subtitle")}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {isSale ? tProp("comparable.subtitleSale") : tProp("comparable.subtitle")}
+          </p>
         </div>
         <Button variant="ghost" size="sm" asChild>
           <Link to="/search">{tProp("comparable.viewAll")}</Link>
@@ -2503,7 +2519,11 @@ function ContactModal({
           <>
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold">{tProp("contactModal.contactLandlord")}</h2>
+                <h2 className="text-lg font-bold">
+                  {property.listingType === "sale"
+                    ? tProp("contactModal.contactAgent")
+                    : tProp("contactModal.contactLandlord")}
+                </h2>
                 <p className="text-xs text-muted-foreground">{property.agent}</p>
               </div>
               <Button variant="ghost" size="icon" onClick={onClose}>
@@ -2696,6 +2716,7 @@ function ScheduleViewingModal({
       <div
         className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        data-testid="viewing-modal"
       >
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
@@ -2708,7 +2729,7 @@ function ScheduleViewingModal({
         </div>
 
         {step === "date" && (
-          <div className="flex justify-center">
+          <div className="flex justify-center" data-testid="viewing-date-calendar">
             <DateRangeCalendar
               mode="single"
               selected={date}
@@ -2729,7 +2750,7 @@ function ScheduleViewingModal({
             {slots.length === 0 ? (
               <p className="text-sm text-muted-foreground">{tProp("viewing.modal.noSlotsToday")}</p>
             ) : (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2" data-testid="viewing-time-slots">
                 {slots.map((slot) => (
                   <button
                     key={slot}
@@ -2767,8 +2788,8 @@ function ScheduleViewingModal({
                 <img src={property.image} alt="" className="size-12 shrink-0 rounded-lg object-cover" />
               )}
               <div className="min-w-0">
-                <div className="truncate font-semibold">{property.title}</div>
-                <div className="truncate text-xs text-muted-foreground">{property.district}, {property.city}</div>
+                <div dir="auto" className="truncate font-semibold">{property.title}</div>
+                <div dir="auto" className="truncate text-xs text-muted-foreground">{property.district}, {property.city}</div>
               </div>
             </div>
             <Row icon={<Building2 className="size-4" />} label={tProp("viewing.modal.reviewMediator")} value={property.agent} />
@@ -2938,6 +2959,7 @@ function MakeOfferModal({
       <div
         className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        data-testid="offer-modal"
       >
         {submitted ? (
           <div className="py-2 text-center space-y-4">
@@ -3008,6 +3030,7 @@ function MakeOfferModal({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder={String(Math.round(listingPrice))}
+                  data-testid="offer-amount-input"
                   className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
                 />
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -3043,8 +3066,8 @@ function MakeOfferModal({
                     <img src={property.image} alt="" className="size-12 shrink-0 rounded-lg object-cover" />
                   )}
                   <div className="min-w-0">
-                    <div className="truncate font-semibold">{property.title}</div>
-                    <div className="truncate text-xs text-muted-foreground">
+                    <div dir="auto" className="truncate font-semibold">{property.title}</div>
+                    <div dir="auto" className="truncate text-xs text-muted-foreground">
                       {property.district}, {property.city}
                     </div>
                   </div>
@@ -4018,7 +4041,8 @@ function ActionsCard({
         </div>
         <div className="mt-5 space-y-2.5">
           <Button variant="hero" size="lg" className="w-full" onClick={() => setShowContact(true)}>
-            <Phone className="size-4" /> {tProp("actions.contactLandlord")}
+            <Phone className="size-4" />{" "}
+            {isSale ? tProp("actions.contactAgent") : tProp("actions.contactLandlord")}
           </Button>
           {onScheduleViewing &&
             (activeViewing ? (
@@ -4208,7 +4232,7 @@ function LandlordCard({
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <div className="truncate font-semibold">{agentName}</div>
+            <div dir="auto" className="truncate font-semibold">{agentName}</div>
             {mediatorRating != null ? (
               <Link
                 to="/agent/$id"

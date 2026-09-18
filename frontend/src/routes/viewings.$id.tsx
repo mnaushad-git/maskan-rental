@@ -39,7 +39,7 @@ const STATUS_TONE: Record<string, "success" | "warning" | "info" | "neutral"> = 
 };
 
 function formatDateTime(iso: string, lang: string): string {
-  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA" : "en-US", {
+  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -149,7 +149,7 @@ function ViewingDetailPage() {
                   <img src={viewing.property_image_url} alt="" className="size-20 shrink-0 rounded-xl object-cover" />
                 )}
                 <div className="min-w-0">
-                  <div className="truncate font-semibold">{viewing.property_title ?? `#${viewing.property_id}`}</div>
+                  <div dir="auto" className="truncate font-semibold">{viewing.property_title ?? `#${viewing.property_id}`}</div>
                   {viewing.property_area && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <MapPin className="size-3.5" /> {viewing.property_area}, {viewing.property_city}

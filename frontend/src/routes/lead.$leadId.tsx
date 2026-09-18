@@ -253,7 +253,7 @@ function CustomerLeadPage() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-medium truncate">{s.property_title ?? t("leadDetail.propertyFallback", { id: s.property_id })}</p>
+                          <p dir="auto" className="font-medium truncate">{s.property_title ?? t("leadDetail.propertyFallback", { id: s.property_id })}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {s.bedrooms ? t("leadDetail.bedroomsPrefix", { count: s.bedrooms }) : ""}
                             {s.monthly_rent ? t("leadDetail.perMonth", { amount: formatSAR(s.monthly_rent) }) : ""}
@@ -301,7 +301,7 @@ function CustomerLeadPage() {
                     )}
                     {msg.content}
                     <div className={`mt-1 text-[10px] ${msg.sender_role === "customer" ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                      {new Date(msg.created_at).toLocaleTimeString(lang === "ar" ? "ar-SA" : "en-SA", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(msg.created_at).toLocaleTimeString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-SA", { hour: "2-digit", minute: "2-digit" })}
                     </div>
                   </div>
                 </div>

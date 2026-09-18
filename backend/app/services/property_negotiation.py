@@ -20,6 +20,7 @@ from app.models.property_negotiation import (
 )
 from app.models.property_viewing import PropertyViewing
 from app.models.user import User
+from app.services import property_transaction as property_transaction_service
 from app.services.property_viewing import _find_linked_lead_id
 
 # Negotiation statuses that mean "this negotiation is over" — a customer may
@@ -255,6 +256,14 @@ def accept_offer(
     latest.status = "accepted"
     negotiation.accepted_at = datetime.now(timezone.utc)
     db.flush()
+
+    # Transaction Workspace (docs/implementation/mymakan-transaction-workspace.md):
+    # auto-create the one PropertyTransaction for this negotiation in the
+    # SAME transaction as the accept, so the two either both land or neither
+    # does — see property_transaction.create_transaction_for_negotiation()'s
+    # docstring for why this is inline rather than an async outbox handler.
+    property_transaction_service.create_transaction_for_negotiation(db, negotiation)
+
     record_event(
         db,
         event_type=EventType.NEGOTIATION_ACCEPTED,

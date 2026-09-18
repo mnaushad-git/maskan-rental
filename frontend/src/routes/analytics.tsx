@@ -5,6 +5,7 @@ import {
   ArrowDownRight,
   ArrowLeft,
   ArrowUpRight,
+  BarChart3,
   Bot,
   Building2,
   Calendar,
@@ -24,7 +25,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { fetchAnalyticsSummary, type AnalyticsSummary } from "@/lib/api/maskan";
+import { fetchAnalyticsSummary, login, type AnalyticsSummary, type AuthUser } from "@/lib/api/maskan";
+import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/analytics")({
@@ -187,9 +189,94 @@ const activity = [
   },
 ];
 
+/* ---------- Small local admin auth guard (mirrors admin_.trust-moderation.tsx / P11-001) ---------- */
+// `/analytics/summary` is admin-only (`mymakan-phase1.md` classifies this
+// page as "Admin analytics") and is only ever linked to from the admin
+// portal's nav — this page had no auth guard of its own before this fix,
+// so it (and its now-admin-gated backend endpoint) was reachable and
+// renderable by anyone with the URL, with zero login required.
+
+function AnalyticsLoginGate({
+  onAuth,
+  nonAdminUser,
+}: {
+  onAuth: (user: AuthUser, token: string) => void;
+  nonAdminUser: boolean;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await login({ email, password });
+      if (!response.user.is_admin) {
+        setError("This account does not have admin access.");
+        return;
+      }
+      onAuth(response.user, response.access_token);
+    } catch {
+      setError("Invalid email or password.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-surface px-6">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex flex-col items-center gap-3">
+          <div className="grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow">
+            <BarChart3 className="size-7" />
+          </div>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold">Analytics dashboard</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {nonAdminUser
+                ? "Your current account does not have admin access. Sign in with an admin account."
+                : "Sign in with an admin account to continue"}
+            </p>
+          </div>
+        </div>
+        <form className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-card" onSubmit={handleSubmit}>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@maskan.sa"
+              className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button type="submit" className="w-full" disabled={loading || !email || !password}>
+            {loading ? "Signing in…" : "Sign in to Admin Console"}
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------- Page --------------------------------- */
 
 function AnalyticsPage() {
+  const { user, authLoading, setAuth } = useAuth();
   const [range, setRange] = useState<Range>("30 days");
   const [data, setData] = useState<DashboardAnalytics>({
     total_properties: 0,
@@ -210,6 +297,16 @@ function AnalyticsPage() {
   });
 
   useEffect(() => {
+    // Gated on `user` (P11-002): this endpoint is admin-only (see P11-001),
+    // so firing the fetch before the in-page login gate has authenticated
+    // (i.e. while `user` is still null) always 401s and is silently
+    // swallowed below — leaving the fabricated fallback sample data
+    // (`kpis`/`searchDemand`/... declared above) on screen *permanently*,
+    // since this effect never re-ran once `user` became available (the old
+    // dependency array was just `[range]`). Confirmed live: after signing in
+    // through the gate, the dashboard kept showing the fake "12,486" total
+    // properties instead of the real DB count until a full page reload.
+    if (!user) return;
     let cancelled = false;
 
     async function loadAnalytics() {
@@ -230,7 +327,18 @@ function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, [range]);
+  }, [range, user]);
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
+  if (!user || !user.is_admin) {
+    return <AnalyticsLoginGate nonAdminUser={!!user && !user.is_admin} onAuth={(u, token) => setAuth(u, token)} />;
+  }
 
   return (
     <div className="min-h-screen bg-surface/40">
@@ -243,7 +351,7 @@ function AnalyticsPage() {
               <Badge variant="secondary" className="bg-ai/10 text-ai">
                 <Sparkles className="mr-1 size-3" /> Executive view
               </Badge>
-              <span className="text-xs text-muted-foreground">Updated 6 min ago</span>
+              <span className="text-xs text-muted-foreground">Live data</span>
             </div>
             <h1 className="mt-2 text-3xl font-bold tracking-tight">Analytics dashboard</h1>
             <p className="text-sm text-muted-foreground">

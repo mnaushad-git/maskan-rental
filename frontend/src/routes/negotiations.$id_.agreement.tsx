@@ -25,7 +25,7 @@ export const Route = createFileRoute("/negotiations/$id_/agreement")({
 });
 
 function formatDate(iso: string, lang: string): string {
-  return new Date(iso).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", {
+  return new Date(iso).toLocaleDateString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
     weekday: "long",
     year: "numeric",
     month: "long",

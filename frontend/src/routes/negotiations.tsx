@@ -44,7 +44,7 @@ const STATUS_TONE: Record<string, "success" | "warning" | "info" | "neutral" | "
 };
 
 function formatDateTime(iso: string, lang: string): string {
-  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA" : "en-US", {
+  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -199,7 +199,7 @@ function NegotiationCard({
         )}
         <div className="flex flex-1 flex-col gap-2 p-5">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="truncate text-sm font-semibold">{n.property_title ?? `#${n.property_id}`}</h3>
+            <h3 dir="auto" className="truncate text-sm font-semibold">{n.property_title ?? `#${n.property_id}`}</h3>
             <Badge tone={tone}>{t(`negotiationDetail.status.${n.status}`)}</Badge>
           </div>
           {n.property_district && (

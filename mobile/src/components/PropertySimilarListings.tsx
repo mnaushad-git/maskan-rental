@@ -8,7 +8,7 @@ import { toCardProperty, type Property } from "@/lib/maskan-data";
 /** Horizontal rail of other listings near this one — backed by the
  * server-side /properties/{id}/similar endpoint (same district first, then
  * closest price), mirroring the web app's "Comparable Listings" section. */
-export function PropertySimilarListings({ excludeId }: { excludeId: string }) {
+export function PropertySimilarListings({ excludeId, isSale }: { excludeId: string; isSale?: boolean }) {
   const { t } = useLanguage();
   const [items, setItems] = useState<Property[] | null>(null);
 
@@ -31,7 +31,9 @@ export function PropertySimilarListings({ excludeId }: { excludeId: string }) {
     <View className="gap-3">
       <View>
         <Text className="text-sm font-bold text-foreground">{t("property.comparable.title")}</Text>
-        <Text className="text-xs text-muted-foreground">{t("property.comparable.subtitle")}</Text>
+        <Text className="text-xs text-muted-foreground">
+          {t(isSale ? "property.comparable.subtitleSale" : "property.comparable.subtitle")}
+        </Text>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-3 pe-1">
         {items.map((p) => (

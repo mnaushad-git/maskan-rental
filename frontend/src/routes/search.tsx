@@ -1211,7 +1211,7 @@ function ResultCard({
         <div className="flex min-w-0 flex-col gap-3 p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="truncate font-display text-base font-bold tracking-tight">
+              <h3 dir="auto" className="truncate font-display text-base font-bold tracking-tight">
                 {p.title}
               </h3>
               <p className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">

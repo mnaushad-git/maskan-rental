@@ -44,6 +44,9 @@ Desktop.ini
 # Docker volumes (not committed)
 pgdata/
 
+# Locally uploaded transaction documents (private, never committed)
+backend/uploads/
+
 # IDE
 .vscode/
 .idea/

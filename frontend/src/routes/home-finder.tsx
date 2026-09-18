@@ -515,10 +515,10 @@ function UnderstoodStep({
             onChange={(e) => update({ city: e.target.value || null })}
             className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
           >
-            <option value="">{t("homeFinder.understood.anyProperty")}</option>
+            <option value="">{t("homeFinder.understood.anyCity")}</option>
             {CITY_LIST.map((c) => (
               <option key={c.name} value={c.name}>
-                {c.name}
+                {t(`cities.${c.name}`)}
               </option>
             ))}
           </select>
@@ -794,7 +794,7 @@ function ResultsStep({
       {view === "map" ? (
         <PropertyMapView properties={mapProperties} showMatchInfo />
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3" data-testid="home-finder-results">
           {results.map((r) => (
             <div key={r.property.id} id={`hf-${r.property.id}`}>
               <MatchCard
@@ -985,9 +985,10 @@ function WhyThisPropertyModal({
   const priceInsight = (() => {
     if (criteria.max_price == null) return null;
     const within = uiProperty.price <= criteria.max_price;
+    const vars = { price: formatSAR(uiProperty.price), max: formatSAR(criteria.max_price) };
     return within
-      ? `Within your budget (SAR ${formatSAR(uiProperty.price)} vs your SAR ${formatSAR(criteria.max_price)} max).`
-      : `Above your budget (SAR ${formatSAR(uiProperty.price)} vs your SAR ${formatSAR(criteria.max_price)} max).`;
+      ? t("homeFinder.whyModal.withinBudget", vars)
+      : t("homeFinder.whyModal.aboveBudget", vars);
   })();
 
   function askAiQuestion(): string {

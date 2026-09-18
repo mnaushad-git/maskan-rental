@@ -234,6 +234,20 @@ function AdminPage() {
     // Dashboard also triggers mediators/leads/users so its stat tiles have
     // real counts — same reasoning as Prompt 6's partner Dashboard reusing
     // the listings-fetch trigger instead of adding new API calls.
+    //
+    // Guard added (P11-003): this effect used to have no `authLoading`/
+    // `user` guard at all (unlike the sibling `loadAll` effect above it),
+    // so on first mount — before the in-page `AdminLoginGate` had
+    // authenticated, or before AuthProvider's own localStorage-read effect
+    // had resolved — it fired `fetchAdminMediators`/`fetchAdminLeads`/
+    // `loadUsers` with no token, all three 401'd, and because this effect's
+    // dependency array was just `[view]` (not `authLoading`/`user`), staying
+    // on the Dashboard afterward never retried: the Mediators/Leads/Users
+    // stat tiles were stuck showing "0" permanently post-login, and the
+    // Users tab greeted the admin with "Failed to load users: Not
+    // authenticated" until a manual Retry click. Confirmed live via network
+    // trace: all three requests 401'd in the same tick as the login POST.
+    if (authLoading || !user || !user.is_admin) return;
     if ((view === "mediators" || view === "dashboard") && mediators.length === 0 && !loadingMediators) {
       setLoadingMediators(true);
       fetchAdminMediators()
@@ -269,7 +283,7 @@ function AdminPage() {
       loadUsers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
+  }, [view, user, authLoading]);
 
   function loadUsers() {
     setLoadingUsers(true);

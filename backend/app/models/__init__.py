@@ -38,6 +38,7 @@ from app.models.home_finder_search import HomeFinderSearch
 from app.models.property_report import PropertyReport
 from app.models.property_viewing import PropertyViewing
 from app.models.property_negotiation import PropertyNegotiation, NegotiationOffer
+from app.models.property_transaction import PropertyTransaction, TransactionDocument
 
 __all__ = [
     "User",
@@ -74,4 +75,6 @@ __all__ = [
     "PropertyViewing",
     "PropertyNegotiation",
     "NegotiationOffer",
+    "PropertyTransaction",
+    "TransactionDocument",
 ]

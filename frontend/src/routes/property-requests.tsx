@@ -48,7 +48,7 @@ const TABS: TabKey[] = ["active", "drafts", "paused", "fulfilled", "closed"];
 
 function relativeDate(iso: string | null, lang: string): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", {
+  return new Date(iso).toLocaleDateString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -288,7 +288,7 @@ function PropertyRequestsPage() {
       return;
     }
     setLoading(true);
-    fetchPropertyRequests({ limit: 200 })
+    fetchPropertyRequests({ limit: 100 })
       .then((res) => setItems(res.data))
       .catch((err) => {
         if (err instanceof UnauthorizedError) clearAuth();

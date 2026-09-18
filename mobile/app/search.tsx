@@ -201,9 +201,16 @@ export default function SearchScreen() {
           <Text className="text-sm text-muted-foreground">
             {isLoading
               ? t("common.loading")
-              : t(resultCount === 1 ? "search.resultsHeadingSingular" : "search.resultsHeadingPlural", {
-                  count: resultCount,
-                })}
+              : t(
+                  filters?.listingType === "sale"
+                    ? resultCount === 1
+                      ? "search.resultsHeadingSaleSingular"
+                      : "search.resultsHeadingSalePlural"
+                    : resultCount === 1
+                      ? "search.resultsHeadingSingular"
+                      : "search.resultsHeadingPlural",
+                  { count: resultCount },
+                )}
           </Text>
           <View className="flex-row items-center gap-1">
             <Pressable

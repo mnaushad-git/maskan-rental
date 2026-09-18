@@ -1807,7 +1807,7 @@ def seed():
         if not admin_exists:
             db.add(User(
                 email=admin_email,
-                full_name="Maskan Admin",
+                full_name="myMakan Admin",
                 hashed_password=pwd_context.hash("Admin@1234"),
             ))
             print(f"  Admin user created: {admin_email} / Admin@1234")

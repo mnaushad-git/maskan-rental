@@ -211,7 +211,8 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
   if (property.mediator_is_verified) badges.push("Verified");
   if (matchScore >= 90) badges.push("Best Match");
   const createdAtMs = Date.parse(property.created_at);
-  const isRecent = !Number.isNaN(createdAtMs) && Date.now() - createdAtMs < 14 * 24 * 60 * 60 * 1000;
+  const isRecent =
+    !Number.isNaN(createdAtMs) && Date.now() - createdAtMs < 14 * 24 * 60 * 60 * 1000;
   if (isRecent && !badges.includes("Best Match")) badges.push("New");
 
   return {
@@ -229,12 +230,15 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     images: imageUrls.length > 0 ? imageUrls : [primaryImage],
     matchScore,
     badges,
-    status:
-      property.status === "Published"
-        ? "Available"
-        : property.status === "Suspended"
-          ? "Reserved"
-          : "Available",
+    // P15: any non-Published status (e.g. "Hidden" — admin moderation,
+    // "Pending Approval") must NOT fall through to "Available" — this is
+    // reachable whenever a customer's own previously-saved property gets
+    // hidden/unpublished after the fact (the Saved Properties list embeds
+    // the property's live status regardless of Discovery's Published-only
+    // filter). "Reserved" is the closest existing UiProperty status that
+    // renders a non-success (warning) tone rather than falsely claiming
+    // the listing is still available.
+    status: property.status === "Published" ? "Available" : "Reserved",
     pricePerSqm: estimatedArea > 0 ? Math.round(displayPrice / estimatedArea) : 0,
     agent: property.mediator_agent_name ?? property.owner_name ?? "myMakan Agent",
     agentPhone: property.call_phone ?? property.mediator_phone ?? null,
@@ -291,8 +295,15 @@ export function mapApiSearchProperty(property: ApiProperty): UiSearchProperty {
       gym: (property.bedrooms ?? 0) >= 3,
       pool: (property.bedrooms ?? 0) >= 3,
     },
+    // "Verified listing" is only included when the mediator is actually
+    // verified (real `mediator_is_verified` flag — same signal `mapApiProperty`'s
+    // "Verified" badge above uses). Previously this was hardcoded into every
+    // card's reasons regardless of the listing's real verification status —
+    // a false trust claim shown on 100% of search/home-page results. Found
+    // during Prompt 5's compare-view spot-check; fixed here since it's the
+    // same root cause (P5 ledger).
     reasons: [
-      "Verified listing",
+      ...(property.mediator_is_verified ? ["Verified listing"] : []),
       `${property.area} location`,
       property.description ? "Detailed description available" : "Fresh inventory",
       "Good rental value",
@@ -381,7 +392,10 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export function fetchProperties() {
-  return requestJson<ApiProperty[]>("/properties/?limit=500");
+  // Excludes short-stay "bookable" listings — see fetchPropertiesPaged's
+  // is_bookable note (P3-001): they only carry nightly_rate, not
+  // monthly_rent/sale_price, and render as a fabricated "SAR 0" price card.
+  return requestJson<ApiProperty[]>("/properties/?limit=500&is_bookable=false");
 }
 
 export type PropertySearchFilters = {
@@ -423,6 +437,11 @@ export async function fetchPropertiesPaged(
     params.set("max_monthly_rent", String(filters.maxMonthlyRent));
   if (filters.minSalePrice != null) params.set("min_sale_price", String(filters.minSalePrice));
   if (filters.maxSalePrice != null) params.set("max_sale_price", String(filters.maxSalePrice));
+  // Short-stay "bookable" listings (mobile-only Bookings tab feature) only
+  // carry a nightly_rate, not monthly_rent/sale_price — surfacing them here
+  // made cards render a fabricated "SAR 0/yr" (see P3-001). Long-term
+  // Discovery/AI Home Finder should never include them.
+  params.set("is_bookable", "false");
 
   const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
   const response = await fetch(`${API_BASE_URL}/properties/?${params.toString()}`, {
@@ -1043,7 +1062,11 @@ export type ApiComparableSummary = {
   items: ApiComparablePropertySummary[];
 };
 
-export type ApiPersonalizedFitRow = { label: string; status: "match" | "moderate" | "miss"; detail: string };
+export type ApiPersonalizedFitRow = {
+  label: string;
+  status: "match" | "moderate" | "miss";
+  detail: string;
+};
 
 export type ApiPersonalizedFit = {
   rows: ApiPersonalizedFitRow[];
@@ -1091,7 +1114,10 @@ export type PropertyIntelligenceCriteria = {
   requiredAmenities?: string[];
 };
 
-export function fetchPropertyIntelligence(propertyId: number, criteria?: PropertyIntelligenceCriteria) {
+export function fetchPropertyIntelligence(
+  propertyId: number,
+  criteria?: PropertyIntelligenceCriteria,
+) {
   const params = new URLSearchParams();
   if (criteria?.maxPrice != null) params.set("max_price", String(criteria.maxPrice));
   if (criteria?.minPrice != null) params.set("min_price", String(criteria.minPrice));
@@ -1099,7 +1125,9 @@ export function fetchPropertyIntelligence(propertyId: number, criteria?: Propert
   for (const d of criteria?.districts ?? []) params.append("districts", d);
   for (const a of criteria?.requiredAmenities ?? []) params.append("required_amenities", a);
   const qs = params.toString();
-  return requestJson<ApiPropertyIntelligence>(`/properties/${propertyId}/intelligence${qs ? `?${qs}` : ""}`);
+  return requestJson<ApiPropertyIntelligence>(
+    `/properties/${propertyId}/intelligence${qs ? `?${qs}` : ""}`,
+  );
 }
 
 export function fetchPropertyAiSummary(
@@ -1119,7 +1147,11 @@ export function fetchPropertyAiSummary(
     `/properties/${propertyId}/ai-summary`,
     {
       method: "POST",
-      body: JSON.stringify({ language, variant, ...(negotiationId != null ? { negotiation_id: negotiationId } : {}) }),
+      body: JSON.stringify({
+        language,
+        variant,
+        ...(negotiationId != null ? { negotiation_id: negotiationId } : {}),
+      }),
     },
   );
 }
@@ -1160,7 +1192,11 @@ export type ApiTrustMediatorTrust = {
 
 export type ApiTrustFreshness = {
   score: number;
-  category: "Recently Confirmed" | "Recently Updated" | "Needs Reconfirmation" | "Potentially Stale";
+  category:
+    | "Recently Confirmed"
+    | "Recently Updated"
+    | "Needs Reconfirmation"
+    | "Potentially Stale";
   days_since_reference: number;
   reason: string;
 };
@@ -1206,7 +1242,9 @@ export type ApiTrustSummary = {
 // separately, after, so it never blocks the trust badge (mirrors the
 // existing fetchPropertyIntelligence / fetchPropertyAiSummary split above).
 export function fetchPropertyTrustSummary(propertyId: number, language: "en" | "ar" = "en") {
-  return requestJson<ApiTrustSummary>(`/properties/${propertyId}/trust-summary?language=${language}`);
+  return requestJson<ApiTrustSummary>(
+    `/properties/${propertyId}/trust-summary?language=${language}`,
+  );
 }
 
 export type ApiDuplicateMatch = {
@@ -1254,7 +1292,10 @@ export type ApiPropertyReport = {
 // Not called yet in Prompt 7's UI (the "Report a Concern" trigger is a stub
 // until Prompt 9 builds the actual report modal) — exported now so that
 // modal can wire straight into this without touching maskan.ts again.
-export function submitPropertyReport(propertyId: number, body: { reason: PropertyReportReason; comment?: string }) {
+export function submitPropertyReport(
+  propertyId: number,
+  body: { reason: PropertyReportReason; comment?: string },
+) {
   return requestJson<ApiPropertyReport>(`/properties/${propertyId}/reports`, {
     method: "POST",
     body: JSON.stringify(body),
@@ -1442,6 +1483,19 @@ export function subscribePartnerMock() {
   );
 }
 
+// Distinct from subscribePartnerMock() above — the backend's own
+// `POST /mediators/me/subscribe` rejects with 400 "Subscription is already
+// active." whenever the mediator already has an active subscription (see
+// P10-003), so a mediator whose subscription IS active (the exact case the
+// "Renew subscription" button targets) must call this endpoint instead to
+// actually extend `subscription_expires_at` by another 30 days.
+export function renewPartnerSubscription() {
+  return requestJson<{ status: string; subscription_expires_at: string }>(
+    "/mediators/me/renew",
+    { method: "POST" },
+  );
+}
+
 export function addPartnerArea(area_name: string, city: string) {
   return requestJson<ApiPartnerArea>("/mediators/me/areas", {
     method: "POST",
@@ -1523,19 +1577,33 @@ export type ApiLeadMessage = {
   created_at: string;
 };
 
-export function createLead(payload: {
-  area_name: string;
-  city: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_email: string;
-  min_budget?: number;
-  max_budget?: number;
-  bedrooms_needed?: number;
-  move_in_date?: string;
-  requirements_note?: string;
-}) {
-  return requestJson<ApiLeadDetail>("/leads/", { method: "POST", body: JSON.stringify(payload) });
+export function createLead(
+  payload: {
+    area_name: string;
+    city: string;
+    customer_name: string;
+    customer_phone: string;
+    customer_email: string;
+    min_budget?: number;
+    max_budget?: number;
+    bedrooms_needed?: number;
+    move_in_date?: string;
+    requirements_note?: string;
+  },
+  idempotencyKey?: string,
+) {
+  // `Idempotency-Key` lets a client retry (double-click, timeout-then-retry)
+  // without creating a second lead — the backend (`leads.py::create_lead`)
+  // already supports this, it just wasn't wired up from the frontend. Found
+  // live in Prompt 5: submitting the same lead twice with no key created two
+  // separate Lead rows. Callers should generate one key per form session
+  // (e.g. `crypto.randomUUID()` on mount) and reuse it across retries of the
+  // same submission.
+  return requestJson<ApiLeadDetail>("/leads/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
+  });
 }
 
 export function fetchMyLeads() {
@@ -1694,7 +1762,10 @@ export function createViewing(payload: {
   timezone?: string;
   customer_note?: string;
 }) {
-  return requestJson<ApiPropertyViewing>("/viewings", { method: "POST", body: JSON.stringify(payload) });
+  return requestJson<ApiPropertyViewing>("/viewings", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function fetchMyViewings(status?: string) {
@@ -1713,7 +1784,10 @@ export function cancelViewing(id: number, reason: string, note?: string) {
   });
 }
 
-export function proposeViewingTime(id: number, payload: { start_at: string; end_at: string; note?: string }) {
+export function proposeViewingTime(
+  id: number,
+  payload: { start_at: string; end_at: string; note?: string },
+) {
   return requestJson<ApiPropertyViewing>(`/viewings/${id}/propose-time`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -1737,7 +1811,10 @@ export const VIEWING_CUSTOMER_CANCEL_REASONS = [
 // (PropertyViewingDetailOut), so `fetchViewing` above already returns it;
 // nothing extra to fetch here beyond that.
 
-export function updateViewingChecklist(id: number, patch: { checked?: Record<string, boolean>; note?: string }) {
+export function updateViewingChecklist(
+  id: number,
+  patch: { checked?: Record<string, boolean>; note?: string },
+) {
   return requestJson<ApiPropertyViewing>(`/viewings/${id}/checklist`, {
     method: "PATCH",
     body: JSON.stringify(patch),
@@ -1745,9 +1822,19 @@ export function updateViewingChecklist(id: number, patch: { checked?: Record<str
 }
 
 export const VIEWING_INTEREST_LEVELS = ["Very Interested", "Maybe", "Not Interested"] as const;
-export const VIEWING_FEEDBACK_REASONS = ["Price", "Location", "Size", "Condition", "Amenities", "Other"] as const;
+export const VIEWING_FEEDBACK_REASONS = [
+  "Price",
+  "Location",
+  "Size",
+  "Condition",
+  "Amenities",
+  "Other",
+] as const;
 
-export function submitViewingFeedback(id: number, payload: { interest_level: string; note?: string; reason?: string }) {
+export function submitViewingFeedback(
+  id: number,
+  payload: { interest_level: string; note?: string; reason?: string },
+) {
   return requestJson<ApiPropertyViewing>(`/viewings/${id}/feedback`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -1755,10 +1842,11 @@ export function submitViewingFeedback(id: number, payload: { interest_level: str
 }
 
 export function fetchViewingNextSteps(id: number) {
-  return requestJson<{ visit_summary: string; next_steps: string[]; generated_by: "ai" | "fallback" }>(
-    `/viewings/${id}/ai-next-steps`,
-    { method: "POST" },
-  );
+  return requestJson<{
+    visit_summary: string;
+    next_steps: string[];
+    generated_by: "ai" | "fallback";
+  }>(`/viewings/${id}/ai-next-steps`, { method: "POST" });
 }
 
 // ── Partner portal viewing requests (Prompt 10) ─────────────────────────────
@@ -1794,7 +1882,10 @@ export function confirmViewing(id: number, mediatorNote?: string) {
   });
 }
 
-export function proposeViewingTimeAsPartner(id: number, payload: { start_at: string; end_at: string; note?: string }) {
+export function proposeViewingTimeAsPartner(
+  id: number,
+  payload: { start_at: string; end_at: string; note?: string },
+) {
   return requestJson<ApiPartnerPropertyViewing>(`/partner/viewings/${id}/propose-time`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -1809,7 +1900,9 @@ export function cancelViewingAsPartner(id: number, reason: string, note?: string
 }
 
 export function completeViewing(id: number) {
-  return requestJson<ApiPartnerPropertyViewing>(`/partner/viewings/${id}/complete`, { method: "POST" });
+  return requestJson<ApiPartnerPropertyViewing>(`/partner/viewings/${id}/complete`, {
+    method: "POST",
+  });
 }
 
 export function markViewingNoShow(id: number, who: "customer" | "mediator") {
@@ -2001,11 +2094,239 @@ export function withdrawNegotiation(id: number, reason: string) {
 // `generated_by` is "ai" | "fallback" — never throws on an AI failure, the
 // backend degrades to a deterministic reply instead (see negotiation_ai.
 // generate_guidance's docstring).
-export function fetchNegotiationGuidance(id: number, question: string | undefined, language: "en" | "ar") {
-  return requestJson<{ guidance: string; generated_by: "ai" | "fallback" }>(`/negotiations/${id}/ai-guidance`, {
-    method: "POST",
-    body: JSON.stringify({ question: question || undefined, language }),
+export function fetchNegotiationGuidance(
+  id: number,
+  question: string | undefined,
+  language: "en" | "ar",
+) {
+  return requestJson<{ guidance: string; generated_by: "ai" | "fallback" }>(
+    `/negotiations/${id}/ai-guidance`,
+    {
+      method: "POST",
+      body: JSON.stringify({ question: question || undefined, language }),
+    },
+  );
+}
+
+// ── Transaction Workspace — customer (Prompt 8) ─────────────────────────────
+// Mirrors backend/app/api/routes/transactions.py (Prompt 4) exactly — see
+// docs/implementation/mymakan-transaction-workspace.md "APIs". A
+// `PropertyTransaction` is auto-created the instant a negotiation is
+// accepted (never via a dedicated "create" call from this client), so
+// there's no createTransaction() here — see negotiations.$id.tsx's
+// "Continue Transaction" handler, which locates the already-existing row via
+// fetchMyTransactions() rather than creating anything.
+
+export type ApiChecklistStep = {
+  key: string;
+  label: string;
+  status: "done" | "in_progress" | "pending" | string;
+  detail: string | null;
+};
+
+export type ApiNextBestAction = {
+  key: string;
+  message: string;
+};
+
+export type ApiTransactionDocument = {
+  id: number;
+  transaction_id: number;
+  document_type: string;
+  label: string;
+  required: boolean;
+  status: "not_uploaded" | "uploaded" | "accepted" | "needs_update" | string;
+  file_reference: string | null;
+  uploaded_at: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ApiCustomerInfo = {
+  email: string;
+  full_name: string | null;
+  phone: string | null;
+};
+
+export type ApiTermsSnapshot = {
+  property_id: number;
+  property_title: string | null;
+  customer_name: string | null;
+  mediator_agent_name: string | null;
+  transaction_type: string;
+  // Decimal fields serialize as JSON strings (pydantic v2 default, no custom
+  // encoder configured — matches ApiPropertyNegotiation's own
+  // current_offer_amount/original_listing_amount convention above). Callers
+  // always wrap with Number(...) before arithmetic/formatting.
+  original_listing_amount: string | null;
+  final_agreed_amount: string;
+  agreed_at: string | null;
+  negotiation_reference: string;
+};
+
+export type ApiPropertyTransaction = {
+  id: number;
+  reference: string;
+  property_id: number;
+  transaction_type: "rent" | "sale";
+  customer_user_id: number;
+  mediator_id: number | null;
+  lead_id: number | null;
+  negotiation_id: number;
+  viewing_id: number | null;
+  agreed_amount: string;
+  currency: string;
+  status: string;
+  progress_percentage: number;
+  customer_info_confirmed_at: string | null;
+  mediator_info_confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  ready_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
+  cancelled_by: string | null;
+  property_title: string | null;
+  property_image_url: string | null;
+  property_area: string | null;
+  mediator_agent_name: string | null;
+  next_best_action: ApiNextBestAction;
+  readiness_label: string;
+};
+
+export type ApiPropertyTransactionDetail = ApiPropertyTransaction & {
+  checklist: ApiChecklistStep[];
+  documents: ApiTransactionDocument[];
+  customer_info: ApiCustomerInfo;
+  terms_snapshot: ApiTermsSnapshot | null;
+};
+
+// GET /transactions — `status` accepts "active" (everything not
+// completed/cancelled), "completed", or "cancelled"; omitted returns
+// everything (used by my-transactions.tsx, which buckets client-side the
+// same way myNegotiations.tsx already does).
+export function fetchMyTransactions(status?: "active" | "completed" | "cancelled") {
+  const q = status ? `?status=${status}` : "";
+  return requestJson<ApiPropertyTransaction[]>(`/transactions${q}`);
+}
+
+export function fetchTransaction(id: number) {
+  return requestJson<ApiPropertyTransactionDetail>(`/transactions/${id}`);
+}
+
+// PATCH /transactions/{id}/customer-information — `undefined` fields are
+// left unchanged (never cleared) — see CustomerInformationUpdate's docstring.
+export function updateTransactionCustomerInformation(
+  id: number,
+  payload: { full_name?: string; phone?: string },
+) {
+  return requestJson<ApiPropertyTransactionDetail>(`/transactions/${id}/customer-information`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
   });
+}
+
+// POST /transactions/{id}/documents — multipart (document_id + file), so
+// this bypasses requestJson()'s JSON-only body/Content-Type default.
+export async function uploadTransactionDocument(id: number, documentId: number, file: File) {
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
+  const form = new FormData();
+  form.append("document_id", String(documentId));
+  form.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/transactions/${id}/documents`, {
+    method: "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: form,
+  });
+  if (!response.ok) {
+    let detail = `Request failed (${response.status})`;
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (typeof body.detail === "string") detail = body.detail;
+    } catch {
+      /* ignore parse errors */
+    }
+    throw new Error(detail);
+  }
+  return response.json() as Promise<ApiPropertyTransactionDetail>;
+}
+
+export function deleteTransactionDocument(id: number, documentId: number) {
+  return requestJson<ApiPropertyTransactionDetail>(`/transactions/${id}/documents/${documentId}`, {
+    method: "DELETE",
+  });
+}
+
+// GET .../download streams the file — the only authenticated read path (no
+// public/static URL exists — see tracking doc "Document storage"). Returns a
+// Blob the caller turns into a temporary object URL to trigger a save.
+export async function downloadTransactionDocument(id: number, documentId: number): Promise<Blob> {
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
+  const response = await fetch(
+    `${API_BASE_URL}/transactions/${id}/documents/${documentId}/download`,
+    {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    },
+  );
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.blob();
+}
+
+// POST /transactions/{id}/confirm-information — sets the customer
+// confirmation timestamp. NOT a signature (wording rule: labeled
+// "Information Confirmation", never "Sign Contract").
+export function confirmTransactionInformation(id: number) {
+  return requestJson<ApiPropertyTransactionDetail>(`/transactions/${id}/confirm-information`, {
+    method: "POST",
+  });
+}
+
+export function cancelTransaction(id: number, reason: string) {
+  return requestJson<ApiPropertyTransactionDetail>(`/transactions/${id}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+// Closed reason list (Prompt 9) — mirrors NEGOTIATION_CUSTOMER_WITHDRAW_REASONS'
+// convention; the backend accepts any free-text string
+// (TransactionCancelRequest.reason has no enum validation).
+export const TRANSACTION_CUSTOMER_CANCEL_REASONS = [
+  "Changed mind",
+  "Found another property",
+  "Financing fell through",
+  "Issue with documents",
+  "Other",
+] as const;
+
+// Customer quick-action vocabulary — mirrors
+// app/services/transaction_ai.py::CUSTOMER_QUICK_ACTIONS exactly (validated
+// server-side; sending anything else 422s via InvalidQuickAction).
+export const TRANSACTION_CUSTOMER_QUICK_ACTIONS = [
+  "whats_next",
+  "whats_missing",
+  "explain_step",
+  "what_to_prepare",
+  "summarize",
+  "what_to_ask_mediator",
+] as const;
+
+// POST /transactions/{id}/ai-assistant — "Ask myMakan" quick actions
+// (customer vocabulary: whats_next / whats_missing / explain_step /
+// what_to_prepare / summarize / what_to_ask_mediator). Rate-limited on the
+// backend same as every other on-request AI endpoint; `generated_by` is
+// "ai" | "fallback" — never throws on an AI failure.
+export function fetchTransactionAssistant(id: number, quickAction: string, language: "en" | "ar") {
+  return requestJson<{ quick_action: string; reply: string; generated_by: "ai" | "fallback" }>(
+    `/transactions/${id}/ai-assistant`,
+    {
+      method: "POST",
+      body: JSON.stringify({ quick_action: quickAction, language }),
+    },
+  );
 }
 
 // ── Partner portal negotiations (Prompt 10) ─────────────────────────────────
@@ -2045,7 +2366,10 @@ export function fetchPartnerNegotiation(id: number) {
 // POST /partner/negotiations/{id}/counter — mediator's "Counter Offer"
 // action. 409 if the negotiation isn't currently submitted/countered, 422
 // for a non-positive amount (same rules as the customer's submitCounterOffer).
-export function counterNegotiationAsPartner(id: number, payload: { amount: number; message?: string }) {
+export function counterNegotiationAsPartner(
+  id: number,
+  payload: { amount: number; message?: string },
+) {
   return requestJson<ApiPartnerNegotiation>(`/partner/negotiations/${id}/counter`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -2057,7 +2381,9 @@ export function counterNegotiationAsPartner(id: number, payload: { amount: numbe
 // latest pending offer was placed by this same mediator's own user account
 // (self-accept blocked — see tracking doc "Status flow").
 export function acceptNegotiationAsPartner(id: number) {
-  return requestJson<ApiPartnerNegotiation>(`/partner/negotiations/${id}/accept`, { method: "POST" });
+  return requestJson<ApiPartnerNegotiation>(`/partner/negotiations/${id}/accept`, {
+    method: "POST",
+  });
 }
 
 // Closed reason list from brief §11 (mediator rejection) — mirrors
@@ -2077,6 +2403,119 @@ export function rejectNegotiationAsPartner(id: number, reason: string) {
     method: "POST",
     body: JSON.stringify({ reason }),
   });
+}
+
+// ── Partner portal transactions (Prompt 10) ─────────────────────────────────
+// Mirrors backend/app/api/routes/partner_transactions.py (Prompt 5) exactly —
+// see docs/implementation/mymakan-transaction-workspace.md "APIs" →
+// "Partner-facing (Prompt 5)". Follows the same extend-the-customer-type
+// convention ApiPartnerNegotiation already established above:
+// PartnerPropertyTransactionOut/PartnerPropertyTransactionDetailOut restrict
+// the customer view to name-only (no phone/email) — deliberately narrower
+// than ApiCustomerInfo — so `customer` (not `customer_info`) is a distinct,
+// smaller type here.
+
+export type ApiPartnerPropertyTransaction = ApiPropertyTransaction & {
+  customer_name: string | null;
+};
+
+export type ApiPartnerTransactionCustomer = {
+  full_name: string | null;
+};
+
+export type ApiPartnerPropertyTransactionDetail = ApiPartnerPropertyTransaction & {
+  checklist: ApiChecklistStep[];
+  documents: ApiTransactionDocument[];
+  customer: ApiPartnerTransactionCustomer;
+  terms_snapshot: ApiTermsSnapshot | null;
+};
+
+// GET /partner/transactions — `status_filter` accepts "action_required" /
+// "active" / "ready" / "completed" / "cancelled" (the 5 dashboard tabs from
+// brief §11); omitted returns everything.
+export function fetchPartnerTransactions(statusFilter?: string) {
+  const q = statusFilter ? `?status_filter=${encodeURIComponent(statusFilter)}` : "";
+  return requestJson<ApiPartnerPropertyTransaction[]>(`/partner/transactions${q}`);
+}
+
+export function fetchPartnerTransaction(id: number) {
+  return requestJson<ApiPartnerPropertyTransactionDetail>(`/partner/transactions/${id}`);
+}
+
+// GET /partner/transactions/{id}/documents/{document_id}/download — mirrors
+// downloadTransactionDocument() above; added alongside the backend's own
+// Prompt 10 addition of this route (Prompt 5's router never had it, but a
+// mediator can't meaningfully review a document without reading its bytes).
+export async function downloadTransactionDocumentAsPartner(
+  id: number,
+  documentId: number,
+): Promise<Blob> {
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
+  const response = await fetch(
+    `${API_BASE_URL}/partner/transactions/${id}/documents/${documentId}/download`,
+    { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } },
+  );
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.blob();
+}
+
+// POST /partner/transactions/{id}/documents/{document_id}/accept — only
+// valid while the document is `uploaded` (409 otherwise). Never touches the
+// uploaded file itself.
+export function acceptTransactionDocumentAsPartner(id: number, documentId: number) {
+  return requestJson<ApiPartnerPropertyTransactionDetail>(
+    `/partner/transactions/${id}/documents/${documentId}/accept`,
+    { method: "POST" },
+  );
+}
+
+// POST /partner/transactions/{id}/documents/{document_id}/request-update —
+// `reason` is required (422 on empty/whitespace, unlike the negotiation
+// reject/cancel reason fields elsewhere in this file).
+export function requestTransactionDocumentUpdateAsPartner(
+  id: number,
+  documentId: number,
+  reason: string,
+) {
+  return requestJson<ApiPartnerPropertyTransactionDetail>(
+    `/partner/transactions/${id}/documents/${documentId}/request-update`,
+    { method: "POST", body: JSON.stringify({ reason }) },
+  );
+}
+
+// POST /partner/transactions/{id}/confirm-information — mediator-side
+// "property and commercial information confirmed" timestamp, independent of
+// the customer's own confirm-information action (see
+// PropertyTransaction.mediator_info_confirmed_at's docstring — storage-only,
+// not yet wired into the checklist/progress engine).
+export function confirmPartnerTransactionInformation(id: number) {
+  return requestJson<ApiPartnerPropertyTransactionDetail>(
+    `/partner/transactions/${id}/confirm-information`,
+    { method: "POST" },
+  );
+}
+
+// Mediator quick-action vocabulary — mirrors
+// app/services/transaction_ai.py::MEDIATOR_QUICK_ACTIONS exactly (validated
+// server-side; sending a customer-only action 422s via InvalidQuickAction).
+export const TRANSACTION_MEDIATOR_QUICK_ACTIONS = [
+  "summarize_outstanding",
+  "whats_blocking",
+  "draft_update_request",
+  "summarize_customer_progress",
+] as const;
+
+// POST /partner/transactions/{id}/ai-assistant — mediator-side "Ask
+// myMakan", same response shape as the customer endpoint above.
+export function fetchPartnerTransactionAssistant(
+  id: number,
+  quickAction: string,
+  language: "en" | "ar",
+) {
+  return requestJson<{ quick_action: string; reply: string; generated_by: "ai" | "fallback" }>(
+    `/partner/transactions/${id}/ai-assistant`,
+    { method: "POST", body: JSON.stringify({ quick_action: quickAction, language }) },
+  );
 }
 
 // ── Contracts ────────────────────────────────────────────────────────────────
@@ -2152,6 +2591,7 @@ export type ApiRentalScoreRequest = {
   bedrooms?: number | null;
   area: string;
   city: string;
+  locale?: "en" | "ar" | null;
 };
 
 export type ApiRentalScoreResponse = {
@@ -3649,7 +4089,10 @@ export type ApiHomeFinderExplainResponse = {
   generated_by: "ai" | "fallback";
 };
 
-export function explainHomeFinderMatch(payload: { criteria: ApiHomeFinderCriteria; property_id: number }) {
+export function explainHomeFinderMatch(payload: {
+  criteria: ApiHomeFinderCriteria;
+  property_id: number;
+}) {
   return requestJson<ApiHomeFinderExplainResponse>("/ai/home-finder/explain", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -3687,4 +4130,62 @@ export function submitFinancingInterest(payload: { property_id: number; stated_b
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+// ── Admin: Transactions (Prompt 13) ─────────────────────────────────────────
+// Mirrors backend/app/api/routes/admin_transactions.py (Prompt 7) exactly —
+// see docs/implementation/mymakan-transaction-workspace.md "APIs" →
+// "Admin (Prompt 7)". Read-only: no mutation endpoints exist on this router
+// at all (see that prompt's "Known limitations" for why this is deliberate).
+
+export type ApiAdminTransaction = ApiPropertyTransaction & {
+  customer_name: string | null;
+  customer_email: string | null;
+};
+
+export type ApiAdminTransactionDetail = ApiAdminTransaction & {
+  checklist: ApiChecklistStep[];
+  documents: ApiTransactionDocument[];
+  customer_info: ApiCustomerInfo;
+  terms_snapshot: ApiTermsSnapshot | null;
+  timeline: { event_type: string; created_at: string; payload: Record<string, unknown> }[];
+};
+
+// GET /admin/transactions — filterable by status/transaction_type/mediator_id/
+// customer_user_id, sortable by created_at|updated_at|progress_percentage +
+// order asc|desc (defaults to updated_at desc). `X-Total-Count` carries the
+// post-filter, pre-pagination count — direct fetch (not requestJson) so that
+// header survives, same convention fetchAdminPropertyRequests() above uses.
+export async function fetchAdminTransactions(params?: {
+  status?: string;
+  transactionType?: "rent" | "sale";
+  mediatorId?: number;
+  customerUserId?: number;
+  sort?: "created_at" | "updated_at" | "progress_percentage";
+  order?: "asc" | "desc";
+  skip?: number;
+  limit?: number;
+}): Promise<{ data: ApiAdminTransaction[]; total: number }> {
+  const qs = buildQuery({
+    status: params?.status,
+    transaction_type: params?.transactionType,
+    mediator_id: params?.mediatorId,
+    customer_user_id: params?.customerUserId,
+    sort: params?.sort,
+    order: params?.order,
+    skip: params?.skip,
+    limit: params?.limit,
+  });
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
+  const response = await fetch(`${API_BASE_URL}/admin/transactions${qs}`, {
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  const data = (await response.json()) as ApiAdminTransaction[];
+  const total = Number(response.headers.get("X-Total-Count") ?? data.length);
+  return { data, total };
+}
+
+export function fetchAdminTransaction(id: number) {
+  return requestJson<ApiAdminTransactionDetail>(`/admin/transactions/${id}`);
 }

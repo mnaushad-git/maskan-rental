@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -28,6 +28,7 @@ import {
   withdrawNegotiation,
   fetchNegotiationGuidance,
   fetchPropertyAiSummary,
+  fetchMyTransactions,
   NEGOTIATION_CUSTOMER_WITHDRAW_REASONS,
   type ApiPropertyNegotiationDetail,
 } from "@/lib/api/maskan";
@@ -61,7 +62,7 @@ const STATUS_TONE: Record<string, "success" | "warning" | "info" | "neutral" | "
 type SignalKey = NegotiationSignalKey;
 
 function formatDateTime(iso: string, lang: string): string {
-  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA" : "en-US", {
+  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -75,6 +76,7 @@ function NegotiationDetailPage() {
   const { ask } = Route.useSearch();
   const { user, authLoading } = useAuth();
   const { t, lang } = useLanguage();
+  const navigate = useNavigate();
   const [negotiation, setNegotiation] = useState<ApiPropertyNegotiationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +86,7 @@ function NegotiationDetailPage() {
   // myMakan" card action (?ask=1) — see the Route's validateSearch above.
   const [showAsk, setShowAsk] = useState(() => ask === true);
   const [accepting, setAccepting] = useState(false);
+  const [openingTransaction, setOpeningTransaction] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const negotiationId = Number(id);
@@ -120,6 +123,29 @@ function NegotiationDetailPage() {
       setActionError(err instanceof Error ? err.message : t("negotiationDetail.actions.acceptFailed"));
     } finally {
       setAccepting(false);
+    }
+  }
+
+  // "Continue Transaction" (brief §10/Prompt 8) — the PropertyTransaction
+  // row is already auto-created server-side the instant this negotiation
+  // was accepted (inline inside accept_offer(), see tracking doc "Domain
+  // model"), so there's nothing to create here: just locate the caller's
+  // own transaction whose negotiation_id matches this negotiation and
+  // navigate to its real id. (list, not a dedicated by-negotiation lookup
+  // endpoint, is all Prompt 4 exposes — fine at this feature's scale.)
+  async function handleContinueTransaction() {
+    if (!negotiation) return;
+    setOpeningTransaction(true);
+    setActionError(null);
+    try {
+      const transactions = await fetchMyTransactions();
+      const match = transactions.find((tx) => tx.negotiation_id === negotiation.id);
+      if (!match) throw new Error(t("negotiationDetail.agreed.continueTransactionFailed"));
+      await navigate({ to: "/transaction/$id", params: { id: String(match.id) } });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t("negotiationDetail.agreed.continueTransactionFailed"));
+    } finally {
+      setOpeningTransaction(false);
     }
   }
 
@@ -201,7 +227,7 @@ function NegotiationDetailPage() {
                   <img src={negotiation.property_image_url} alt="" className="size-20 shrink-0 rounded-xl object-cover" />
                 )}
                 <div className="min-w-0">
-                  <div className="truncate font-semibold">{negotiation.property_title ?? `#${negotiation.property_id}`}</div>
+                  <div dir="auto" className="truncate font-semibold">{negotiation.property_title ?? `#${negotiation.property_id}`}</div>
                   {negotiation.property_district && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <MapPin className="size-3.5" /> {negotiation.property_district}
@@ -356,10 +382,16 @@ function NegotiationDetailPage() {
                         </Link>
                       </Button>
                     )}
-                    <Button variant="outline" className="w-full" asChild>
-                      <Link to="/transaction/$id" params={{ id: String(negotiation.id) }}>
-                        <MoveRight className="size-4" /> {t("negotiationDetail.agreed.continueTransaction")}
-                      </Link>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => void handleContinueTransaction()}
+                      disabled={openingTransaction}
+                    >
+                      <MoveRight className="size-4" />
+                      {openingTransaction
+                        ? t("negotiationDetail.agreed.openingTransaction")
+                        : t("negotiationDetail.agreed.continueTransaction")}
                     </Button>
                   </>
                 )}
@@ -587,7 +619,7 @@ function CounterModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 backdrop-blur-sm px-4" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-background p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-background p-6 shadow-2xl" onClick={(e) => e.stopPropagation()} data-testid="counter-modal">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h2 className="text-lg font-bold">{t("negotiationDetail.counterModal.title")}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -602,6 +634,7 @@ function CounterModal({
               min={1}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              data-testid="counter-amount-input"
               className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
             />
           </div>

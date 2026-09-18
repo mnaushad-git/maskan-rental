@@ -1,5 +1,6 @@
 {
   "name": "tanstack_start_ts",
+  "version": "0.1.0-beta.1",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -10,7 +11,10 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report e2e-report"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -69,6 +73,7 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "^2.3.2",
+    "@playwright/test": "^1.63.0",
     "@types/google.maps": "^3.58.1",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
