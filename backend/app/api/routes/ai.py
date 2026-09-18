@@ -49,7 +49,7 @@ def _customer_tools(db: Session) -> list:
         max_monthly_rent: float | None = None,
         min_bedrooms: int | None = None,
     ) -> str:
-        """Search published property listings on the Maskan platform.
+        """Search published property listings on the myMakan platform.
 
         Args:
             city: Filter by city, e.g. Riyadh, Jeddah.
@@ -89,7 +89,7 @@ def _customer_tools(db: Session) -> list:
 
     @beta_tool
     def get_area_score(district: str) -> str:
-        """Get Maskan's platform intelligence score and overview for one district/area.
+        """Get myMakan's platform intelligence score and overview for one district/area.
 
         Args:
             district: The district/area name, e.g. Al Yasmin, Al Malqa.
@@ -835,6 +835,7 @@ class RentalScoreRequest(BaseModel):
     bedrooms: int | None = None
     area: str
     city: str
+    locale: str | None = None  # "en" | "ar" — see P14-004
 
 
 class RentalScoreResponse(BaseModel):
@@ -858,6 +859,23 @@ def _deterministic_rental_score(req: RentalScoreRequest, avg_monthly: float | No
 
 
 _FALLBACK_REASONING = "Estimated using district rent averages and listing details (AI unavailable right now)."
+# P14-004: this whole endpoint had no language awareness at all — the "facts"
+# handed to the model are always authored in English by the backend itself
+# (no free-text user input to infer a language from, unlike the general chat
+# endpoints), so with no explicit instruction the model defaulted to English
+# every time, including when called from a fully Arabic-language property
+# page. Every other AI-generated explanation on the Property Intelligence/
+# Trust Center/Negotiation/Transaction surfaces already threads a `locale` ->
+# "Language: {English|Arabic}" line through to its prompt (see the repeated
+# `_LANGUAGE_NAMES` pattern in property_intelligence_ai.py, trust_ai_summary.py,
+# negotiation_ai.py, transaction_ai.py, partner_listing_ai.py, review_summary.py)
+# — this was the one AI feature on the property page that never got it.
+_LANGUAGE_NAMES = {"en": "English", "ar": "Arabic"}
+_FALLBACK_REASONING_AR = "تقدير تقريبي بناءً على متوسط الإيجار في الحي وتفاصيل الإعلان (الذكاء الاصطناعي غير متاح حاليًا)."
+
+
+def _fallback_reasoning(locale: str | None) -> str:
+    return _FALLBACK_REASONING_AR if locale == "ar" else _FALLBACK_REASONING
 
 
 @router.post(
@@ -881,7 +899,7 @@ def rental_score(
     if not settings.ANTHROPIC_API_KEY:
         return RentalScoreResponse(
             score=_deterministic_rental_score(req, avg_rent),
-            reasoning=_FALLBACK_REASONING,
+            reasoning=_fallback_reasoning(req.locale),
             generated_by="fallback",
             district_avg_monthly_rent=avg_rent,
             district_area_score=area_score,
@@ -918,6 +936,8 @@ def rental_score(
         )
     facts = "\n".join(facts_lines)
 
+    language_name = _LANGUAGE_NAMES.get(req.locale, "English")
+
     status = "error"
     result = None
     try:
@@ -925,7 +945,10 @@ def rental_score(
             model=gateway.DEFAULT_MODEL,
             system=RENTAL_SCORE_ASSISTANT.template,
             tools=[],
-            messages=[{"role": "user", "content": f"Score this listing:\n{facts}\n\nRespond with the JSON object only."}],
+            messages=[{
+                "role": "user",
+                "content": f"Language: {language_name}\n\nScore this listing:\n{facts}\n\nRespond with the JSON object only.",
+            }],
             max_tokens=350,
         )
         status = "ok"
@@ -946,7 +969,7 @@ def rental_score(
         status = "error"
         return RentalScoreResponse(
             score=_deterministic_rental_score(req, avg_rent),
-            reasoning=_FALLBACK_REASONING,
+            reasoning=_fallback_reasoning(req.locale),
             generated_by="fallback",
             district_avg_monthly_rent=avg_rent,
             district_area_score=area_score,

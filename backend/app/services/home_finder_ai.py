@@ -27,6 +27,45 @@ _PROPERTY_TYPES = {"Apartment", "Villa", "Penthouse", "Townhouse"}
 _AMENITY_SET = set(SUPPORTED_AMENITIES)
 _PREFERENCE_SET = set(SUPPORTED_PREFERENCES)
 
+# P14-003: `HOME_FINDER_EXTRACTOR`/`HOME_FINDER_REFINER` never told the model
+# what language/script to use for `city`, so it naturally echoed the city
+# name back in whichever language the customer's own text used (e.g. an
+# Arabic query mentioning "الرياض" produced city="الرياض"). Every downstream
+# consumer (`home_finder_scoring.py::_load_pool` -> `Property.city.ilike(...)`,
+# and `app/core/search/filters.py::matches_criteria`) compares this value
+# against `Property.city`, which is ALWAYS stored in English ("Riyadh",
+# "Jeddah", ...) — confirmed live: an Arabic-language query for a real
+# Al Yasmin rent listing returned `pool_count: 0` (not just zero *matches* —
+# zero candidates even loaded), silently breaking the single most-marketed AI
+# feature for any Arabic-speaking customer who names their own city, which is
+# the natural way to ask. The Arabic UI's own placeholder examples
+# (`homeFinder.tryExample`/`quickExamples` in ar.ts) literally use "الرياض",
+# so this was not a contrived edge case. Normalizing here (in addition to a
+# prompt-level instruction) is defense-in-depth: it protects against any
+# future prompt regression and against a user directly editing the criteria.
+_CITY_NORMALIZE = {
+    "riyadh": "Riyadh",
+    "الرياض": "Riyadh",
+    "jeddah": "Jeddah",
+    "جدة": "Jeddah",
+    "جده": "Jeddah",
+    "dammam": "Dammam",
+    "الدمام": "Dammam",
+    "khobar": "Khobar",
+    "al khobar": "Khobar",
+    "الخبر": "Khobar",
+    "madinah": "Madinah",
+    "medina": "Madinah",
+    "المدينة المنورة": "Madinah",
+    "المدينة": "Madinah",
+}
+
+
+def _normalize_city(city: str | None) -> str | None:
+    if not city:
+        return city
+    return _CITY_NORMALIZE.get(city.strip().lower(), city)
+
 
 def _extract_json(raw: str) -> dict:
     match = re.search(r"\{.*\}", raw.strip(), re.DOTALL)
@@ -81,6 +120,7 @@ def _sanitize_criteria(data: dict) -> HomeFinderCriteria:
 
     city = data.get("city")
     city = str(city).strip()[:100] if isinstance(city, str) and city.strip() else None
+    city = _normalize_city(city)
 
     commute_destination = data.get("commute_destination")
     commute_destination = (

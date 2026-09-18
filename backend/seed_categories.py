@@ -152,14 +152,14 @@ def build_listings() -> list[dict]:
                     "sale_price": price if listing_type == "sale" else None,
                     "bedrooms": bedrooms,
                     "bathrooms": bathrooms,
-                    "owner_name": "Maskan Verified Owner",
+                    "owner_name": "myMakan Verified Owner",
                     "status": "Published",
                     "image_url": _image_for(img_pool),
                     "property_type": prop_type,
                     "furnished": "Semi-furnished" if has_bedrooms else None,
                     "description": (
                         f"{prop_type} available {verb.lower()} in {district}, {city}. "
-                        f"Approx. {size} m². Listed by a Maskan-verified owner."
+                        f"Approx. {size} m². Listed by a myMakan-verified owner."
                     ),
                 }
                 listings.append(listing)

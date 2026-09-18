@@ -150,7 +150,7 @@ export function PropertyCard({
         <div className="flex flex-1 flex-col gap-4 p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="truncate text-base font-semibold tracking-tight">{p.title}</h3>
+              <h3 dir="auto" className="truncate text-base font-semibold tracking-tight">{p.title}</h3>
               <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
                 <MapPin className="size-3.5" />
                 {p.district}, {p.city}

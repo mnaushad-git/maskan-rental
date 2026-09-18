@@ -160,7 +160,11 @@ def _budget_fit(criteria: HomeFinderCriteria, prop: Property) -> DimResult:
     if price is None:
         return DimResult()
     is_sale = prop.listing_type == "sale"
-    price_label = f"SAR {price:,.0f}" if is_sale else f"SAR {prop.monthly_rent:,.0f}/mo"
+    # Labeled in the same unit as `price`/`criteria.max_price` (annual for
+    # rent, total for sale) — a monthly figure compared against an annual
+    # budget read as contradictory (e.g. "SAR 8,500/mo is above your budget"
+    # next to a stated "Up to SAR 80,000/year", see P3-002).
+    price_label = f"SAR {price:,.0f}" if is_sale else f"SAR {price:,.0f}/year"
 
     if criteria.max_price is not None:
         if price <= criteria.max_price:
@@ -331,6 +335,12 @@ def score_property(
 def _load_pool(db: Session, criteria: HomeFinderCriteria, *, limit: int = POOL_LIMIT) -> list[Property]:
     pf = PropertyFilterCriteria(transaction_type=criteria.transaction_type, city=criteria.city or "")
     filters = build_property_filters(pf)
+    # Short-stay "bookable" listings only carry nightly_rate, not
+    # monthly_rent/sale_price — budget_fit and every price-derived reason/
+    # trade-off silently produced a fabricated "SAR 0" for them (see P3-001).
+    # Home Finder is a long-term rent/buy journey; short-stay is a separate,
+    # unfinished, gated feature that shouldn't leak into these results.
+    filters.append(Property.is_bookable.is_(False))
     stmt = select(Property).where(*filters).order_by(Property.created_at.desc()).limit(limit)
     return list(db.scalars(stmt).all())
 

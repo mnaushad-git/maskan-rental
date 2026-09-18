@@ -1,6 +1,6 @@
 ﻿import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { TopNav } from "@/components/maskan/TopNav";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,11 @@ function NewLeadPage() {
   const [result, setResult] = useState<ApiLeadDetail | null>(null);
   const [error, setError] = useState("");
   const [availableAreas, setAvailableAreas] = useState<{ name: string; city: string }[]>([]);
+  // One key per submission attempt: a retry of the same click (double-tap,
+  // or a resubmit after a network error) reuses it so the backend can
+  // de-duplicate; a fresh key is only generated after this component
+  // remounts (i.e. a genuinely new lead-submission session).
+  const idempotencyKeyRef = useRef(crypto.randomUUID());
 
   useEffect(() => {
     fetchAreas()
@@ -69,18 +74,21 @@ function NewLeadPage() {
     setError("");
     setSubmitting(true);
     try {
-      const lead = await createLead({
-        area_name: form.area_name,
-        city: form.city,
-        customer_name: form.customer_name,
-        customer_phone: form.customer_phone,
-        customer_email: form.customer_email,
-        min_budget: form.min_budget ? Number(form.min_budget) : undefined,
-        max_budget: form.max_budget ? Number(form.max_budget) : undefined,
-        bedrooms_needed: form.bedrooms_needed ? Number(form.bedrooms_needed) : undefined,
-        move_in_date: form.move_in_date || undefined,
-        requirements_note: form.requirements_note || undefined,
-      });
+      const lead = await createLead(
+        {
+          area_name: form.area_name,
+          city: form.city,
+          customer_name: form.customer_name,
+          customer_phone: form.customer_phone,
+          customer_email: form.customer_email,
+          min_budget: form.min_budget ? Number(form.min_budget) : undefined,
+          max_budget: form.max_budget ? Number(form.max_budget) : undefined,
+          bedrooms_needed: form.bedrooms_needed ? Number(form.bedrooms_needed) : undefined,
+          move_in_date: form.move_in_date || undefined,
+          requirements_note: form.requirements_note || undefined,
+        },
+        idempotencyKeyRef.current,
+      );
       setResult(lead);
     } catch {
       setError(t("leadNew.failedToSubmit"));
@@ -111,7 +119,7 @@ function NewLeadPage() {
                   <div key={s.id} className="rounded-lg border border-border p-3 text-sm">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-medium truncate">{s.property_title ?? t("leadNew.success.propertyFallback", { id: s.property_id ?? "" })}</p>
+                        <p dir="auto" className="font-medium truncate">{s.property_title ?? t("leadNew.success.propertyFallback", { id: s.property_id ?? "" })}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {s.bedrooms ? t("leadNew.success.bedroomsPrefix", { count: s.bedrooms }) : ""}
                           {s.monthly_rent ? t("leadNew.success.perMonth", { amount: s.monthly_rent.toLocaleString() }) : ""}

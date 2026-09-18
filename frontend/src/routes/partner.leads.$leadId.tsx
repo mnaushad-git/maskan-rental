@@ -29,11 +29,21 @@ function MediatorLeadDetail() {
   const [showCloseMenu, setShowCloseMenu] = useState(false);
   const [closureNote, setClosureNote] = useState("");
   const [error, setError] = useState("");
+  // Distinct from `error` above (which is only for action-button failures,
+  // e.g. accept/reject/closure) — this tracks the initial `fetchLead` call
+  // itself so a 403/404/network failure renders "Unable to load this lead"
+  // instead of leaving the page stuck on the loading state forever (see
+  // P10-002: previously `.catch(() => {})` silently swallowed the error and
+  // `lead` just stayed `null`, which this component's `if (!lead)` guard
+  // rendered as "Loading lead…" indefinitely — including for a real 403
+  // ownership rejection, i.e. Mediator B hitting Mediator A's lead by URL).
+  const [loadError, setLoadError] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user) return;
-    fetchLead(Number(leadId)).then(setLead).catch(() => {});
+    setLoadError(false);
+    fetchLead(Number(leadId)).then(setLead).catch(() => setLoadError(true));
     fetchLeadMessages(Number(leadId)).then(msgs => { setMessages(msgs); markLeadMessagesRead(Number(leadId)).catch(() => {}); }).catch(() => {});
   }, [leadId, user]);
 
@@ -106,6 +116,14 @@ function MediatorLeadDetail() {
   }
 
   if (!user) return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">{t("partnerLeadDetail.pleaseSignIn")}</p></div>;
+  if (loadError) return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3">
+      <p className="text-sm text-muted-foreground">{t("partnerLeadDetail.unableToLoad")}</p>
+      <Link to="/partner" className="text-sm font-medium text-primary hover:underline">
+        {t("partnerLeadDetail.backToDashboard")}
+      </Link>
+    </div>
+  );
   if (!lead) return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-muted-foreground">{t("partnerLeadDetail.loadingLead")}</p></div>;
 
   const myAssignment = lead.assignments.find(a => a.status === "pending" || a.status === "accepted");
@@ -190,7 +208,7 @@ function MediatorLeadDetail() {
                   <div key={s.id} className="rounded-lg border border-border p-3 text-sm">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-medium truncate">{s.property_title ?? t("partnerLeadDetail.propertyFallback", { id: s.property_id ?? "" })}</p>
+                        <p dir="auto" className="font-medium truncate">{s.property_title ?? t("partnerLeadDetail.propertyFallback", { id: s.property_id ?? "" })}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {s.bedrooms ? t("partnerLeadDetail.bedroomsPrefix", { count: s.bedrooms }) : ""}
                           {s.monthly_rent ? t("partnerLeadDetail.perMonthPlain", { amount: s.monthly_rent.toLocaleString() }) : ""}
@@ -306,7 +324,7 @@ function MediatorLeadDetail() {
                   <div className={`max-w-xs rounded-2xl px-4 py-2 text-sm ${msg.sender_role === "mediator" ? "bg-primary text-primary-foreground" : "bg-surface border border-border"}`}>
                     {msg.content}
                     <div className={`mt-1 text-[10px] ${msg.sender_role === "mediator" ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                      {new Date(msg.created_at).toLocaleTimeString(lang === "ar" ? "ar-SA" : "en-SA", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(msg.created_at).toLocaleTimeString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-SA", { hour: "2-digit", minute: "2-digit" })}
                     </div>
                   </div>
                 </div>

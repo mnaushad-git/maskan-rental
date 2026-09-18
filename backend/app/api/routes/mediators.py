@@ -135,7 +135,7 @@ def subscribe_mediator(
     if _real_payments_enabled():
         result = get_payment_gateway_provider().create_subscription_invoice(
             amount_sar=settings.SUBSCRIPTION_FEE_SAR,
-            description=f"Maskan mediator subscription (SAR {settings.SUBSCRIPTION_FEE_SAR}/month)",
+            description=f"myMakan mediator subscription (SAR {settings.SUBSCRIPTION_FEE_SAR}/month)",
             metadata={"payment_type": "subscription", "mediator_id": str(mediator.id)},
             success_url=f"{settings.FRONTEND_ORIGIN}/mediator/subscription?status=success",
             back_url=f"{settings.FRONTEND_ORIGIN}/mediator/subscription?status=cancelled",
@@ -199,7 +199,7 @@ def renew_subscription(
         result = get_payment_gateway_provider().charge_saved_card(
             token=mediator.moyasar_card_token,
             amount_sar=settings.SUBSCRIPTION_FEE_SAR,
-            description=f"Maskan mediator subscription renewal (SAR {settings.SUBSCRIPTION_FEE_SAR}/month)",
+            description=f"myMakan mediator subscription renewal (SAR {settings.SUBSCRIPTION_FEE_SAR}/month)",
             metadata={"payment_type": "subscription", "mediator_id": str(mediator.id)},
         )
         if not result.success:

@@ -14,6 +14,7 @@ import app.tasks.lead_notifications  # noqa: F401 — registers outbox event han
 import app.tasks.property_requests  # noqa: F401 — registers outbox event handlers (property request matching) at import time
 import app.tasks.viewing_notifications  # noqa: F401 — registers outbox event handlers (viewing notifications) at import time
 import app.tasks.negotiation_notifications  # noqa: F401 — registers outbox event handlers (negotiation notifications) at import time
+import app.tasks.transaction_notifications  # noqa: F401 — registers outbox event handlers (transaction notifications) at import time
 from app.api.routes import properties, search, analytics, areas, auth, users, saved_searches, saved_properties, ai, health, projects
 from app.api.routes import area_intelligence, mediators, leads, contracts, payments, reviews, notifications, devices, bookings
 from app.api.routes import property_requests, property_request_partner, property_request_admin, verification, subscriptions
@@ -25,6 +26,9 @@ from app.api.routes import viewings
 from app.api.routes import partner_viewings
 from app.api.routes import negotiations
 from app.api.routes import partner_negotiations
+from app.api.routes import transactions
+from app.api.routes import partner_transactions
+from app.api.routes import admin_transactions
 
 configure_logging()
 
@@ -69,17 +73,29 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Maskan Rental API",
-    version="0.1.0",
+    title="myMakan Rental API",
+    version="0.1.0-beta.1",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
 )
 
-# CORS — allow the Vite dev server (and production origin)
+# CORS — allow the Vite dev server (and production origin).
+#
+# Vite (frontend/) and Expo web (mobile/) both auto-increment past their
+# default port whenever something else on the dev machine already holds it
+# (see docs/testing/mymakan-e2e-test-report.md P2-001 — this exact gap made
+# login/signup requests silently CORS-fail in a real browser when the dev
+# server landed on :8083, even though FRONTEND_ORIGIN and curl-based API
+# testing both looked fine). Allow the full range either realistically falls
+# back through, not just the couple of ports someone happened to hit before.
+_DEV_LOCAL_PORTS = range(8080, 8100)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list({settings.FRONTEND_ORIGIN, "http://localhost:8080", "http://localhost:8082", "http://localhost:5173"}),
+    allow_origins=list(
+        {settings.FRONTEND_ORIGIN, "http://localhost:5173"}
+        | {f"http://localhost:{p}" for p in _DEV_LOCAL_PORTS}
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -149,6 +165,12 @@ _ROUTERS = [
     # docstring.
     *([(negotiations.router, "", ["negotiations"])] if settings.FEATURE_NEGOTIATIONS else []),
     *([(partner_negotiations.router, "/partner/negotiations", ["partner-negotiations"])] if settings.FEATURE_NEGOTIATIONS else []),
+    # transactions.router: gated the same way, not a dedicated new flag — a
+    # PropertyTransaction can only ever exist off an accepted
+    # PropertyNegotiation (see transactions.py's module docstring).
+    *([(transactions.router, "/transactions", ["transactions"])] if settings.FEATURE_NEGOTIATIONS else []),
+    *([(partner_transactions.router, "/partner/transactions", ["partner-transactions"])] if settings.FEATURE_NEGOTIATIONS else []),
+    *([(admin_transactions.router, "/admin/transactions", ["admin-transactions"])] if settings.FEATURE_NEGOTIATIONS else []),
     (verification.router, "/verification", ["verification"]),
     (subscriptions.router, "/subscriptions", ["subscriptions"]),
     *([(financing.router, "/financing", ["financing"])] if settings.FEATURE_FINANCING else []),

@@ -435,12 +435,25 @@ function SavedCard({
         <div className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-background/95 px-2.5 py-1 text-[11px] font-semibold text-foreground shadow-card backdrop-blur">
           <Calendar className="size-3.5" /> {t("saved.savedOn", { date: formatDate(item.savedAt, lang) })}
         </div>
+        {/* P15: the property this was saved from may have since been hidden
+            (admin moderation) or otherwise unpublished — mapApiProperty's
+            `status` field reflects the property's real, live status
+            (Published -> "Available", anything else -> "Reserved"), not a
+            snapshot from when it was saved. Without this, the card looked
+            identical to a normal, currently-listed property and clicking
+            through only revealed the problem on the property detail page's
+            own "not found" state. */}
+        {p.status !== "Available" && (
+          <div className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-destructive/95 px-2.5 py-1 text-[11px] font-semibold text-destructive-foreground shadow-card backdrop-blur">
+            <AlertCircle className="size-3.5" /> {t("saved.noLongerAvailable")}
+          </div>
+        )}
       </div>
 
       {/* Summary */}
       <div className="flex items-start justify-between gap-4 px-5 pt-5">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold tracking-tight">{p.title}</h3>
+          <h3 dir="auto" className="truncate text-base font-semibold tracking-tight">{p.title}</h3>
           <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
             <MapPin className="size-3.5" /> {p.district}, {p.city}
           </p>
@@ -713,14 +726,14 @@ function EmptyState() {
 // ---------- utils ----------
 
 function formatDate(iso: string, lang: "en" | "ar") {
-  return new Date(iso).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", {
+  return new Date(iso).toLocaleDateString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
 }
 function formatDateTime(iso: string, lang: "en" | "ar") {
-  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA" : "en-US", {
+  return new Date(iso).toLocaleString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",

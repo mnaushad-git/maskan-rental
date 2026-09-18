@@ -28,7 +28,10 @@ export default function SignupScreen() {
     try {
       const res = await signup({ email, password, full_name: fullName || undefined });
       await setAuth(res.user, res.access_token);
-      router.back();
+      // See app/auth/login.tsx's matching comment — router.back() silently
+      // no-ops with no back-stack (e.g. a deep link straight to signup).
+      if (router.canGoBack()) router.back();
+      else router.replace("/");
     } catch {
       setError(t("auth.errors.unableToCreate"));
     } finally {

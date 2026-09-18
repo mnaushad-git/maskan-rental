@@ -30,7 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge, RecommendationBadge } from "@/components/maskan/Badges";
 import { ScoreRing, ScoreBar } from "@/components/maskan/ScoreIndicator";
-import { formatSAR, type Property } from "@/lib/maskan-data";
+import { formatSAR, type Property, type PropertyFeatures } from "@/lib/maskan-data";
 import {
   fetchProperties,
   fetchAreas,
@@ -52,7 +52,7 @@ export const Route = createFileRoute("/compare")({
       {
         name: "description",
         content:
-          "Compare up to three Saudi rental properties side by side — rent, area scores, amenities, and AI rental intelligence.",
+          "Compare up to three Saudi rent or sale properties side by side — price, area scores, amenities, and AI value intelligence.",
       },
     ],
   }),
@@ -62,26 +62,35 @@ export const Route = createFileRoute("/compare")({
 // ---------- Compare data helpers ----------
 
 type CompareData = {
-  deposit: number;
   furnishing: "Furnished" | "Semi-furnished" | "Unfurnished";
   areaScore: number;
   schoolScore: number;
   familyScore: number;
   rentalScore: number;
-  amenities: { parking: boolean; gym: boolean; pool: boolean; balcony: boolean };
 };
 
 function computeCompareData(
   p: Property,
   intel: ApiAreaIntelligence | null | undefined,
   avgMonthly: number | undefined,
+  decisionScore?: number | null,
 ): CompareData {
   const areaScore = Math.round(intel?.area_score ?? 75);
   const schoolScore = Math.round(intel?.school_score ?? 75);
   const familyScore = Math.round(intel?.family_score ?? 75);
 
+  // `avgMonthly` (district average MONTHLY RENT, from `fetchAreas()`) is only
+  // meaningful for rent listings — comparing a sale price against it produces
+  // a nonsensical ratio (e.g. a SAR 2.2M villa / SAR 8,000 avg rent). For
+  // sale properties, reuse the property's own real, already-fetched myMakan
+  // Decision Score (`decisionScore`, from `/properties/{id}/intelligence` —
+  // the same value already shown correctly elsewhere on this page via
+  // `PropertyIntelligenceCategory`/`MyMakanRecommendationCard`) instead of
+  // inventing a new sale-side metric.
   let rentalScore = 75;
-  if (avgMonthly && avgMonthly > 0) {
+  if (p.listingType === "sale") {
+    if (decisionScore != null) rentalScore = decisionScore;
+  } else if (avgMonthly && avgMonthly > 0) {
     const ratio = p.price / avgMonthly;
     if (ratio < 0.85) rentalScore = 95;
     else if (ratio < 0.95) rentalScore = 88;
@@ -90,22 +99,24 @@ function computeCompareData(
     else rentalScore = 52;
   }
 
+  // `furnishing` uses the real DB-backed `furnished` field (Furnished /
+  // Semi-furnished / null) — never inferred from property type. Deposit and
+  // parking/gym/pool/balcony amenities were previously fabricated here from
+  // unrelated proxies (property price/type/bedroom count) with zero backing
+  // data; myMakan's schema has no deposit or parking/gym/pool/balcony
+  // columns at all, so those rows were removed rather than shown as
+  // plausible-looking but invented figures (see the ledger's P5 entry for
+  // the amenities row, which now shows the real tracked feature flags
+  // instead).
   const furnishing: CompareData["furnishing"] =
-    p.type === "Penthouse" || p.type === "Villa" ? "Furnished" : "Semi-furnished";
+    p.furnished === "Furnished" || p.furnished === "Semi-furnished" ? p.furnished : "Unfurnished";
 
   return {
-    deposit: Math.round(p.price * 2),
     furnishing,
     areaScore,
     schoolScore,
     familyScore,
     rentalScore,
-    amenities: {
-      parking: true,
-      balcony: p.bedrooms >= 2,
-      gym: p.bedrooms >= 3,
-      pool: p.type === "Penthouse" || p.type === "Villa",
-    },
   };
 }
 
@@ -179,7 +190,12 @@ function ComparePage() {
 
   const composite = useMemo(() => {
     return selected.map((p) => {
-      const d = computeCompareData(p, areaIntelMap[p.district], areaAvgMap[p.district]);
+      const d = computeCompareData(
+        p,
+        areaIntelMap[p.district],
+        areaAvgMap[p.district],
+        intelMap[p.id]?.decision_score,
+      );
       const total =
         d.areaScore * 0.25 +
         d.familyScore * 0.25 +
@@ -187,7 +203,7 @@ function ComparePage() {
         p.matchScore * 0.25;
       return { p, d, total: Math.round(total) };
     });
-  }, [selected, areaIntelMap, areaAvgMap]);
+  }, [selected, areaIntelMap, areaAvgMap, intelMap]);
 
   const winner = composite.length
     ? composite.reduce((a, b) => (b.total > a.total ? b : a))
@@ -294,24 +310,21 @@ function ComparePage() {
             icon={<Crown className="size-4" />}
             rows={[
               {
-                label: t("compare.rows.annualRent"),
+                // Neutral row label — a mixed rent/sale comparison can't use
+                // a single "Annual rent" heading for every column (see the
+                // per-property "Annual rent"/"Sale price" label already
+                // shown just above, on each PropertyHeaderCard). Only rent
+                // listings get the "/mo" breakdown; a sale price has no
+                // monthly-equivalent concept.
+                label: t("compare.rows.price"),
                 values: selected.map((p) => ({
                   value: `SAR ${formatSAR(p.price)}`,
                   best: p.price === Math.min(...selected.map((s) => s.price)),
-                  sub: t("compare.rows.perMonth", { amount: formatSAR(Math.round(p.price / 12)) }),
+                  sub:
+                    p.listingType === "sale"
+                      ? undefined
+                      : t("compare.rows.perMonth", { amount: formatSAR(Math.round(p.price / 12)) }),
                 })),
-              },
-              {
-                label: t("compare.rows.securityDeposit"),
-                values: selected.map((p) => {
-                  const d = computeCompareData(p, areaIntelMap[p.district], areaAvgMap[p.district]);
-                  return {
-                    value: `SAR ${formatSAR(d.deposit)}`,
-                    best:
-                      d.deposit ===
-                      Math.min(...selected.map((s) => computeCompareData(s, areaIntelMap[s.district], areaAvgMap[s.district]).deposit)),
-                  };
-                }),
               },
               {
                 label: t("compare.rows.pricePerSqm"),
@@ -402,9 +415,14 @@ function ComparePage() {
             ]}
           />
 
-          <AmenitiesCategory selected={selected} areaIntelMap={areaIntelMap} areaAvgMap={areaAvgMap} />
+          <AmenitiesCategory selected={selected} />
 
-          <RentalIntelligenceCategory selected={selected} areaIntelMap={areaIntelMap} areaAvgMap={areaAvgMap} />
+          <RentalIntelligenceCategory
+            selected={selected}
+            areaIntelMap={areaIntelMap}
+            areaAvgMap={areaAvgMap}
+            intelMap={intelMap}
+          />
         </div>
       </main>
     </div>
@@ -602,7 +620,7 @@ function PropertyPickerModal({
                   <img src={p.image} alt="" className="size-full object-cover" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{p.title}</p>
+                  <p dir="auto" className="truncate text-sm font-semibold">{p.title}</p>
                   <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                     <MapPin className="size-3" /> {p.district}, {p.city}
                   </p>
@@ -675,7 +693,7 @@ function PropertyHeaderCard({
         <div className="space-y-3 p-4">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="truncate text-sm font-bold tracking-tight">{p.title}</h3>
+              <h3 dir="auto" className="truncate text-sm font-bold tracking-tight">{p.title}</h3>
               <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                 <MapPin className="size-3" /> {p.district}, {p.city}
               </p>
@@ -684,7 +702,9 @@ function PropertyHeaderCard({
           </div>
           <div className="flex items-end justify-between border-t border-border pt-3">
             <div>
-              <div className="text-[11px] text-muted-foreground">{t("compare.header.annualRent")}</div>
+              <div className="text-[11px] text-muted-foreground">
+                {p.listingType === "sale" ? t("compare.header.salePrice") : t("compare.header.annualRent")}
+              </div>
               <div className="text-lg font-bold tracking-tight">SAR {formatSAR(p.price)}</div>
             </div>
             <div className="flex flex-wrap justify-end gap-1">
@@ -865,21 +885,22 @@ function ScoreCategory({
   );
 }
 
-function AmenitiesCategory({
-  selected,
-  areaIntelMap,
-  areaAvgMap,
-}: {
-  selected: Property[];
-  areaIntelMap: Record<string, ApiAreaIntelligence | null>;
-  areaAvgMap: Record<string, number>;
-}) {
+// Real, DB-backed feature flags only (`Property.features`, from the same 7
+// tracked columns Property Intelligence's `amenities` dimension scores
+// against — see P4-005 in the test ledger). Previously this section showed
+// parking/gym/pool/balcony instead, computed from bedroom count / property
+// type with zero real backing — myMakan's schema has no such columns at
+// all. Fixed as part of Prompt 5's compare-view spot-check (P5 ledger).
+function AmenitiesCategory({ selected }: { selected: Property[] }) {
   const { t } = useLanguage();
-  const items: { key: keyof CompareData["amenities"]; label: string; icon: React.ReactNode }[] = [
-    { key: "parking", label: t("compare.amenityItems.parking"), icon: <Car className="size-4" /> },
-    { key: "gym", label: t("compare.amenityItems.gym"), icon: <Dumbbell className="size-4" /> },
-    { key: "pool", label: t("compare.amenityItems.pool"), icon: <Waves className="size-4" /> },
-    { key: "balcony", label: t("compare.amenityItems.balcony"), icon: <Trees className="size-4" /> },
+  const items: { key: keyof PropertyFeatures; label: string; icon: React.ReactNode }[] = [
+    { key: "kitchen", label: t("property.features.kitchen"), icon: <Building2 className="size-4" /> },
+    { key: "water", label: t("property.features.water"), icon: <Waves className="size-4" /> },
+    { key: "electricity", label: t("property.features.electricity"), icon: <Gauge className="size-4" /> },
+    { key: "privateRoof", label: t("property.features.privateRoof"), icon: <Trees className="size-4" /> },
+    { key: "inVilla", label: t("property.features.inVilla"), icon: <Car className="size-4" /> },
+    { key: "twoEntrances", label: t("property.features.twoEntrances"), icon: <ArrowLeftRight className="size-4" /> },
+    { key: "separateElectricalMeter", label: t("property.features.separateElectricalMeter"), icon: <Dumbbell className="size-4" /> },
   ];
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
@@ -900,7 +921,7 @@ function AmenitiesCategory({
               {it.label}
             </div>
             {selected.map((p) => {
-              const has = computeCompareData(p, areaIntelMap[p.district], areaAvgMap[p.district]).amenities[it.key];
+              const has = p.features[it.key];
               return (
                 <div
                   key={p.id}
@@ -932,10 +953,12 @@ function RentalIntelligenceCategory({
   selected,
   areaIntelMap,
   areaAvgMap,
+  intelMap,
 }: {
   selected: Property[];
   areaIntelMap: Record<string, ApiAreaIntelligence | null>;
   areaAvgMap: Record<string, number>;
+  intelMap: Record<string, ApiPropertyIntelligence | null>;
 }) {
   const { t } = useLanguage();
   return (
@@ -953,7 +976,12 @@ function RentalIntelligenceCategory({
           {t("compare.scoresLabel")}
         </div>
         {selected.map((p) => {
-          const d = computeCompareData(p, areaIntelMap[p.district], areaAvgMap[p.district]);
+          const d = computeCompareData(
+            p,
+            areaIntelMap[p.district],
+            areaAvgMap[p.district],
+            intelMap[p.id]?.decision_score,
+          );
           return (
             <div
               key={p.id}
@@ -1161,7 +1189,7 @@ function MyMakanRecommendationCard({
               <Badge tone="ai" icon={r.icon}>
                 {t(`compare.myMakanReco.${r.key}`)}
               </Badge>
-              <div className="mt-2 truncate text-sm font-semibold">{r.entry!.title}</div>
+              <div dir="auto" className="mt-2 truncate text-sm font-semibold">{r.entry!.title}</div>
               <p className="mt-1 text-xs text-muted-foreground">{r.why(r.entry!)}</p>
               <Link
                 to="/property/$id"
@@ -1208,7 +1236,7 @@ function AiRecommendationCard({
             {t("compare.aiReco.strongestMatch", { title: winner.title })}
           </h2>
           <p className="text-sm text-muted-foreground sm:text-base">
-            {t("compare.aiReco.description", {
+            {t(winner.listingType === "sale" ? "compare.aiReco.descriptionSale" : "compare.aiReco.description", {
               district: winner.district,
               score: totalScore,
               price: formatSAR(winner.price),
@@ -1219,9 +1247,9 @@ function AiRecommendationCard({
           <ul className="grid grid-cols-1 gap-2 pt-2 text-sm sm:grid-cols-2">
             <li className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-              {t("compare.aiReco.cheapestRentPrefix")}{" "}
+              {t(cheapest.p.listingType === "sale" ? "compare.aiReco.cheapestPricePrefix" : "compare.aiReco.cheapestRentPrefix")}{" "}
               <strong>{cheapest.p.district}</strong>{" "}
-              {t("compare.aiReco.cheapestRentSuffix", { price: formatSAR(cheapest.p.price) })}
+              {t(cheapest.p.listingType === "sale" ? "compare.aiReco.cheapestPriceSuffix" : "compare.aiReco.cheapestRentSuffix", { price: formatSAR(cheapest.p.price) })}
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />

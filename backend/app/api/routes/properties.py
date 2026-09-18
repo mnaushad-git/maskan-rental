@@ -274,10 +274,38 @@ def update_partner_property(
 
 
 @router.get("/{property_id}", response_model=PropertyOut)
-def get_property(property_id: int, db: Session = Depends(get_db)):
+def get_property(
+    property_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
     property_obj = db.get(Property, property_id)
     if not property_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
+
+    # P15: admin_trust.py's own "hide" action (ADMIN_HIDDEN_STATUS) is
+    # written on the explicit assumption that "every existing
+    # Property.status == 'Published' filter across search/matching/
+    # comparables would already exclude a 'Hidden' row" — true for the list/
+    # search/similar/comparable endpoints, but this single-property lookup
+    # had no status check at all, so a Hidden (admin-moderated-off) listing
+    # remained fully fetchable by anyone with the ID or a direct link,
+    # authenticated or not — defeating the moderation action entirely.
+    # Scoped to only the admin-moderation "Hidden" status (not every non-
+    # Published status) so a customer/mediator's own legitimate access to a
+    # property tied to their saved/lead/viewing/negotiation/transaction
+    # history in another status (e.g. still Pending Approval) is unaffected.
+    if property_obj.status == "Hidden":
+        is_owning_mediator = False
+        if current_user is not None:
+            mediator = db.query(Mediator).filter(Mediator.user_id == current_user.id).first()
+            is_owning_mediator = bool(mediator and mediator.id == property_obj.mediator_id)
+        is_admin_caller = bool(
+            current_user
+            and (current_user.email in settings.admin_emails or current_user.is_admin)
+        )
+        if not is_owning_mediator and not is_admin_caller:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
 
     property_obj.views_count = (property_obj.views_count or 0) + 1
     db.commit()
@@ -310,6 +338,7 @@ def get_similar_properties(
             Property.id != base.id,
             Property.status == "Published",
             Property.city == base.city,
+            Property.listing_type == base.listing_type,
         )
         .order_by(
             case((Property.area == base.area, 0), else_=1),

@@ -76,7 +76,13 @@ function AuthPage() {
       void navigate({ to: "/" });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      if (mode === "signin") {
+      if (msg.toLowerCase().includes("too many requests") || msg.toLowerCase().includes("rate limit")) {
+        // A 429 is not a credentials problem — showing "Invalid email or
+        // password" here would send a real user chasing a typo that
+        // doesn't exist (P17-001, surfaced by the Playwright suite's own
+        // repeated-login-in-one-session testing hitting this exact path).
+        setError(t("auth.errors.tooManyAttempts"));
+      } else if (mode === "signin") {
         setError(t("auth.errors.invalidCredentials"));
       } else if (msg.toLowerCase().includes("email already") || msg.includes("409") || msg.includes("Conflict")) {
         setError(t("auth.errors.emailAlreadyRegistered"));
@@ -193,6 +199,7 @@ function AuthPage() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={setEmail}
+                testId="auth-email"
               />
 
 
@@ -205,6 +212,7 @@ function AuthPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={mode === "signup" ? t("auth.createPasswordPlaceholder") : t("auth.yourPasswordPlaceholder")}
+                    data-testid="auth-password"
                     className="h-11 w-full rounded-lg border border-border bg-card px-10 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
                   <button
@@ -252,7 +260,14 @@ function AuthPage() {
 
               {error && <p className="text-sm text-destructive">{error}</p>}
 
-              <Button type="submit" variant="hero" size="lg" className="w-full" disabled={loading || !email || !password || (mode === "signup" && (!fullName || !agreedToTerms))}>
+              <Button
+                type="submit"
+                variant="hero"
+                size="lg"
+                className="w-full"
+                data-testid="auth-submit"
+                disabled={loading || !email || !password || (mode === "signup" && (!fullName || !agreedToTerms))}
+              >
                 {mode === "signin" ? t("auth.signIn") : t("auth.createAccountBtn")} <ArrowRight className="rtl:rotate-180" />
               </Button>
             </form>
@@ -285,6 +300,7 @@ function Field({
   placeholder,
   value,
   onChange,
+  testId,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -292,6 +308,7 @@ function Field({
   placeholder: string;
   value: string;
   onChange: (value: string) => void;
+  testId?: string;
 }) {
   return (
     <div>
@@ -303,6 +320,7 @@ function Field({
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          data-testid={testId}
           className="h-11 w-full rounded-lg border border-border bg-card px-10 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
       </div>

@@ -56,7 +56,7 @@ function nextNDays(n: number): Date[] {
   return Array.from({ length: n }, (_, i) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + i));
 }
 function formatDayLabel(d: Date, lang: string): string {
-  return d.toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", { weekday: "short", month: "short", day: "numeric" });
+  return d.toLocaleDateString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
 type Step = "date" | "time" | "note" | "review";

@@ -490,23 +490,33 @@ export default function PropertyDetailScreen() {
             </View>
           )}
 
-          {/* Register lease contract */}
-          <View className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-            <View className="flex-row items-start gap-3">
-              <View className="mt-0.5 size-8 items-center justify-center rounded-lg bg-primary">
-                <FileText size={16} color="#FFFFFF" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-sm font-semibold text-foreground">{t("property.registerLease.title")}</Text>
-                <Text className="mt-0.5 text-xs text-muted-foreground">{t("property.registerLease.desc")}</Text>
-                <Link href="/lead/new" asChild>
-                  <Button variant="outline" size="sm" className="mt-3">
-                    {t("property.registerLease.cta")}
-                  </Button>
-                </Link>
+          {/* Register lease contract — a rent-only feature (digital rental
+              contract / Ejar-equivalent, still Hide-Phase1 per the phase1
+              implementation doc). Web gates this whole banner behind
+              PHASE1_FLAGS.contracts (currently false, so it never renders
+              there); mobile has no such flag system (documented gap in
+              mymakan-customer-parity.md), but regardless of that, its
+              copy ("lease", "rental contract") is rent-specific and must
+              never render on a SALE property — see
+              docs/testing/mymakan-e2e-test-report.md P9-002. */}
+          {!isSale && (
+            <View className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <View className="flex-row items-start gap-3">
+                <View className="mt-0.5 size-8 items-center justify-center rounded-lg bg-primary">
+                  <FileText size={16} color="#FFFFFF" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-foreground">{t("property.registerLease.title")}</Text>
+                  <Text className="mt-0.5 text-xs text-muted-foreground">{t("property.registerLease.desc")}</Text>
+                  <Link href="/lead/new" asChild>
+                    <Button variant="outline" size="sm" className="mt-3">
+                      {t("property.registerLease.cta")}
+                    </Button>
+                  </Link>
+                </View>
               </View>
             </View>
-          </View>
+          )}
 
           {/* Listing details */}
           <View className="rounded-xl border border-border p-4">
@@ -541,7 +551,7 @@ export default function PropertyDetailScreen() {
             </Accordion>
           </View>
 
-          <PropertySimilarListings excludeId={property.id} />
+          <PropertySimilarListings excludeId={property.id} isSale={isSale} />
 
           <SmartQuestionsSection property={property} intelligence={intelligence} />
           <NegotiationInsightCard property={property} intelligence={intelligence} waLink={waLink} />

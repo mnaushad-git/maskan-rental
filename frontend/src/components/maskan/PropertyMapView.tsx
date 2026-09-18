@@ -278,7 +278,7 @@ export function PropertyMapView({
               </button>
             </div>
             <div className="p-4">
-              <p className="truncate font-display text-sm font-bold">{selected.title}</p>
+              <p dir="auto" className="truncate font-display text-sm font-bold">{selected.title}</p>
               <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                 <MapPin className="size-3" /> {selected.district}, {selected.city}
               </p>

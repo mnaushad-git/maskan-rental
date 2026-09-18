@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Bell, ClipboardList, Handshake, ListChecks, LogOut, Settings, User } from "lucide-react";
+import { Bell, CalendarCheck, ClipboardList, FileCheck2, Handshake, ListChecks, LogOut, Settings, User } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -90,12 +90,32 @@ export function NavAuthButton({ className }: { className?: string }) {
               <button
                 type="button"
                 onClick={() => {
+                  navigate({ to: "/viewings" });
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 hover:bg-surface-2"
+              >
+                <CalendarCheck className="size-3.5 text-muted-foreground" /> {t("navAuth.myViewings")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   navigate({ to: "/negotiations" });
                   setOpen(false);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 hover:bg-surface-2"
               >
                 <Handshake className="size-3.5 text-muted-foreground" /> {t("navAuth.myNegotiations")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  navigate({ to: "/my-transactions" });
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 hover:bg-surface-2"
+              >
+                <FileCheck2 className="size-3.5 text-muted-foreground" /> {t("navAuth.myTransactions")}
               </button>
               <button
                 type="button"

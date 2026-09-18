@@ -268,7 +268,12 @@ function routeFromResponse(response: NotificationsModule.NotificationResponse): 
  * (`getLastNotificationResponseAsync`) for the "app was fully terminated
  * and launched by tapping a push" case. Call once near the root
  * (app/_layout.tsx) — see that file for the actual mount site. No-ops when
- * push isn't available (e.g. Expo Go).
+ * push isn't available (e.g. Expo Go) or on web: unlike Expo Go,
+ * `expo-notifications` *does* load on web (`isRunningInExpoGo()` is false),
+ * but `getLastNotificationResponseAsync` throws "not available on web" —
+ * an uncaught error at the app root that blocked every screen behind Expo's
+ * full-screen dev error overlay (see
+ * docs/testing/mymakan-e2e-test-report.md P2-00x).
  */
 export function useNotificationTapHandler(): void {
   const navigate = useCallback((route: string | null) => {
@@ -281,7 +286,7 @@ export function useNotificationTapHandler(): void {
   }, []);
 
   useEffect(() => {
-    if (!Notifications) return undefined;
+    if (!Notifications || Platform.OS === "web") return undefined;
 
     // Cold start: app was terminated, user tapped a push to launch it.
     Notifications.getLastNotificationResponseAsync().then((response) => {

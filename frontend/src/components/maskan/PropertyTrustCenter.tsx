@@ -422,7 +422,9 @@ function PropertyTrustSheet({
                   {tt(`sheet.freshness.category.${freshness.category}`)}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">{freshness.reason}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {tt(`sheet.freshness.reason.${freshness.category}`, { count: freshness.days_since_reference })}
+              </p>
             </div>
           )}
 

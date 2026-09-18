@@ -48,7 +48,7 @@ def subscribe(
     if _real_payments_enabled():
         result = get_payment_gateway_provider().create_subscription_invoice(
             amount_sar=settings.RENTER_PREMIUM_FEE_SAR,
-            description=f"Maskan renter premium subscription (SAR {settings.RENTER_PREMIUM_FEE_SAR}/month)",
+            description=f"myMakan renter premium subscription (SAR {settings.RENTER_PREMIUM_FEE_SAR}/month)",
             metadata={"payment_type": "subscription", "user_id": str(current_user.id)},
             success_url=f"{settings.FRONTEND_ORIGIN}/premium?status=success",
             back_url=f"{settings.FRONTEND_ORIGIN}/premium?status=cancelled",
@@ -114,7 +114,7 @@ def renew_subscription(
         result = get_payment_gateway_provider().charge_saved_card(
             token=current_user.moyasar_card_token,
             amount_sar=settings.RENTER_PREMIUM_FEE_SAR,
-            description=f"Maskan renter premium subscription renewal (SAR {settings.RENTER_PREMIUM_FEE_SAR}/month)",
+            description=f"myMakan renter premium subscription renewal (SAR {settings.RENTER_PREMIUM_FEE_SAR}/month)",
             metadata={"payment_type": "subscription", "user_id": str(current_user.id)},
         )
         if not result.success:

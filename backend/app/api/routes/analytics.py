@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_optional_current_user
+from app.api.deps import get_admin_user, get_db, get_optional_current_user
 from app.core.rate_limit import rate_limit_dependency
 from app.models.analytics_event import ANALYTICS_EVENTS, AnalyticsEvent
 from app.models.property import Property
@@ -15,8 +15,12 @@ router = APIRouter()
 
 
 @router.get("/summary")
-def analytics_summary(db: Session = Depends(get_db)):
-    """Return high-level rental market analytics."""
+def analytics_summary(db: Session = Depends(get_db), _admin: User = Depends(get_admin_user)):
+    """Return high-level rental market analytics. Admin-only (P11-001): this
+    backs the admin portal's "Analytics" nav item (`mymakan-phase1.md`
+    classifies `analytics.py`/`analytics.tsx` as "Admin analytics") and was
+    previously reachable with zero authentication, leaking aggregate
+    business metrics (total users, total properties, KPIs) to anyone."""
     total_properties = db.scalar(select(func.count(Property.id))) or 0
     total_users = db.scalar(select(func.count(User.id))) or 0
     saved_properties = db.scalar(select(func.count(SavedProperty.id))) or 0
@@ -112,8 +116,11 @@ def analytics_summary(db: Session = Depends(get_db)):
 
 
 @router.get("/trends")
-def price_trends(db: Session = Depends(get_db)):
-    """Return price trend data over time."""
+def price_trends(db: Session = Depends(get_db), _admin: User = Depends(get_admin_user)):
+    """Return price trend data over time. Admin-only (P11-001), same
+    rationale as `analytics_summary` above — no frontend call site
+    currently uses this endpoint, but it sits in the same admin-only router
+    and should not be an unauthenticated outlier either."""
     rows = db.execute(
         select(Property.city, func.avg(Property.monthly_rent).label("avg_rent"))
         .group_by(Property.city)

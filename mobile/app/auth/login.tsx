@@ -23,7 +23,14 @@ export default function LoginScreen() {
     try {
       const res = await login({ email, password });
       await setAuth(res.user, res.access_token);
-      router.back();
+      // Usually pushed from a protected screen's sign-in prompt, so back()
+      // returns there. But this screen is also reachable with no back-stack
+      // (e.g. a deep link) — router.back() then silently no-ops (dev-only
+      // "GO_BACK not handled" warning, found testing the web target — see
+      // docs/testing/mymakan-e2e-test-report.md P2-00x), leaving the user
+      // looking at a stale login form despite being signed in.
+      if (router.canGoBack()) router.back();
+      else router.replace("/");
     } catch {
       setError(t("auth.errors.invalidCredentials"));
     } finally {
