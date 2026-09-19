@@ -54,3 +54,6 @@ backend/uploads/
 
 # Logs
 *.log
+
+# Local build artifacts (APKs etc.) — never committed
+releases/*.apk
