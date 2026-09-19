@@ -3,6 +3,39 @@
 **Date:** 2026-09-19
 **Target:** Hostinger VPS (187.127.159.23, `maskanai.com`), Docker Compose (`docker-compose.prod.yml`, Caddy-fronted)
 
+## Google API key migration (2026-09-19, post-deployment)
+
+Following the original Anthropic/Google key exposure noted below, three new restricted Google keys were created:
+
+- **myMakan Web Maps** — website-restricted, used by `VITE_GOOGLE_MAPS_API_KEY` (frontend, browser-side Maps JS)
+- **myMakan Server Places** — IP-restricted to the Hostinger VPS (`187.127.159.23`), used by `GOOGLE_PLACES_API_KEY` / `GOOGLE_MAPS_API_KEY` (backend, server-side Places + Distance Matrix)
+- Existing Android-native Maps SDK key — **left untouched**, not part of this migration
+
+Values were transferred from the developer's local `backend/.env` / `frontend/.env` into `~/maskan-rental/.env.production` on the VPS without ever displaying them in this session, **except for two accidental exposures during this migration**, both logged transparently at the time:
+
+1. A Windows-side file transfer step introduced a UTF-8 BOM + CRLF into one line of `.env.production`, which broke Docker Compose's env-file parser; the resulting error message echoed the new **myMakan Server Places** key value once.
+2. The area-intelligence refresh job (`python -m app.jobs.refresh_area_intelligence`), run to verify the new server key, uses `httpx`'s default INFO-level request logging, which logs full request URLs including the `key=` query parameter — this printed the same Server Places key repeatedly across ~50 log lines while confirming the job worked.
+
+**Recommendation: rotate the myMakan Server Places key again** given these two exposures, then repeat the transfer using a method that avoids both failure modes (LF-only/no-BOM file writes; suppress or redact `httpx` request-URL logging before re-running the refresh job).
+
+`.env.production` also had one pre-existing duplicate `GOOGLE_PLACES_API_KEY=` line (unrelated to this session — cause not established, no prior backup of this file existed to compare against) discovered and deduplicated to a single line during cleanup of the BOM/CRLF corruption.
+
+Affected services (`frontend` — rebuilt, since the Maps key is a Docker build arg; `backend` and `worker` — recreated to pick up the new server-side env vars) were redeployed; `db`, `redis`, and `caddy` were untouched.
+
+### Verification results
+
+| Check | Result |
+|---|---|
+| Web Maps JS (referrer-restricted key, tested with a matching `Referer: https://maskanai.com/` header) | **PASS** — SDK bootstrap returns valid JS, no `InvalidKeyMapError`/`RefererNotAllowedMapError`/`ApiNotActivatedMapError` |
+| Web Places (no client-side Places calls exist in the frontend today — only server-side) | **PASS** (library loads under the restricted key; nothing in the current UI calls it directly) |
+| Backend Places + Distance Matrix | **PASS** — live run of the real weekly refresh job against 6 districts, every Places Nearby Search and Distance Matrix call returned `200 OK`, zero `REQUEST_DENIED`, job completed ("Weekly refresh complete") |
+| Android Maps (existing, untouched key) | **PASS** — reinstalled the already-built APK, map tiles + 111 property pins render correctly, session persisted |
+| Production API health/readiness | **PASS** — `{"status":"ok"}` / `{"status":"ready",...}` after redeploy |
+| Homepage / `/search` / `/property/{id}` | **PASS** — 200, no map error strings in HTML |
+| Backend/worker/frontend logs since redeploy | **PASS** — no errors, exceptions, or denials found |
+
+Anthropic key: **left untouched**, per instruction — no confirmation of its rotation has been given yet.
+
 ## Git
 
 | | |
