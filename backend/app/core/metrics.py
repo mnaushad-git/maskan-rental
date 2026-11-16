@@ -63,6 +63,16 @@ push_accepted_total = Counter("maskan_push_accepted_total", "Push sends accepted
 push_failed_total = Counter("maskan_push_failed_total", "Push sends that failed", ["provider", "reason"])
 push_invalid_token_total = Counter("maskan_push_invalid_token_total", "Push sends rejected for an invalid/unregistered token", ["provider"])
 push_delivery_latency_seconds = Histogram("maskan_push_delivery_latency_seconds", "Push provider round-trip latency", ["provider"])
+# SQLAlchemy connection pool (per worker process, no labels). Gauges are
+# read live from the pool at scrape time (bound in app.core.db_metrics). A
+# leak shows up as checked_out staying high while traffic is idle, and as
+# checkouts_total - checkins_total drifting upward.
+db_pool_checked_out = Gauge("maskan_db_pool_checked_out", "Pool connections currently checked out")
+db_pool_checked_in = Gauge("maskan_db_pool_checked_in", "Idle pool connections available for checkout")
+db_pool_overflow = Gauge("maskan_db_pool_overflow", "Current pool overflow (negative = unused base capacity)")
+db_pool_size = Gauge("maskan_db_pool_size", "Configured base pool size")
+db_pool_checkouts_total = Counter("maskan_db_pool_checkouts_total", "Pool connection checkouts")
+db_pool_checkins_total = Counter("maskan_db_pool_checkins_total", "Pool connection check-ins")
 notification_stream_connections = Gauge("maskan_notification_stream_connections", "Currently-open SSE notification stream connections")
 notification_stream_reconnects_total = Counter("maskan_notification_stream_reconnects_total", "SSE stream reconnect attempts observed server-side")
 digest_generated_total = Counter("maskan_digest_generated_total", "Digest runs that produced at least one notification", ["period"])
