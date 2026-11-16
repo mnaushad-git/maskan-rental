@@ -178,16 +178,20 @@ def test_ai_stream_client_disconnect_returns_connection(fake_ai, baseline):
         assert server.started
 
         body = json.dumps(_CHAT_BODY).encode()
-        for _ in range(4):
+        for n in range(1, 5):
             sock = socket.create_connection(("127.0.0.1", port))
             sock.sendall(
                 b"POST /api/ai/chat/stream HTTP/1.1\r\nHost: test\r\nContent-Type: application/json\r\n"
                 + f"Content-Length: {len(body)}\r\n\r\n".encode()
                 + body
             )
-            time.sleep(0.4)  # tool call has run; stream is mid-flight
-            sock.close()     # client goes away
-        assert fake_ai["tool_calls"] >= 1
+            # Disconnect only once this stream's DB tool call has really run
+            # (no fixed sleep: a cold first request can take > 1s to get there).
+            deadline = time.monotonic() + 15
+            while fake_ai["tool_calls"] < n and time.monotonic() < deadline:
+                time.sleep(0.02)
+            assert fake_ai["tool_calls"] == n, "stream never reached its tool call"
+            sock.close()  # client goes away mid-stream
         assert _wait_for(baseline, timeout=10) == baseline
     finally:
         server.should_exit = True
