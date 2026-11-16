@@ -1,3 +1,6 @@
+# Exact versions (incl. transitive deps) are locked in constraints.txt.
+-c constraints.txt
+
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 python-multipart==0.0.32
