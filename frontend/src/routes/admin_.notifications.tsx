@@ -47,7 +47,7 @@ import { cn } from "@/lib/utils";
 // across the two large route files.
 export const Route = createFileRoute("/admin_/notifications")({
   head: () => ({
-    meta: [{ title: "Notification Operations — myMakan Admin" }],
+    meta: [{ title: "Notification Operations — Maskan Admin" }],
   }),
   component: AdminNotificationsPage,
 });

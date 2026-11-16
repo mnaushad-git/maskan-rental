@@ -22,7 +22,7 @@ import { formatSAR } from "@/lib/maskan-data";
 export const Route = createFileRoute("/saved-searches")({
   head: () => ({
     meta: [
-      { title: "Saved Searches — myMakan" },
+      { title: "Saved Searches — Maskan" },
       {
         name: "description",
         content: "Manage your saved searches and property alert preferences.",

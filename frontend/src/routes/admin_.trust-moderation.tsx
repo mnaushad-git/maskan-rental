@@ -51,7 +51,7 @@ import { cn } from "@/lib/utils";
 // "Request correction" is a UI-only affordance, not a new backend endpoint —
 // Prompt 6 didn't build one).
 export const Route = createFileRoute("/admin_/trust-moderation")({
-  head: () => ({ meta: [{ title: "Trust & Moderation — myMakan Admin" }] }),
+  head: () => ({ meta: [{ title: "Trust & Moderation — Maskan Admin" }] }),
   component: AdminTrustModerationPage,
 });
 
@@ -1024,7 +1024,7 @@ function PropertyReviewDetail({ propertyId, onBack }: { propertyId: number; onBa
         )}
       </Panel>
 
-      <Panel title="Property intelligence" subtitle="Reused from the customer-facing myMakan Intelligence assembly — not recomputed here.">
+      <Panel title="Property intelligence" subtitle="Reused from the customer-facing Maskan Intelligence assembly — not recomputed here.">
         {detail.property_intelligence ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2">

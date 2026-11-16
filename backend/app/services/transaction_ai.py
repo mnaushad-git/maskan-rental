@@ -114,7 +114,7 @@ def _trust_facts_block(transaction: PropertyTransaction) -> str:
     mediator = transaction.mediator
     if mediator is None:
         return "Trust: no mediator assigned to this transaction."
-    return f"Mediator verification: {'Verified by myMakan' if mediator.is_verified else 'Not yet verified by myMakan'}"
+    return f"Mediator verification: {'Verified by Maskan' if mediator.is_verified else 'Not yet verified by Maskan'}"
 
 
 def _customer_facts_block(transaction: PropertyTransaction) -> str:

@@ -240,7 +240,7 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     // the listing is still available.
     status: property.status === "Published" ? "Available" : "Reserved",
     pricePerSqm: estimatedArea > 0 ? Math.round(displayPrice / estimatedArea) : 0,
-    agent: property.mediator_agent_name ?? property.owner_name ?? "myMakan Agent",
+    agent: property.mediator_agent_name ?? property.owner_name ?? "Maskan Agent",
     agentPhone: property.call_phone ?? property.mediator_phone ?? null,
     agentWhatsapp: property.whatsapp_number ?? property.mediator_phone ?? null,
     agentProfileImage: property.mediator_profile_image_url ?? null,

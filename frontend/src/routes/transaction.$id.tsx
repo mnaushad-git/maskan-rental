@@ -40,7 +40,7 @@ import {
 } from "@/lib/api/maskan";
 
 export const Route = createFileRoute("/transaction/$id")({
-  head: () => ({ meta: [{ title: "Transaction — myMakan" }] }),
+  head: () => ({ meta: [{ title: "Transaction — Maskan" }] }),
   component: TransactionWorkspacePage,
 });
 

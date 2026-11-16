@@ -208,7 +208,7 @@ export default function CompareScreen() {
           </View>
         )}
 
-        {/* myMakan Intelligence (Prompt 11) */}
+        {/* Maskan Intelligence (Prompt 11) */}
         {selected.length >= 2 && (
           <View className="gap-2">
             <View className="flex-row items-center gap-1.5 px-1">

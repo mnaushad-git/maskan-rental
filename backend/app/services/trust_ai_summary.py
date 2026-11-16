@@ -91,8 +91,8 @@ def _mediator_trust_facts_block(mediator_trust: MediatorTrustResult | None) -> s
     if mediator_trust is None:
         return "No mediator is on record for this listing."
     lines = [
-        f"Mediator verification: {'Verified by myMakan' if mediator_trust.is_verified else 'Not yet verified by myMakan'}",
-        f"Mediator listing count on myMakan: {mediator_trust.listing_count}",
+        f"Mediator verification: {'Verified by Maskan' if mediator_trust.is_verified else 'Not yet verified by Maskan'}",
+        f"Mediator listing count on Maskan: {mediator_trust.listing_count}",
     ]
     if mediator_trust.review_count > 0 and mediator_trust.avg_rating is not None:
         lines.append(f"Mediator rating: {mediator_trust.avg_rating:.1f}/5 from {mediator_trust.review_count} review(s)")

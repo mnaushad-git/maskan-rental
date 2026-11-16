@@ -36,7 +36,7 @@ def _assessment(prop: Property, **kwargs):
 
 
 def _mediator_trust(**overrides) -> MediatorTrustResult:
-    defaults = dict(score=90, is_verified=True, review_count=12, avg_rating=4.8, listing_count=6, reason="Verified by myMakan; 4.8★ average from 12 reviews; 6 listings on myMakan.")
+    defaults = dict(score=90, is_verified=True, review_count=12, avg_rating=4.8, listing_count=6, reason="Verified by Maskan; 4.8★ average from 12 reviews; 6 listings on myMakan.")
     defaults.update(overrides)
     return MediatorTrustResult(**defaults)
 

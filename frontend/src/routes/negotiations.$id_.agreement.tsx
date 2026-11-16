@@ -20,7 +20,7 @@ import { fetchNegotiation, type ApiPropertyNegotiationDetail } from "@/lib/api/m
 // path through unmodified. Documented in
 // docs/implementation/mymakan-negotiations.md "Screens changed".
 export const Route = createFileRoute("/negotiations/$id_/agreement")({
-  head: () => ({ meta: [{ title: "Agreement Summary — myMakan" }] }),
+  head: () => ({ meta: [{ title: "Agreement Summary — Maskan" }] }),
   component: AgreementSummaryPage,
 });
 

@@ -321,7 +321,7 @@ export default function NegotiationDetailScreen() {
           )}
         </View>
 
-        {/* myMakan Summary — deterministic, always populated */}
+        {/* Maskan Summary — deterministic, always populated */}
         <View className="gap-2 rounded-2xl p-4" style={{ backgroundColor: "rgba(124,58,237,0.06)", borderWidth: 1, borderColor: "rgba(124,58,237,0.2)" }}>
           <View className="flex-row items-center gap-1.5">
             <Sparkles size={14} color={colors.ai} />
@@ -349,7 +349,7 @@ export default function NegotiationDetailScreen() {
           </View>
         </View>
 
-        {/* Ask myMakan panel */}
+        {/* Ask Maskan panel */}
         {showAsk && <AskMyMakanPanel negotiationId={negotiation.id} signalKey={signalKey} />}
 
         {/* Actions */}

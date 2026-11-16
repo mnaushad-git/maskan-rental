@@ -95,7 +95,7 @@ def _render(event_type: str, lead: Lead, *, locale: str, notification_key: str, 
             body = f"Your request in {label} was closed successfully." if won else f"Your request in {label} was closed."
     elif notification_key == "lead_message":
         sender = extra.get("sender_role", "")
-        who = {"customer": "العميل" if locale == "ar" else "the customer", "mediator": "الوسيط" if locale == "ar" else "the agent", "admin": "فريق myHome" if locale == "ar" else "the myHome team"}.get(sender, "")
+        who = {"customer": "العميل" if locale == "ar" else "the customer", "mediator": "الوسيط" if locale == "ar" else "the agent", "admin": "فريق مسكن" if locale == "ar" else "the Maskan team"}.get(sender, "")
         body = f"رسالة جديدة من {who} بخصوص {label}." if locale == "ar" else f"New message from {who} about {label}."
     else:  # lead_status_update fallback
         body = f"تغيرت حالة طلبك في {label}." if locale == "ar" else f"Your request in {label} changed status."

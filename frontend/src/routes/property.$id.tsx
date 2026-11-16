@@ -91,7 +91,7 @@ import heroImg from "@/assets/hero-villa.jpg";
 export const Route = createFileRoute("/property/$id")({
   head: () => ({
     meta: [
-      { title: "Property Details — myMakan" },
+      { title: "Property Details — Maskan" },
       {
         name: "description",
         content: "Rental intelligence, area scores, fair rent and AI insights for this property.",
@@ -728,7 +728,7 @@ function Summary({ property }: { property: Property }) {
   );
 }
 
-/* --------------------------- myMakan Intelligence -------------------------- */
+/* --------------------------- Maskan Intelligence -------------------------- */
 // Prompt 7: hero + Decision Score + Price Intelligence. Comparables/Area/
 // Smart Questions/Negotiation sections are built in Prompts 8-9.
 
@@ -1582,7 +1582,7 @@ function NegotiationInsightCard({
   );
 }
 
-/* -------------------------- Ask myMakan (Prompt 9) -------------------------- */
+/* -------------------------- Ask Maskan (Prompt 9) -------------------------- */
 // Property-aware quick questions into the existing AI Advisor, via the same
 // sessionStorage handoff (`storeAdvisorCtx`) property.$id.tsx already uses
 // for the hero's "Ask myMakan" button — not a new chat surface.

@@ -16,7 +16,7 @@ import {
 } from "@/lib/api/maskan";
 
 export const Route = createFileRoute("/viewings")({
-  head: () => ({ meta: [{ title: "My Viewings — myMakan" }] }),
+  head: () => ({ meta: [{ title: "My Viewings — Maskan" }] }),
   component: MyViewingsPage,
 });
 

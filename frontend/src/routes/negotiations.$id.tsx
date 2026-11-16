@@ -40,7 +40,7 @@ export const Route = createFileRoute("/negotiations/$id")({
   validateSearch: (s: Record<string, unknown>): { ask?: boolean } => ({
     ask: s.ask === true || s.ask === "true" ? true : undefined,
   }),
-  head: () => ({ meta: [{ title: "Negotiation — myMakan" }] }),
+  head: () => ({ meta: [{ title: "Negotiation — Maskan" }] }),
   component: NegotiationDetailPage,
 });
 
@@ -325,7 +325,7 @@ function NegotiationDetailPage() {
               )}
             </section>
 
-            {/* myMakan Summary — deterministic, always populated */}
+            {/* Maskan Summary — deterministic, always populated */}
             <section className="rounded-2xl border border-ai/20 bg-ai-soft/40 p-6 shadow-card">
               <div className="flex items-center gap-2">
                 <Sparkles className="size-4 text-ai" />
@@ -337,7 +337,7 @@ function NegotiationDetailPage() {
             {/* Timeline — derived from the offer list + status timestamps */}
             <NegotiationTimeline negotiation={negotiation} lang={lang} t={t} />
 
-            {/* Ask myMakan panel */}
+            {/* Ask Maskan panel */}
             {showAsk && <AskMyMakanPanel negotiationId={negotiation.id} signalKey={signalKey} />}
           </div>
 

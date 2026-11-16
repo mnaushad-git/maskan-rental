@@ -15,7 +15,7 @@ import {
 } from "@/lib/api/maskan";
 
 export const Route = createFileRoute("/partner/viewings")({
-  head: () => ({ meta: [{ title: "Viewing Requests — myMakan Partner" }] }),
+  head: () => ({ meta: [{ title: "Viewing Requests — Maskan Partner" }] }),
   component: PartnerViewingsPage,
 });
 

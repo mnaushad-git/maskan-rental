@@ -41,7 +41,7 @@ export const Route = createFileRoute("/property-requests/new")({
   validateSearch: (s: Record<string, unknown>): { requestId?: number } => ({
     requestId: s.requestId != null ? Number(s.requestId) : undefined,
   }),
-  head: () => ({ meta: [{ title: "Tell myMakan What You Need — myMakan" }] }),
+  head: () => ({ meta: [{ title: "Tell Maskan What You Need — Maskan" }] }),
   component: NewPropertyRequestPage,
 });
 

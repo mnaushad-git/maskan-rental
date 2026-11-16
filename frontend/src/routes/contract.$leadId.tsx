@@ -30,7 +30,7 @@ import { formatSAR } from "@/lib/maskan-data";
 import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/contract/$leadId")({
-  head: () => ({ meta: [{ title: "Rental Contract — myMakan" }] }),
+  head: () => ({ meta: [{ title: "Rental Contract — Maskan" }] }),
   component: ContractPage,
 });
 

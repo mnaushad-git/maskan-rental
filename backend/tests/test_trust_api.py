@@ -81,7 +81,7 @@ def test_trust_endpoint_verified_mediator_present_and_grounded(client, db_sessio
     assert mt is not None
     assert mt["is_verified"] is True
     # The one allowed verification phrase, per the global wording constraint.
-    assert "✓ Verified by myMakan" in body["positive_signals"]
+    assert "✓ Verified by Maskan" in body["positive_signals"]
     assert "Government Verified" not in " ".join(body["positive_signals"])
     assert "REGA" not in " ".join(body["positive_signals"])
 

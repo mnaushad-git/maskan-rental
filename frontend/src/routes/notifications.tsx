@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/notifications")({
   head: () => ({
     meta: [
-      { title: "Notifications — myMakan" },
+      { title: "Notifications — Maskan" },
       { name: "description", content: "Property alerts, digests, and platform updates." },
     ],
   }),

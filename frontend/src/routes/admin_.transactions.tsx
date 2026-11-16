@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 // mutation actions anywhere on this page — the backend router itself has
 // none (see admin_transactions.py's own "Known limitations" note).
 export const Route = createFileRoute("/admin_/transactions")({
-  head: () => ({ meta: [{ title: "Transactions — myMakan Admin" }] }),
+  head: () => ({ meta: [{ title: "Transactions — Maskan Admin" }] }),
   component: AdminTransactionsPage,
 });
 

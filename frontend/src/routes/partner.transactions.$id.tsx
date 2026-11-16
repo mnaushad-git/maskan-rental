@@ -40,7 +40,7 @@ import {
 } from "@/lib/api/maskan";
 
 export const Route = createFileRoute("/partner/transactions/$id")({
-  head: () => ({ meta: [{ title: "Transaction — myMakan Partner" }] }),
+  head: () => ({ meta: [{ title: "Transaction — Maskan Partner" }] }),
   component: PartnerTransactionDetailPage,
 });
 

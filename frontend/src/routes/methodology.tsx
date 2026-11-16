@@ -28,11 +28,11 @@ import { useLanguage } from "@/lib/i18n/context";
 export const Route = createFileRoute("/methodology")({
   head: () => ({
     meta: [
-      { title: "Score Methodology — myMakan" },
+      { title: "Score Methodology — Maskan" },
       {
         name: "description",
         content:
-          "Learn how myMakan calculates area scores: what data we use, how each score is weighted, when data refreshes, and what the scores mean.",
+          "Learn how Maskan calculates area scores: what data we use, how each score is weighted, when data refreshes, and what the scores mean.",
       },
     ],
   }),

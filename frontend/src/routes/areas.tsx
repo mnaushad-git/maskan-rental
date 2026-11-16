@@ -33,7 +33,7 @@ import { useLanguage } from "@/lib/i18n/context";
 export const Route = createFileRoute("/areas")({
   head: () => ({
     meta: [
-      { title: "Explore Areas — myMakan" },
+      { title: "Explore Areas — Maskan" },
       {
         name: "description",
         content:

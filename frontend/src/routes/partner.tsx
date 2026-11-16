@@ -86,7 +86,7 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/partner")({
-  head: () => ({ meta: [{ title: "Partner Dashboard — myMakan" }] }),
+  head: () => ({ meta: [{ title: "Partner Dashboard — Maskan" }] }),
   component: PartnerDashboard,
   // P15: several partner "tabs" (Leads, My Properties, Messages, Profile,
   // Reviews, Area Coverage, Subscription) are internal `view` state within

@@ -78,7 +78,7 @@ def _positive_signals(
     # Only allowed verification wording anywhere in this feature — see the
     # global "Verification wording" constraint.
     if mediator_trust is not None and mediator_trust.is_verified:
-        signals.append("✓ Verified by myMakan")
+        signals.append("✓ Verified by Maskan")
 
     if completeness.score >= 90:
         signals.append(f"{completeness.score}% of listing details are complete")
@@ -124,7 +124,7 @@ def _things_to_verify(
     if mediator_trust is None:
         items.append("No mediator is on record for this listing — verify details directly.")
     elif not mediator_trust.is_verified:
-        items.append("This mediator is not yet verified by myMakan.")
+        items.append("This mediator is not yet verified by Maskan.")
 
     for label in completeness.missing_required[:3]:
         items.append(f"Confirm '{label}' directly with the mediator — not listed.")

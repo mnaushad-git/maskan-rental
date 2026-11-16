@@ -59,7 +59,7 @@ def test_strong_listing_scores_high_and_all_components_present():
     assert 0 <= result.overall_score <= 100
     assert result.overall_score >= 70
     assert result.trust_level in ("High", "Good")
-    assert "✓ Verified by myMakan" in result.positive_signals
+    assert "✓ Verified by Maskan" in result.positive_signals
 
 
 def test_weak_listing_scores_low_and_limited_confidence():

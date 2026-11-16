@@ -13,7 +13,7 @@ import { fetchMyTransactions, type ApiPropertyTransaction } from "@/lib/api/mask
 import { readinessText, statusTone, nbaText } from "@/lib/transactionWorkspace";
 
 export const Route = createFileRoute("/my-transactions")({
-  head: () => ({ meta: [{ title: "My Transactions — myMakan" }] }),
+  head: () => ({ meta: [{ title: "My Transactions — Maskan" }] }),
   component: MyTransactionsPage,
 });
 

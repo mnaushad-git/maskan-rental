@@ -32,11 +32,11 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/analytics")({
   head: () => ({
     meta: [
-      { title: "Analytics Dashboard — myMakan" },
+      { title: "Analytics Dashboard — Maskan" },
       {
         name: "description",
         content:
-          "Executive analytics for myMakan: search demand, lead conversion, AI usage, data quality and inventory health across the Saudi rental market.",
+          "Executive analytics for Maskan: search demand, lead conversion, AI usage, data quality and inventory health across the Saudi rental market.",
       },
     ],
   }),

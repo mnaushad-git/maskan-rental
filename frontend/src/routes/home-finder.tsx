@@ -79,11 +79,11 @@ export const Route = createFileRoute("/home-finder")({
   }),
   head: () => ({
     meta: [
-      { title: "AI Home Finder — myMakan" },
+      { title: "AI Home Finder — Maskan" },
       {
         name: "description",
         content:
-          "Describe what you're looking for in plain language and myMakan AI finds and ranks the best matching properties.",
+          "Describe what you're looking for in plain language and Maskan AI finds and ranks the best matching properties.",
       },
     ],
   }),
