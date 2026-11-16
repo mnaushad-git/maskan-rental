@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from collections.abc import Callable
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -24,6 +25,7 @@ from app.core.ai.prompts import (
 )
 from app.core.config import settings
 from app.core.rate_limit import _client_identifier, check_rate_limit, rate_limit_dependency
+from app.db.session import SessionLocal
 from app.models.contract import Contract
 from app.models.lead import Lead
 from app.models.property import Property
@@ -397,7 +399,40 @@ def _run_chat(feature: str, prompt: PromptDefinition, tools: list, req: ChatRequ
         )
 
 
-def _stream_chat(feature: str, prompt: PromptDefinition, tools: list, req: ChatRequest, user_id: int | None = None) -> StreamingResponse:
+def _release_session_after_each_call(tools: list, db: Session) -> list:
+    """Wrap each tool so the session's connection goes back to the pool as
+    soon as the tool returns (or raises). The session stays usable: the next
+    tool call simply checks a connection out again."""
+    for tool in tools:
+        original_call = tool.call
+
+        def call(tool_input, _original_call=original_call):
+            try:
+                return _original_call(tool_input)
+            finally:
+                db.close()
+
+        tool.call = call
+    return tools
+
+
+def _stream_chat(
+    feature: str,
+    prompt: PromptDefinition,
+    tools_factory: Callable[[Session], list],
+    req: ChatRequest,
+    user_id: int | None = None,
+) -> StreamingResponse:
+    """Takes a tools *factory*, not a tools list built from the request's
+    `db`: FastAPI (0.115) closes `get_db`'s session before a StreamingResponse
+    body runs, and the tool runner calls tools mid-stream. Tools bound to the
+    request session would silently re-open it after close, check out a fresh
+    pool connection, and never return it — each such stream permanently
+    leaked one connection until the pool was exhausted (P0, Nov 2026). The
+    stream therefore owns its own session, and releases its connection after
+    every tool call — never holding one across a `yield`, because a client
+    disconnect abandons this generator without closing it (its `finally`
+    then only runs whenever the cyclic GC gets to it)."""
     import time
 
     client = gateway.get_client()
@@ -407,12 +442,13 @@ def _stream_chat(feature: str, prompt: PromptDefinition, tools: list, req: ChatR
     def events():
         started = time.monotonic()
         status = "error"
+        db = SessionLocal()
         try:
             runner = client.beta.messages.tool_runner(
                 model=gateway.DEFAULT_MODEL,
                 max_tokens=1500,
                 system=prompt.template,
-                tools=tools,
+                tools=_release_session_after_each_call(tools_factory(db), db),
                 messages=messages,
                 stream=True,
             )
@@ -427,6 +463,10 @@ def _stream_chat(feature: str, prompt: PromptDefinition, tools: list, req: ChatR
         except Exception as exc:
             yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
         finally:
+            # Return the connection before anything else in this block can
+            # fail. Also runs when the client disconnects and the abandoned
+            # generator is closed (GeneratorExit at the pending yield).
+            db.close()
             # Token usage isn't reliably extractable mid-stream from the tool
             # runner, so the streaming path logs latency/status only — the
             # non-streaming path (_run_chat) is the one with full token/cost data.
@@ -501,7 +541,7 @@ def ai_chat_stream(
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(status_code=503, detail="AI service not configured — set ANTHROPIC_API_KEY")
     _enforce_free_chat_cap(request, current_user)
-    return _stream_chat("customer_chat_stream", CUSTOMER_ADVISOR, _customer_tools(db), req, user_id=current_user.id if current_user else None)
+    return _stream_chat("customer_chat_stream", CUSTOMER_ADVISOR, _customer_tools, req, user_id=current_user.id if current_user else None)
 
 
 # ── AI Contract Assistant ───────────────────────────────────────────────────

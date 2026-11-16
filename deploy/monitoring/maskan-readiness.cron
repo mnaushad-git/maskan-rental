@@ -1,0 +1,7 @@
+# /etc/cron.d/maskan-readiness — myMakan public readiness watchdog (see maskan-readiness-check.sh).
+# Set AUTO_RESTART=1 to let it restart the backend container after FAIL_THRESHOLD consecutive failures.
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+AUTO_RESTART=0
+FAIL_THRESHOLD=5
+* * * * * root /usr/local/bin/maskan-readiness-check.sh
