@@ -37,6 +37,7 @@ import {
   type AuthUser,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
+import { loginErrorMessage } from "@/lib/adminFeedback";
 import { cn } from "@/lib/utils";
 
 // This route is intentionally self-contained (no imports from routes/admin.tsx
@@ -97,8 +98,8 @@ function AdminNotificationsLoginGate({
         return;
       }
       onAuth(response.user, response.access_token);
-    } catch {
-      setError("Invalid email or password.");
+    } catch (err) {
+      setError(loginErrorMessage(err));
     } finally {
       setLoading(false);
     }

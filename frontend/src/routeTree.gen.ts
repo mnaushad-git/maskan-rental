@@ -53,6 +53,8 @@ import { Route as AdminTrustModerationRouteImport } from './routes/admin_.trust-
 import { Route as AdminTransactionsRouteImport } from './routes/admin_.transactions'
 import { Route as AdminPropertyRequestsRouteImport } from './routes/admin_.property-requests'
 import { Route as AdminNotificationsRouteImport } from './routes/admin_.notifications'
+import { Route as AdminImportRouteImport } from './routes/admin_.import'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin_.analytics'
 import { Route as PropertyRouteImport } from './routes/property.'
 import { Route as PartnerViewingsIdRouteImport } from './routes/partner.viewings.$id'
 import { Route as PartnerTransactionsIdRouteImport } from './routes/partner.transactions.$id'
@@ -281,6 +283,16 @@ const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
   path: '/admin/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminImportRoute = AdminImportRouteImport.update({
+  id: '/admin_/import',
+  path: '/admin/import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/admin_/analytics',
+  path: '/admin/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PropertyRoute = PropertyRouteImport.update({
   id: '/property/',
   path: '/property/',
@@ -343,6 +355,8 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/viewings': typeof ViewingsRouteWithChildren
   '/property/': typeof PropertyRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/import': typeof AdminImportRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/property-requests': typeof AdminPropertyRequestsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
@@ -396,6 +410,8 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/viewings': typeof ViewingsRouteWithChildren
   '/property': typeof PropertyRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/import': typeof AdminImportRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/property-requests': typeof AdminPropertyRequestsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
@@ -450,6 +466,8 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/viewings': typeof ViewingsRouteWithChildren
   '/property/': typeof PropertyRoute
+  '/admin_/analytics': typeof AdminAnalyticsRoute
+  '/admin_/import': typeof AdminImportRoute
   '/admin_/notifications': typeof AdminNotificationsRoute
   '/admin_/property-requests': typeof AdminPropertyRequestsRoute
   '/admin_/transactions': typeof AdminTransactionsRoute
@@ -505,6 +523,8 @@ export interface FileRouteTypes {
     | '/search'
     | '/viewings'
     | '/property/'
+    | '/admin/analytics'
+    | '/admin/import'
     | '/admin/notifications'
     | '/admin/property-requests'
     | '/admin/transactions'
@@ -558,6 +578,8 @@ export interface FileRouteTypes {
     | '/search'
     | '/viewings'
     | '/property'
+    | '/admin/analytics'
+    | '/admin/import'
     | '/admin/notifications'
     | '/admin/property-requests'
     | '/admin/transactions'
@@ -611,6 +633,8 @@ export interface FileRouteTypes {
     | '/search'
     | '/viewings'
     | '/property/'
+    | '/admin_/analytics'
+    | '/admin_/import'
     | '/admin_/notifications'
     | '/admin_/property-requests'
     | '/admin_/transactions'
@@ -665,6 +689,8 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   ViewingsRoute: typeof ViewingsRouteWithChildren
   PropertyRoute: typeof PropertyRoute
+  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
+  AdminImportRoute: typeof AdminImportRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminPropertyRequestsRoute: typeof AdminPropertyRequestsRoute
   AdminTransactionsRoute: typeof AdminTransactionsRoute
@@ -988,6 +1014,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/import': {
+      id: '/admin_/import'
+      path: '/admin/import'
+      fullPath: '/admin/import'
+      preLoaderRoute: typeof AdminImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin_/analytics': {
+      id: '/admin_/analytics'
+      path: '/admin/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/property/': {
       id: '/property/'
       path: '/property'
@@ -1172,6 +1212,8 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   ViewingsRoute: ViewingsRouteWithChildren,
   PropertyRoute: PropertyRoute,
+  AdminAnalyticsRoute: AdminAnalyticsRoute,
+  AdminImportRoute: AdminImportRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminPropertyRequestsRoute: AdminPropertyRequestsRoute,
   AdminTransactionsRoute: AdminTransactionsRoute,

@@ -11,6 +11,7 @@ from app.api.deps import get_admin_user, get_current_user, get_db, get_mediator_
 from app.api.routes.reviews import get_mediator_summary
 from app.core.audit import record_audit
 from app.core.config import settings
+from app.core.roles import is_admin_user
 from app.core.feature_flags import is_enabled
 from app.core.geo import coords_for
 from app.core.metrics import properties_published_total
@@ -302,7 +303,7 @@ def get_property(
             is_owning_mediator = bool(mediator and mediator.id == property_obj.mediator_id)
         is_admin_caller = bool(
             current_user
-            and (current_user.email in settings.admin_emails or current_user.is_admin)
+            and is_admin_user(current_user)
         )
         if not is_owning_mediator and not is_admin_caller:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")

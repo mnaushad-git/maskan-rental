@@ -1,117 +1,200 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import case, func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_admin_user, get_db, get_optional_current_user
 from app.core.rate_limit import rate_limit_dependency
+from app.models.ai_call_log import AICallLog
 from app.models.analytics_event import ANALYTICS_EVENTS, AnalyticsEvent
+from app.models.lead import Lead
+from app.models.listing_image import ListingImage
 from app.models.property import Property
-from app.models.saved_property import SavedProperty
-from app.models.saved_search import SavedSearch
+from app.models.property_transaction import PropertyTransaction
+from app.models.property_viewing import PropertyViewing
 from app.models.user import User
 
 router = APIRouter()
 
 
+_WINDOW_DAYS = 30
+
+# Data-quality goals shown next to each measured coverage figure. These are
+# product targets (configuration), not measurements.
+_DATA_QUALITY_TARGETS = {"photos": 90, "geocoded": 98, "partner": 85, "details": 90}
+
+
+def _pct(part: int, whole: int) -> int:
+    return int(round(part * 100 / whole)) if whole else 0
+
+
+def _window_counts(db: Session, column, now: datetime) -> tuple[int, int]:
+    """(rows created in the last 30 days, rows created in the 30 days before)."""
+    start = now - timedelta(days=_WINDOW_DAYS)
+    prev_start = start - timedelta(days=_WINDOW_DAYS)
+    current = db.scalar(select(func.count()).where(column >= start)) or 0
+    previous = db.scalar(select(func.count()).where(column >= prev_start, column < start)) or 0
+    return int(current), int(previous)
+
+
+def _new_kpi(label: str, total: int, new_in_window: int, accent: str) -> dict:
+    return {
+        "label": label,
+        "value": f"{total:,}",
+        "delta": f"+{new_in_window:,}" if new_in_window else "",
+        "sub": f"new in last {_WINDOW_DAYS} days" if new_in_window else f"none new in last {_WINDOW_DAYS} days",
+        "trend": "up" if new_in_window else "flat",
+        "accent": accent,
+    }
+
+
 @router.get("/summary")
 def analytics_summary(db: Session = Depends(get_db), _admin: User = Depends(get_admin_user)):
-    """Return high-level rental market analytics. Admin-only (P11-001): this
-    backs the admin portal's "Analytics" nav item (`mymakan-phase1.md`
-    classifies `analytics.py`/`analytics.tsx` as "Admin analytics") and was
-    previously reachable with zero authentication, leaking aggregate
-    business metrics (total users, total properties, KPIs) to anyone."""
+    """Admin analytics summary. Admin-only (P11-001).
+
+    Every figure here is computed from real rows. This endpoint previously
+    returned fabricated numbers (search demand / funnel derived by
+    multiplying the listing count, hard-coded AI-trend and data-quality
+    percentages, fixed "+8.2%"-style deltas and fake "5 min ago" activity).
+    Metrics Maskan does not record yet are listed in `unavailable` and
+    returned empty, so the dashboard can say so instead of inventing them."""
+    now = datetime.now(timezone.utc)
+
     total_properties = db.scalar(select(func.count(Property.id))) or 0
     total_users = db.scalar(select(func.count(User.id))) or 0
-    saved_properties = db.scalar(select(func.count(SavedProperty.id))) or 0
-    saved_searches = db.scalar(select(func.count(SavedSearch.id))) or 0
+    total_leads = db.scalar(select(func.count(Lead.id))) or 0
+    total_viewings = db.scalar(select(func.count(PropertyViewing.id))) or 0
+    total_transactions = db.scalar(select(func.count(PropertyTransaction.id))) or 0
+    total_views = db.scalar(select(func.coalesce(func.sum(Property.views_count), 0))) or 0
 
-    property_rows = db.execute(
-        select(
-            Property.area.label("name"),
-            Property.city.label("city"),
-            func.count(Property.id).label("count"),
-            func.avg(Property.monthly_rent).label("avg_rent"),
-        )
+    new_properties, _ = _window_counts(db, Property.created_at, now)
+    new_leads, _ = _window_counts(db, Lead.created_at, now)
+    new_users, _ = _window_counts(db, User.created_at, now)
+
+    unavailable = ["searchDemand"]  # no search-event tracking exists yet
+
+    # AI usage — from the AI call log (one row per model call).
+    ai_trends: list[dict] = []
+    try:
+        ai_current, ai_previous = _window_counts(db, AICallLog.created_at, now)
+        if ai_previous:
+            change = round((ai_current - ai_previous) * 100 / ai_previous)
+            delta = f"{change:+d}%"
+            trend = "up" if change > 0 else "down" if change < 0 else "flat"
+            sub = f"vs {ai_previous:,} in previous {_WINDOW_DAYS} days"
+        else:
+            delta, trend, sub = "", "flat", f"AI requests, last {_WINDOW_DAYS} days"
+        ai_kpi = {"label": "AI requests", "value": f"{ai_current:,}", "delta": delta, "sub": sub, "trend": trend, "accent": "ai"}
+        feature_rows = db.execute(
+            select(AICallLog.feature, func.count(AICallLog.id).label("n"))
+            .where(AICallLog.created_at >= now - timedelta(days=_WINDOW_DAYS))
+            .group_by(AICallLog.feature)
+            .order_by(func.count(AICallLog.id).desc())
+            .limit(5)
+        ).all()
+        feature_total = sum(r.n for r in feature_rows)
+        ai_trends = [
+            {"label": r.feature.replace("_", " ").capitalize(), "count": int(r.n), "value": _pct(int(r.n), feature_total)}
+            for r in feature_rows
+        ]
+    except SQLAlchemyError:
+        db.rollback()
+        ai_kpi = {"label": "AI requests", "value": "—", "delta": "", "sub": "AI usage log unavailable", "trend": "flat", "accent": "ai"}
+        unavailable.append("aiTrends")
+
+    area_rows = db.execute(
+        select(Property.area.label("name"), Property.city.label("city"), func.count(Property.id).label("count"))
         .group_by(Property.area, Property.city)
         .order_by(func.count(Property.id).desc())
         .limit(7)
     ).all()
+    top_count = area_rows[0].count if area_rows else 0
+    popular_areas = [
+        {"name": r.name, "city": r.city, "listings": int(r.count), "share": _pct(int(r.count), int(top_count))}
+        for r in area_rows
+    ]
 
     inventory_rows = db.execute(
         select(
             Property.city,
-            func.count(Property.id).label("total"),
-            func.sum(case((Property.status == "Published", 1), else_=0)).label("available"),
-            func.sum(case((Property.status == "Pending Approval", 1), else_=0)).label("reserved"),
-            func.sum(case((Property.status.in_(["Suspended", "Rejected"]), 1), else_=0)).label("rented"),
+            func.sum(case((Property.status == "Published", 1), else_=0)).label("published"),
+            func.sum(case((Property.status == "Pending Approval", 1), else_=0)).label("pending"),
+            func.sum(case((Property.status.notin_(["Published", "Pending Approval"]), 1), else_=0)).label("inactive"),
         )
         .group_by(Property.city)
         .order_by(func.count(Property.id).desc())
     ).all()
 
-    search_demand = [
-        {"day": "Sun", "riyadh": total_properties * 10 + 20, "jeddah": total_properties * 6 + 12, "dammam": total_properties * 3 + 6},
-        {"day": "Mon", "riyadh": total_properties * 12 + 24, "jeddah": total_properties * 7 + 14, "dammam": total_properties * 4 + 8},
-        {"day": "Tue", "riyadh": total_properties * 14 + 28, "jeddah": total_properties * 8 + 16, "dammam": total_properties * 5 + 10},
-        {"day": "Wed", "riyadh": total_properties * 16 + 32, "jeddah": total_properties * 9 + 18, "dammam": total_properties * 6 + 12},
-        {"day": "Thu", "riyadh": total_properties * 18 + 36, "jeddah": total_properties * 11 + 20, "dammam": total_properties * 7 + 14},
-        {"day": "Fri", "riyadh": total_properties * 15 + 30, "jeddah": total_properties * 9 + 18, "dammam": total_properties * 5 + 10},
-        {"day": "Sat", "riyadh": total_properties * 17 + 34, "jeddah": total_properties * 10 + 19, "dammam": total_properties * 6 + 12},
-    ]
+    with_photos = db.scalar(select(func.count(func.distinct(ListingImage.property_id)))) or 0
+    geocoded = db.scalar(
+        select(func.count(Property.id)).where(Property.latitude.isnot(None), Property.longitude.isnot(None))
+    ) or 0
+    with_partner = db.scalar(select(func.count(Property.id)).where(Property.mediator_id.isnot(None))) or 0
+    complete_details = db.scalar(
+        select(func.count(Property.id)).where(
+            Property.size_sq_m.isnot(None), Property.bedrooms.isnot(None), Property.bathrooms.isnot(None)
+        )
+    ) or 0
 
-    popular_areas = [
-        {
-            "name": row.name,
-            "city": row.city,
-            "searches": int(row.count * 125),
-            "share": max(20, min(100, int(row.count * 100 / max(1, property_rows[0].count if property_rows else 1)))),
-        }
-        for row in property_rows
-    ]
+    activity: list[dict] = []
+    for prop in db.scalars(select(Property).order_by(Property.created_at.desc()).limit(4)).all():
+        activity.append({
+            "tone": "primary",
+            "title": f"New listing — {prop.title}",
+            "meta": f"{prop.area}, {prop.city} · {prop.status}",
+            "time": prop.created_at.isoformat(),
+        })
+    for lead in db.scalars(select(Lead).order_by(Lead.created_at.desc()).limit(4)).all():
+        activity.append({
+            "tone": "info",
+            "title": f"New lead #{lead.id}",
+            "meta": "Status: " + (lead.status or "").replace("_", " "),
+            "time": lead.created_at.isoformat(),
+        })
+    for u in db.scalars(select(User).order_by(User.created_at.desc()).limit(3)).all():
+        activity.append({
+            "tone": "success",
+            "title": "New account registered",
+            "meta": f"User #{u.id}",
+            "time": u.created_at.isoformat(),
+        })
+    activity.sort(key=lambda a: a["time"], reverse=True)
 
     return {
+        "generated_at": now.isoformat(),
+        "window_days": _WINDOW_DAYS,
+        "unavailable": unavailable,
         "total_properties": total_properties,
         "total_users": total_users,
         "kpis": [
-            {"label": "Total properties", "value": str(total_properties), "delta": "+8.2%", "sub": "vs. last 30 days", "trend": "up", "accent": "primary"},
-            {"label": "Total leads", "value": str(saved_properties + saved_searches), "delta": "+14.6%", "sub": f"{saved_properties} active shortlist actions", "trend": "up", "accent": "info"},
-            {"label": "Conversion rate", "value": f"{min(99, (saved_properties * 100 // max(1, total_properties)))}%", "delta": "+0.9 pp", "sub": "Saved → engaged", "trend": "up", "accent": "success"},
-            {"label": "AI usage", "value": str(saved_searches * 12 + total_users * 8), "delta": "+22.4%", "sub": "Advisor-style sessions", "trend": "up", "accent": "ai"},
+            _new_kpi("Total properties", total_properties, new_properties, "primary"),
+            _new_kpi("Total leads", total_leads, new_leads, "info"),
+            _new_kpi("Registered users", total_users, new_users, "success"),
+            ai_kpi,
         ],
-        "searchDemand": search_demand,
+        "searchDemand": [],
         "popularAreas": popular_areas,
         "funnel": [
-            {"stage": "Search impressions", "value": max(100, total_properties * 180), "color": "chart-1"},
-            {"stage": "Listing views", "value": max(60, total_properties * 90), "color": "chart-2"},
-            {"stage": "Saved actions", "value": max(10, saved_properties * 12), "color": "chart-3"},
-            {"stage": "Viewings scheduled", "value": max(1, saved_properties), "color": "chart-4"},
-            {"stage": "Contracts signed", "value": max(1, total_users), "color": "chart-5"},
+            {"stage": "Listing views", "value": int(total_views), "color": "chart-1"},
+            {"stage": "Leads created", "value": int(total_leads), "color": "chart-2"},
+            {"stage": "Viewings scheduled", "value": int(total_viewings), "color": "chart-3"},
+            {"stage": "Transactions started", "value": int(total_transactions), "color": "chart-4"},
         ],
-        "aiTrends": [
-            {"label": "Area recommendation", "value": 38, "delta": "+6.1%"},
-            {"label": "Budget fit", "value": 26, "delta": "+4.8%"},
-            {"label": "Compare districts", "value": 18, "delta": "+2.2%"},
-            {"label": "Rent fairness check", "value": 12, "delta": "+1.4%"},
-            {"label": "Schools & family", "value": 6, "delta": "-0.3%"},
-        ],
+        "aiTrends": ai_trends,
         "dataQuality": [
-            {"label": "Verified listings", "value": 92, "target": 95},
-            {"label": "Complete photos", "value": 84, "target": 90},
-            {"label": "Geocoded address", "value": 97, "target": 98},
-            {"label": "Owner assigned", "value": 100 if total_properties and all(row for row in inventory_rows) else 80, "target": 85},
-            {"label": "Pricing within band", "value": 88, "target": 90},
+            {"label": "Listings with photos", "value": _pct(with_photos, total_properties), "target": _DATA_QUALITY_TARGETS["photos"]},
+            {"label": "Geocoded location", "value": _pct(geocoded, total_properties), "target": _DATA_QUALITY_TARGETS["geocoded"]},
+            {"label": "Assigned to a partner", "value": _pct(with_partner, total_properties), "target": _DATA_QUALITY_TARGETS["partner"]},
+            {"label": "Size, bedrooms & bathrooms set", "value": _pct(complete_details, total_properties), "target": _DATA_QUALITY_TARGETS["details"]},
         ],
         "inventory": [
-            {"city": row.city, "available": int(row.available or 0), "reserved": int(row.reserved or 0), "rented": int(row.rented or 0)}
-            for row in inventory_rows
+            {"city": r.city, "published": int(r.published or 0), "pending": int(r.pending or 0), "inactive": int(r.inactive or 0)}
+            for r in inventory_rows
         ],
-        "activity": [
-            {"tone": "info", "title": f"{saved_properties} shortlist actions recorded", "meta": "Saved properties activity", "time": "Just now"},
-            {"tone": "success", "title": f"{total_properties} listings currently tracked", "meta": "Live property inventory", "time": "5 min ago"},
-            {"tone": "ai", "title": f"{saved_searches} search presets active", "meta": "Search intent signals", "time": "11 min ago"},
-            {"tone": "primary", "title": f"{total_users} registered users", "meta": "Account growth", "time": "26 min ago"},
-        ],
+        "activity": activity[:8],
     }
 
 

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.core.config import settings
+from app.core.roles import is_admin_user
 from app.core.rate_limit import rate_limit_dependency
 from app.models.user import User
 from passlib.context import CryptContext
@@ -111,7 +112,7 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
             id=user.id,
             email=user.email,
             full_name=user.full_name,
-            is_admin=user.email in settings.admin_emails,
+            is_admin=is_admin_user(user),
             verification_status=user.verification_status,
             is_verified=user.is_verified,
         ),
@@ -138,7 +139,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             id=user.id,
             email=user.email,
             full_name=user.full_name,
-            is_admin=user.email in settings.admin_emails,
+            is_admin=is_admin_user(user),
             verification_status=user.verification_status,
             is_verified=user.is_verified,
         ),
@@ -151,7 +152,7 @@ def me(current_user: User = Depends(get_current_user)):
         id=current_user.id,
         email=current_user.email,
         full_name=current_user.full_name,
-        is_admin=current_user.email in settings.admin_emails,
+        is_admin=is_admin_user(current_user),
         verification_status=current_user.verification_status,
         is_verified=current_user.is_verified,
     )

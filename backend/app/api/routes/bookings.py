@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.core.config import settings
+from app.core.roles import is_admin_user
 from app.models.booking import Booking
 from app.models.mediator import Mediator
 from app.models.property import Property
@@ -167,7 +168,7 @@ def property_bookings(
 
     mediator = db.query(Mediator).filter(Mediator.user_id == current_user.id).first()
     is_owner = mediator is not None and mediator.id == prop.mediator_id
-    is_admin = current_user.email in settings.admin_emails
+    is_admin = is_admin_user(current_user)
     if not is_owner and not is_admin:
         raise HTTPException(status_code=403, detail="Only the property's mediator or an admin can view its bookings.")
 
@@ -188,7 +189,7 @@ def cancel_booking(
     booking = db.get(Booking, booking_id)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
-    if booking.renter_user_id != current_user.id and current_user.email not in settings.admin_emails:
+    if booking.renter_user_id != current_user.id and not is_admin_user(current_user):
         raise HTTPException(status_code=403, detail="Only the renter or an admin can cancel this booking.")
     if booking.status == "cancelled":
         raise HTTPException(status_code=400, detail="Booking is already cancelled.")

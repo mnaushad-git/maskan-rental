@@ -29,6 +29,11 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  IdCard,
+  FileCheck2,
+  Activity,
+  ExternalLink,
+  Bell,
   MessageSquare,
   Send,
   Sparkles,
@@ -80,6 +85,10 @@ import {
   deletePropertyImage,
   fetchAdminProjects,
   patchProjectAdmin,
+  fetchPendingVerifications,
+  approveVerification,
+  rejectVerification,
+  type ApiVerificationRequest,
   type ApiAreaSummary,
   type ApiProperty,
   type ApiProject,
@@ -91,6 +100,9 @@ import {
   type AuthUser,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
+import { apiErrorMessage, confirmAdminAction, loginErrorMessage } from "@/lib/adminFeedback";
+import { LoadErrorNotice } from "@/components/admin/LoadErrorNotice";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin")({
@@ -152,13 +164,14 @@ type AdminView =
   | "mediators"
   | "leads"
   | "reviews"
+  | "verification"
   | "users";
 type TransactionTypeFilter = "all" | "rent" | "sale";
 type VerificationFilter = "All" | "Verified" | "Unverified";
 
 type AdminNavItem = { key: string; icon: React.ElementType; label: string; badge?: number } & (
   | { kind: "view"; active: boolean; onClick: () => void }
-  | { kind: "link"; to: string }
+  | { kind: "link"; to: string; external?: boolean }
 );
 
 function AdminPage() {
@@ -178,6 +191,13 @@ function AdminPage() {
   const [reviews, setReviews] = useState<ApiReviewAdmin[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
+  // Load errors per data source. An outage must never render as an empty
+  // list / zero count ("No leads awaiting review", "0 properties").
+  const [listingsError, setListingsError] = useState<string | null>(null);
+  const [mediatorsError, setMediatorsError] = useState<string | null>(null);
+  const [leadsError, setLeadsError] = useState<string | null>(null);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ListingStatus | "All">("All");
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<TransactionTypeFilter>("all");
@@ -207,10 +227,14 @@ function AdminPage() {
     async function loadAll() {
       try {
         setLoadingListings(true);
+        setListingsError(null);
         const listingsData = await fetchAdminProperties();
         if (!cancelled) setListings(listingsData.map(toListing));
       } catch (err) {
-        if (!cancelled) console.error("fetchAdminProperties failed:", err);
+        if (!cancelled) {
+          console.error("fetchAdminProperties failed:", err);
+          setListingsError(apiErrorMessage(err));
+        }
       } finally {
         if (!cancelled) setLoadingListings(false);
       }
@@ -220,7 +244,7 @@ function AdminPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, authLoading]);
+  }, [user, authLoading, reloadKey]);
 
   // Load pending review count on mount for badge
   useEffect(() => {
@@ -250,16 +274,21 @@ function AdminPage() {
     if (authLoading || !user || !user.is_admin) return;
     if ((view === "mediators" || view === "dashboard") && mediators.length === 0 && !loadingMediators) {
       setLoadingMediators(true);
+      setMediatorsError(null);
       fetchAdminMediators()
         .then((m) => setMediators(m))
-        .catch(() => {})
+        .catch((err) => setMediatorsError(apiErrorMessage(err)))
         .finally(() => setLoadingMediators(false));
     }
     if ((view === "leads" || view === "dashboard") && leads.length === 0 && !loadingLeads) {
       setLoadingLeads(true);
+      setLeadsError(null);
       fetchAdminLeads()
         .then((l) => setLeads(l))
-        .catch((err) => console.error("fetchAdminLeads failed:", err))
+        .catch((err) => {
+          console.error("fetchAdminLeads failed:", err);
+          setLeadsError(apiErrorMessage(err));
+        })
         .finally(() => setLoadingLeads(false));
     }
     if (view === "projects" && projects.length === 0 && !loadingProjects) {
@@ -271,19 +300,49 @@ function AdminPage() {
     }
     if (view === "reviews" && !loadingReviews) {
       setLoadingReviews(true);
+      setReviewsError(null);
       fetchAllReviews()
         .then((r) => {
           setReviews(r);
           setPendingReviewCount(r.filter((x) => x.status === "pending").length);
         })
-        .catch(() => {})
+        .catch((err) => setReviewsError(apiErrorMessage(err)))
         .finally(() => setLoadingReviews(false));
     }
     if (view === "dashboard" && users.length === 0 && !loadingUsers && !usersError) {
       loadUsers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, user, authLoading]);
+  }, [view, user, authLoading, reloadKey]);
+
+  /** Retry every data source that failed to load. */
+  function retryLoads() {
+    setListingsError(null);
+    setMediatorsError(null);
+    setLeadsError(null);
+    setReviewsError(null);
+    if (usersError) loadUsers();
+    setReloadKey((k) => k + 1);
+  }
+
+  /**
+   * Runs a consequential admin action: optional confirmation first, then a
+   * success toast or an error toast — never a silent failure.
+   */
+  async function adminAction(
+    fn: () => Promise<unknown>,
+    opts: { confirm?: string; success?: string; failure: string },
+  ): Promise<boolean> {
+    if (opts.confirm && !confirmAdminAction(opts.confirm)) return false;
+    try {
+      await fn();
+      if (opts.success) toast.success(opts.success);
+      return true;
+    } catch (err) {
+      toast.error(`${opts.failure}: ${apiErrorMessage(err)}`);
+      return false;
+    }
+  }
 
   function loadUsers() {
     setLoadingUsers(true);
@@ -296,6 +355,14 @@ function AdminPage() {
       })
       .finally(() => setLoadingUsers(false));
   }
+
+  const newThisWeek = useMemo(() => {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return listings.filter((l) => {
+      const t = new Date(l.createdAt).getTime();
+      return Number.isFinite(t) && t >= cutoff;
+    }).length;
+  }, [listings]);
 
   const stats = useMemo(
     () => ({
@@ -417,6 +484,13 @@ function AdminPage() {
   }
   async function setStatus(id: string, status: ListingStatus) {
     const numericId = Number(id);
+    if (
+      (status === "Suspended" || status === "Rejected") &&
+      !confirmAdminAction(
+        `${status === "Suspended" ? "Suspend" : "Reject"} this listing? It will be removed from the public site.`,
+      )
+    )
+      return;
     if (Number.isFinite(numericId)) {
       try {
         await patchProperty(numericId, { status });
@@ -440,8 +514,14 @@ function AdminPage() {
 
   async function remove(id: string) {
     const numericId = Number(id);
+    const title = listings.find((l) => l.id === id)?.title ?? `#${id}`;
+    if (!confirmAdminAction(`Permanently delete the listing "${title}"? This cannot be undone.`)) return;
     if (Number.isFinite(numericId)) {
-      await removeProperty(numericId);
+      const ok = await adminAction(() => removeProperty(numericId), {
+        success: "Listing deleted.",
+        failure: "Couldn't delete the listing",
+      });
+      if (!ok) return;
     }
     setListings((prev) => prev.filter((l) => l.id !== id));
     setSelected((prev) => {
@@ -465,6 +545,12 @@ function AdminPage() {
   }
   async function bulkSetStatus(status: ListingStatus) {
     const ids = [...selected].map(Number).filter(Number.isFinite);
+    if (
+      !confirmAdminAction(
+        `${status === "Published" ? "Publish" : "Suspend"} ${ids.length} selected listing${ids.length === 1 ? "" : "s"}?`,
+      )
+    )
+      return;
     try {
       await Promise.all(ids.map((id) => patchProperty(id, { status })));
       const fresh = await fetchAdminProperties();
@@ -482,12 +568,14 @@ function AdminPage() {
       title: data.title,
       area: data.district,
       city: data.city,
-      size_sq_m: data.areaSqm ?? 200,
+      // Missing values are sent as null (never a made-up default): the
+      // console used to silently write 200 m² / 3 bed / 3 bath.
+      size_sq_m: data.areaSqm ?? null,
       listing_type: listingType,
       monthly_rent: listingType === "rent" ? data.rent : undefined,
       sale_price: listingType === "sale" ? data.rent : undefined,
-      bedrooms: data.bedrooms ?? 3,
-      bathrooms: data.bathrooms ?? 3,
+      bedrooms: data.bedrooms ?? null,
+      bathrooms: data.bathrooms ?? null,
       owner_name: data.owner,
       status: data.status,
       description: data.description ?? "",
@@ -498,7 +586,7 @@ function AdminPage() {
     try {
       const saved = await (Number.isFinite(numericId)
         ? patchProperty(numericId, payload)
-        : createProperty({ ...payload, external_id: `MSK-${Date.now()}` }));
+        : createProperty({ ...payload, external_id: `MSK-${Date.now()}` } as Parameters<typeof createProperty>[0]));
 
       // Sync images: add new URLs, delete removed ones
       const existingImages = saved.images ?? [];
@@ -517,24 +605,44 @@ function AdminPage() {
       const fresh = await fetchAdminProperties();
       setListings(fresh.map(toListing));
       setFormOpen(false);
+      toast.success(Number.isFinite(numericId) ? "Listing updated." : "Listing created.");
     } catch (err) {
       alert(`Failed to save listing: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  async function handleVerifyMediator(id: number, is_verified: boolean) {
-    const updated = await patchMediatorAdmin(id, { is_verified });
+  function partnerName(id: number) {
+    return mediators.find((m) => m.id === id)?.agency_name ?? `Partner #${id}`;
+  }
+
+  function replaceMediator(updated: ApiPartner) {
     setMediators((m) => m.map((med) => (med.id === updated.id ? updated : med)));
+  }
+
+  async function handleVerifyMediator(id: number, is_verified: boolean) {
+    await adminAction(async () => replaceMediator(await patchMediatorAdmin(id, { is_verified })), {
+      confirm: is_verified
+        ? undefined
+        : `Remove the verified badge from ${partnerName(id)}? Customers will no longer see this partner as verified.`,
+      success: is_verified ? `${partnerName(id)} marked as verified.` : `${partnerName(id)} is no longer verified.`,
+      failure: is_verified ? "Couldn't verify the partner" : "Couldn't remove verification",
+    });
   }
 
   async function handleApprovePartner(id: number) {
-    const updated = await approvePartner(id);
-    setMediators((m) => m.map((med) => (med.id === updated.id ? updated : med)));
+    await adminAction(async () => replaceMediator(await approvePartner(id)), {
+      confirm: `Approve ${partnerName(id)}? They will be able to use the partner portal.`,
+      success: `${partnerName(id)} approved.`,
+      failure: "Couldn't approve the partner",
+    });
   }
 
   async function handleRejectPartner(id: number) {
-    const updated = await rejectPartner(id);
-    setMediators((m) => m.map((med) => (med.id === updated.id ? updated : med)));
+    await adminAction(async () => replaceMediator(await rejectPartner(id)), {
+      confirm: `Reject ${partnerName(id)}? They will lose access to the partner portal.`,
+      success: `${partnerName(id)} rejected.`,
+      failure: "Couldn't reject the partner",
+    });
   }
 
   async function handleAddPartner(payload: Parameters<typeof adminCreatePartner>[0]) {
@@ -564,28 +672,43 @@ function AdminPage() {
   }
 
   async function handleApproveLead(id: number) {
-    const updated = await adminApproveLead(id);
-    updateLead(updated);
+    await adminAction(async () => updateLead(await adminApproveLead(id)), {
+      confirm: `Approve lead #${id}? It will be released to matching partners.`,
+      success: `Lead #${id} approved.`,
+      failure: "Couldn't approve the lead",
+    });
   }
 
   async function handleRejectLead(id: number) {
-    const updated = await adminRejectLead(id);
-    updateLead(updated);
+    await adminAction(async () => updateLead(await adminRejectLead(id)), {
+      confirm: `Reject lead #${id}? The customer's request will not be sent to partners.`,
+      success: `Lead #${id} rejected.`,
+      failure: "Couldn't reject the lead",
+    });
   }
 
   async function handleApproveClosure(id: number) {
-    const updated = await adminApproveClosure(id);
-    updateLead(updated);
+    await adminAction(async () => updateLead(await adminApproveClosure(id)), {
+      confirm: `Approve the closure of lead #${id}?`,
+      success: `Closure of lead #${id} approved.`,
+      failure: "Couldn't approve the closure",
+    });
   }
 
   async function handleRejectClosure(id: number) {
-    const updated = await adminRejectClosure(id);
-    updateLead(updated);
+    await adminAction(async () => updateLead(await adminRejectClosure(id)), {
+      confirm: `Reject the closure request for lead #${id}? The lead will stay open.`,
+      success: `Closure request for lead #${id} rejected.`,
+      failure: "Couldn't reject the closure",
+    });
   }
 
   async function handleForceCloseLead(id: number, status: "closed_won" | "closed_lost") {
-    const updated = await adminForceCloseLead(id, status);
-    updateLead(updated);
+    await adminAction(async () => updateLead(await adminForceCloseLead(id, status)), {
+      confirm: `Force-close lead #${id} as ${status === "closed_won" ? "won" : "lost"}? This ends the lead for everyone.`,
+      success: `Lead #${id} closed as ${status === "closed_won" ? "won" : "lost"}.`,
+      failure: "Couldn't close the lead",
+    });
   }
 
   if (authLoading)
@@ -646,13 +769,20 @@ function AdminPage() {
     { key: "mediators", kind: "view", icon: Briefcase, label: "Mediators", active: view === "mediators", onClick: () => setView("mediators") },
     { key: "leads", kind: "view", icon: Users, label: "Leads", active: view === "leads", onClick: () => setView("leads") },
     { key: "reviews", kind: "view", icon: Star, label: "Reviews", badge: pendingReviewCount, active: view === "reviews", onClick: () => setView("reviews") },
-    { key: "areas", kind: "link", icon: MapPin, label: "Area Intelligence", to: "/areas" },
-    { key: "import", kind: "link", icon: Upload, label: "Data Import", to: "/import" },
-    { key: "analytics", kind: "link", icon: BarChart3, label: "Analytics", to: "/analytics" },
+    { key: "verification", kind: "view", icon: IdCard, label: "Identity Verification", active: view === "verification", onClick: () => setView("verification") },
     { key: "users", kind: "view", icon: UserPlus, label: "Users", active: view === "users", onClick: () => setView("users") },
-    // The closest thing this codebase has to platform/notification settings —
-    // see the "Settings" judgment call in the doc's "Navigation changed".
-    { key: "settings", kind: "link", icon: Settings, label: "Settings", to: "/admin/notifications" },
+    // Standalone admin pages (own routes under /admin/*, so they share the
+    // admin session). Trust & Moderation / Transactions / Property Requests
+    // previously had no entry point at all.
+    { key: "trust", kind: "link", icon: ShieldCheck, label: "Trust & Moderation", to: "/admin/trust-moderation" },
+    { key: "transactions", kind: "link", icon: FileCheck2, label: "Transactions", to: "/admin/transactions" },
+    { key: "property-requests", kind: "link", icon: Activity, label: "Property Requests", to: "/admin/property-requests" },
+    { key: "analytics", kind: "link", icon: BarChart3, label: "Analytics", to: "/admin/analytics" },
+    { key: "import", kind: "link", icon: Upload, label: "Data Import", to: "/admin/import" },
+    { key: "settings", kind: "link", icon: Bell, label: "Notification Ops", to: "/admin/notifications" },
+    // Area Intelligence has no admin screen — this opens the public page in a
+    // new tab so it never leaves (or swaps) the admin session.
+    { key: "areas", kind: "link", icon: MapPin, label: "Area Intelligence", to: "/areas", external: true },
     ...(PHASE1_FLAGS.projects
       ? ([{ key: "projects", kind: "view", icon: Building2, label: "Projects", active: view === "projects", onClick: () => setView("projects") }] as AdminNavItem[])
       : []),
@@ -675,9 +805,19 @@ function AdminPage() {
               leadCount={leads.length}
               userCount={users.length}
               pendingReviewCount={pendingReviewCount}
+              errors={{
+                listings: listingsError,
+                mediators: mediatorsError,
+                leads: leadsError,
+                users: usersError,
+              }}
+              loading={loadingListings || loadingMediators || loadingLeads || loadingUsers}
+              onRetry={retryLoads}
               onGo={setView}
             />
           )}
+
+          {view === "verification" && <VerificationReviewView />}
 
           {/* Users view */}
           {view === "users" && (
@@ -692,7 +832,10 @@ function AdminPage() {
           )}
 
           {/* Mediators view */}
-          {view === "mediators" && (
+          {view === "mediators" && mediatorsError && (
+            <LoadErrorNotice what="partners" message={mediatorsError} onRetry={retryLoads} />
+          )}
+          {view === "mediators" && !mediatorsError && (
             <MediatorsView
               mediators={mediators}
               loading={loadingMediators}
@@ -704,7 +847,10 @@ function AdminPage() {
           )}
 
           {/* Leads view */}
-          {view === "leads" && (
+          {view === "leads" && leadsError && (
+            <LoadErrorNotice what="leads" message={leadsError} onRetry={retryLoads} />
+          )}
+          {view === "leads" && !leadsError && (
             <LeadsView
               leads={leads}
               loading={loadingLeads}
@@ -718,15 +864,25 @@ function AdminPage() {
           )}
 
           {/* Reviews moderation view */}
-          {view === "reviews" && (
+          {view === "reviews" && reviewsError && (
+            <LoadErrorNotice what="reviews" message={reviewsError} onRetry={retryLoads} />
+          )}
+          {view === "reviews" && !reviewsError && (
             <ReviewsModerationView
               reviews={reviews}
               loading={loadingReviews}
               onModerate={async (id, status) => {
-                const updated = await moderateReview(id, status);
-                setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, ...updated } : r)));
-                setPendingReviewCount((c) =>
-                  status === "approved" ? Math.max(0, c - 1) : Math.max(0, c - 1),
+                await adminAction(
+                  async () => {
+                    const updated = await moderateReview(id, status);
+                    setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, ...updated } : r)));
+                    setPendingReviewCount((c) => Math.max(0, c - 1));
+                  },
+                  {
+                    confirm: status === "rejected" ? "Reject this review? It will not be shown on the partner's profile." : undefined,
+                    success: status === "approved" ? "Review approved." : "Review rejected.",
+                    failure: status === "approved" ? "Couldn't approve the review" : "Couldn't reject the review",
+                  },
                 );
               }}
             />
@@ -761,7 +917,7 @@ function AdminPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" asChild>
-                    <Link to="/import">
+                    <Link to="/admin/import">
                       <Upload className="size-4" /> Import CSV
                     </Link>
                   </Button>
@@ -771,33 +927,38 @@ function AdminPage() {
                 </div>
               </div>
 
-              {/* Stat cards */}
+              {listingsError && (
+                <LoadErrorNotice what="listings" message={listingsError} onRetry={retryLoads} className="mb-4" />
+              )}
+
+              {/* Stat cards — real counts only (the "+12 this week" / "+4.2%
+                  MoM" / "-1 vs last week" deltas were hard-coded text). */}
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                 <StatCard
                   label="Total listings"
-                  value={stats.total}
-                  delta="+12 this week"
+                  value={listingsError ? "—" : stats.total}
+                  delta={listingsError ? "Unavailable" : `${newThisWeek} added in last 7 days`}
                   icon={<Home className="size-4" />}
                   tone="primary"
                 />
                 <StatCard
                   label="Pending approval"
-                  value={stats.pending}
+                  value={listingsError ? "—" : stats.pending}
                   delta="Needs review"
                   icon={<Clock className="size-4" />}
                   tone="warning"
                 />
                 <StatCard
                   label="Published"
-                  value={stats.published}
-                  delta="+4.2% MoM"
+                  value={listingsError ? "—" : stats.published}
+                  delta="Live on the portal"
                   icon={<CheckCircle2 className="size-4" />}
                   tone="success"
                 />
                 <StatCard
                   label="Rejected"
-                  value={stats.rejected}
-                  delta="-1 vs last week"
+                  value={listingsError ? "—" : stats.rejected}
+                  delta="Needs follow-up"
                   icon={<ShieldAlert className="size-4" />}
                   tone="destructive"
                 />
@@ -1005,7 +1166,11 @@ function AdminPage() {
                             colSpan={8}
                             className="px-4 py-16 text-center text-sm text-muted-foreground"
                           >
-                            No listings match these filters.
+                            {listingsError
+                              ? "Listings couldn't be loaded — see the error above."
+                              : listings.length === 0
+                                ? "No listings yet."
+                                : "No listings match these filters."}
                           </td>
                         </tr>
                       )}
@@ -1090,6 +1255,150 @@ function AdminPage() {
           onSave={saveListing}
         />
       )}
+    </div>
+  );
+}
+
+// ---------- Identity verification review ----------
+// Reviews identity-verification requests users submit from the mobile app
+// (POST /verification/me). Uses the existing backend endpoints only
+// (GET /verification/admin/pending, POST …/{id}/approve|reject) — there is no
+// third-party identity check; the admin decides from the submitted document
+// reference. Approving sets the user's "verified" badge.
+
+function VerificationReviewView() {
+  const [items, setItems] = useState<ApiVerificationRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  function load() {
+    setLoading(true);
+    setError(null);
+    fetchPendingVerifications()
+      .then(setItems)
+      .catch((err) => setError(apiErrorMessage(err)))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function decide(req: ApiVerificationRequest, decision: "approve" | "reject") {
+    const who = req.full_name ? `${req.full_name} (${req.email})` : req.email;
+    const ok = confirmAdminAction(
+      decision === "approve"
+        ? `Approve identity verification for ${who}? Their account will show as verified.`
+        : `Reject identity verification for ${who}? They will need to submit again.`,
+    );
+    if (!ok) return;
+    setBusyId(req.id);
+    try {
+      await (decision === "approve" ? approveVerification(req.id) : rejectVerification(req.id));
+      setItems((prev) => prev.filter((x) => x.id !== req.id));
+      toast.success(decision === "approve" ? `${req.email} verified.` : `Verification for ${req.email} rejected.`);
+    } catch (err) {
+      toast.error(
+        `${decision === "approve" ? "Couldn't approve verification" : "Couldn't reject verification"}: ${apiErrorMessage(err)}`,
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Trust</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">Identity Verification</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Requests submitted from the Maskan app. Check the document reference against your records, then approve or
+            reject. No automatic identity check is performed.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          Refresh
+        </Button>
+      </div>
+
+      {error && <LoadErrorNotice what="verification requests" message={error} onRetry={load} className="mb-4" />}
+
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-2/60 text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 text-start font-semibold">User</th>
+                <th className="px-4 py-3 text-start font-semibold">Document reference</th>
+                <th className="px-4 py-3 text-start font-semibold">Submitted</th>
+                <th className="w-48 px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {loading && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                    Loading verification requests…
+                  </td>
+                </tr>
+              )}
+              {!loading && !error && items.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                    <CheckCircle2 className="mx-auto mb-2 size-8 text-success/60" />
+                    No verification requests waiting for review.
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                items.map((req) => (
+                  <tr key={req.id} className="hover:bg-surface-2/40">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold">{req.full_name ?? "—"}</div>
+                      <div className="text-xs text-muted-foreground">{req.email}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs" dir="ltr">
+                        {req.verification_document_ref ?? "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {req.verification_submitted_at
+                        ? new Date(req.verification_submitted_at).toLocaleString("en-SA", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-1.5">
+                        <Button
+                          size="sm"
+                          className="text-xs"
+                          disabled={busyId === req.id}
+                          onClick={() => void decide(req, "approve")}
+                        >
+                          <CheckCircle2 className="size-3.5" /> Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs text-destructive hover:bg-destructive/10"
+                          disabled={busyId === req.id}
+                          onClick={() => void decide(req, "reject")}
+                        >
+                          <X className="size-3.5" /> Reject
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1458,15 +1767,30 @@ function AdminMobileNav({ navItems }: { navItems: AdminNavItem[] }) {
         <nav className="absolute inset-x-0 top-full z-50 flex flex-col gap-0.5 border-b border-border bg-background p-3 shadow-lg">
           {navItems.map((it) =>
             it.kind === "link" ? (
-              <Link
-                key={it.key}
-                to={it.to}
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
-              >
-                <it.icon className="size-4" />
-                <span className="flex-1 text-start">{it.label}</span>
-              </Link>
+              it.external ? (
+                <a
+                  key={it.key}
+                  href={it.to}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+                >
+                  <it.icon className="size-4" />
+                  <span className="flex-1 text-start">{it.label}</span>
+                  <ExternalLink className="size-3.5" aria-label="opens in a new tab" />
+                </a>
+              ) : (
+                <Link
+                  key={it.key}
+                  to={it.to}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+                >
+                  <it.icon className="size-4" />
+                  <span className="flex-1 text-start">{it.label}</span>
+                </Link>
+              )
             ) : (
               <button
                 key={it.key}
@@ -1518,14 +1842,29 @@ function AdminSidebar({ navItems }: { navItems: AdminNavItem[] }) {
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
         {navItems.map((it) =>
           it.kind === "link" ? (
-            <Link
-              key={it.key}
-              to={it.to}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-start text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
-            >
-              <it.icon className="size-4" />
-              <span className="flex-1">{it.label}</span>
-            </Link>
+            it.external ? (
+              <a
+                key={it.key}
+                href={it.to}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Opens the public page in a new tab"
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-start text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+              >
+                <it.icon className="size-4" />
+                <span className="flex-1">{it.label}</span>
+                <ExternalLink className="size-3.5" aria-label="opens in a new tab" />
+              </a>
+            ) : (
+              <Link
+                key={it.key}
+                to={it.to}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-start text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+              >
+                <it.icon className="size-4" />
+                <span className="flex-1">{it.label}</span>
+              </Link>
+            )
           ) : (
             <button
               key={it.key}
@@ -1580,6 +1919,12 @@ type AiAction = {
   type: "create_listing" | "create_partner" | "create_lead";
   data?: Record<string, unknown>;
 };
+
+function optionalNumber(v: unknown): number | undefined {
+  if (v === null || v === undefined || v === "") return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 function parseAction(reply: string): AiAction | null {
   const m = reply.match(/<action>([\s\S]*?)<\/action>/);
@@ -1662,9 +2007,9 @@ function AdminAIPanel({
         district: String(d.area ?? d.district ?? ""),
         rent: Number(d.monthly_rent ?? d.rent ?? 0),
         owner: String(d.owner_name ?? d.owner ?? ""),
-        bedrooms: Number(d.bedrooms ?? 3),
-        bathrooms: Number(d.bathrooms ?? 2),
-        areaSqm: Number(d.size_sq_m ?? d.area_sqm ?? 200),
+        bedrooms: optionalNumber(d.bedrooms),
+        bathrooms: optionalNumber(d.bathrooms),
+        areaSqm: optionalNumber(d.size_sq_m ?? d.area_sqm),
         description: String(d.description ?? ""),
         status: "Draft",
         createdAt: new Date().toISOString(),
@@ -1853,7 +2198,7 @@ function StatCard({
   tone,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   delta: string;
   icon: React.ReactNode;
   tone: "primary" | "warning" | "success" | "destructive";
@@ -1891,6 +2236,9 @@ function AdminDashboardOverview({
   leadCount,
   userCount,
   pendingReviewCount,
+  errors,
+  loading,
+  onRetry,
   onGo,
 }: {
   stats: { total: number; pending: number; published: number; rejected: number };
@@ -1898,8 +2246,14 @@ function AdminDashboardOverview({
   leadCount: number;
   userCount: number;
   pendingReviewCount: number;
+  errors: { listings: string | null; mediators: string | null; leads: string | null; users: string | null };
+  loading: boolean;
+  onRetry: () => void;
   onGo: (v: AdminView) => void;
 }) {
+  // A failed source shows "—" and an error banner, never a misleading 0.
+  const failed = (Object.entries(errors) as [string, string | null][]).filter(([, e]) => !!e);
+  const lst = (n: number) => (errors.listings ? "—" : n);
   return (
     <div>
       <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
@@ -1907,31 +2261,40 @@ function AdminDashboardOverview({
         Platform overview — properties, mediators, leads and reviews.
       </p>
 
+      {failed.length > 0 && (
+        <LoadErrorNotice
+          className="mt-4"
+          what={failed.map(([k]) => (k === "mediators" ? "partners" : k)).join(", ")}
+          message={failed[0][1] ?? ""}
+          onRetry={loading ? undefined : onRetry}
+        />
+      )}
+
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
           label="Total properties"
-          value={stats.total}
+          value={lst(stats.total)}
           delta="All listings"
           icon={<Home className="size-4" />}
           tone="primary"
         />
         <StatCard
           label="Pending approval"
-          value={stats.pending}
+          value={lst(stats.pending)}
           delta="Needs review"
           icon={<Clock className="size-4" />}
           tone="warning"
         />
         <StatCard
           label="Published"
-          value={stats.published}
+          value={lst(stats.published)}
           delta="Live on the portal"
           icon={<CheckCircle2 className="size-4" />}
           tone="success"
         />
         <StatCard
           label="Rejected"
-          value={stats.rejected}
+          value={lst(stats.rejected)}
           delta="Needs follow-up"
           icon={<ShieldAlert className="size-4" />}
           tone="destructive"
@@ -1940,9 +2303,9 @@ function AdminDashboardOverview({
 
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { label: "Mediators", value: mediatorCount, view: "mediators" as const, icon: Briefcase },
-          { label: "Leads", value: leadCount, view: "leads" as const, icon: Users },
-          { label: "Users", value: userCount, view: "users" as const, icon: UserPlus },
+          { label: "Mediators", value: errors.mediators ? "—" : mediatorCount, view: "mediators" as const, icon: Briefcase },
+          { label: "Leads", value: errors.leads ? "—" : leadCount, view: "leads" as const, icon: Users },
+          { label: "Users", value: errors.users ? "—" : userCount, view: "users" as const, icon: UserPlus },
           {
             label: "Pending reviews",
             value: pendingReviewCount,
@@ -2117,12 +2480,21 @@ function ListingRow({
       </td>
       <td className="w-52 max-w-[208px] px-4 py-3">
         <div className="flex items-center gap-2">
-          <img
-            src={l.image}
-            alt=""
-            loading="lazy"
-            className="size-8 shrink-0 rounded-md object-cover"
-          />
+          {l.image ? (
+            <img
+              src={l.image}
+              alt=""
+              loading="lazy"
+              className="size-8 shrink-0 rounded-md object-cover"
+            />
+          ) : (
+            <span
+              title="No photo"
+              className="grid size-8 shrink-0 place-items-center rounded-md bg-surface-2 text-muted-foreground"
+            >
+              <ImageIcon className="size-3.5" />
+            </span>
+          )}
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">{l.title}</div>
             <div className="truncate text-[11px] font-mono text-muted-foreground">{l.id}</div>
@@ -2310,7 +2682,15 @@ function ListingDetailDrawer({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
           {/* Image */}
-          <img src={listing.image} alt="" className="w-full h-48 rounded-xl object-cover" />
+          {listing.image ? (
+            <img src={listing.image} alt="" className="w-full h-48 rounded-xl object-cover" />
+          ) : (
+            <div className="grid h-48 w-full place-items-center rounded-xl bg-surface-2 text-sm text-muted-foreground">
+              <span className="flex items-center gap-2">
+                <ImageIcon className="size-4" /> No photos uploaded
+              </span>
+            </div>
+          )}
 
           {/* Status + quick actions */}
           <div className="flex items-center gap-3 flex-wrap">
@@ -2441,9 +2821,10 @@ function ListingFormDrawer({
     rent: listing?.rent?.toString() ?? "",
     status: listing?.status ?? ("Draft" as ListingStatus),
     owner: listing?.owner ?? "",
-    bedrooms: listing?.bedrooms ?? 3,
-    bathrooms: listing?.bathrooms ?? 3,
-    area: listing?.areaSqm ?? 200,
+    // Blank when unknown — never prefilled with made-up values.
+    bedrooms: listing?.bedrooms?.toString() ?? "",
+    bathrooms: listing?.bathrooms?.toString() ?? "",
+    area: listing?.areaSqm?.toString() ?? "",
     description: listing?.description ?? "",
     property_type: listing?.property_type ?? "",
     furnished: listing?.furnished ?? "",
@@ -2455,12 +2836,14 @@ function ListingFormDrawer({
       .catch(() => {});
   }, []);
   const [amenities, setAmenities] = useState<Set<string>>(new Set(["Parking", "Central A/C"]));
+  // Only the listing's real uploaded images. `listing.image` can be a bundled
+  // stock placeholder (mapApiProperty fallback) — seeding the form with it
+  // made every save of a photo-less listing POST that stock photo as a real
+  // property image.
   const [media, setMedia] = useState<string[]>(
     listing?.images?.length
-      ? listing.images.sort((a, b) => a.display_order - b.display_order).map((i) => i.url)
-      : listing?.image && !listing.image.startsWith("data:")
-        ? [listing.image]
-        : [],
+      ? [...listing.images].sort((a, b) => a.display_order - b.display_order).map((i) => i.url)
+      : [],
   );
   const [urlInput, setUrlInput] = useState("");
 
@@ -2478,6 +2861,20 @@ function ListingFormDrawer({
       alert("Please select a district.");
       return;
     }
+    const optionalInt = (raw: string, label: string): number | undefined | null => {
+      const v = raw.trim();
+      if (!v) return undefined;
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 0) {
+        alert(`${label} must be a whole number of 0 or more.`);
+        return null;
+      }
+      return n;
+    };
+    const bedrooms = optionalInt(form.bedrooms, "Bedrooms");
+    const bathrooms = optionalInt(form.bathrooms, "Bathrooms");
+    const areaSqm = optionalInt(form.area, "Area (m²)");
+    if (bedrooms === null || bathrooms === null || areaSqm === null) return;
     if (!rentNum || rentNum <= 0) {
       alert(
         form.listingType === "sale"
@@ -2499,9 +2896,9 @@ function ListingFormDrawer({
         createdAt: listing?.createdAt ?? new Date().toISOString().slice(0, 10),
         image: media[0] ?? "",
         images: listing?.images ?? [],
-        areaSqm: form.area,
-        bedrooms: form.bedrooms,
-        bathrooms: form.bathrooms,
+        areaSqm,
+        bedrooms,
+        bathrooms,
         description: form.description,
         property_type: form.property_type || undefined,
         furnished: form.furnished || undefined,
@@ -2644,8 +3041,10 @@ function ListingFormDrawer({
                   <BedDouble className="size-4 text-muted-foreground" />
                   <Input
                     type="number"
+                    min={0}
+                    placeholder="—"
                     value={form.bedrooms}
-                    onChange={(e) => setForm({ ...form, bedrooms: Number(e.target.value) })}
+                    onChange={(e) => setForm({ ...form, bedrooms: e.target.value })}
                   />
                 </div>
               </Field>
@@ -2654,16 +3053,20 @@ function ListingFormDrawer({
                   <Bath className="size-4 text-muted-foreground" />
                   <Input
                     type="number"
+                    min={0}
+                    placeholder="—"
                     value={form.bathrooms}
-                    onChange={(e) => setForm({ ...form, bathrooms: Number(e.target.value) })}
+                    onChange={(e) => setForm({ ...form, bathrooms: e.target.value })}
                   />
                 </div>
               </Field>
               <Field label="Area (m²)">
                 <Input
                   type="number"
+                  min={0}
+                  placeholder="—"
                   value={form.area}
-                  onChange={(e) => setForm({ ...form, area: Number(e.target.value) })}
+                  onChange={(e) => setForm({ ...form, area: e.target.value })}
                 />
               </Field>
               <Field label="Property type">
@@ -2951,8 +3354,21 @@ function UsersView({
             setDetailUser(null);
           }}
           onToggle={async () => {
-            const updated = await onUpdate(detailUser.id, { is_active: !detailUser.is_active });
-            setDetailUser(updated);
+            const disabling = detailUser.is_active;
+            if (
+              disabling &&
+              !confirmAdminAction(
+                `Disable ${detailUser.email}? They will be signed out everywhere and won't be able to sign in until re-enabled.`,
+              )
+            )
+              return;
+            try {
+              const updated = await onUpdate(detailUser.id, { is_active: !detailUser.is_active });
+              setDetailUser(updated);
+              toast.success(disabling ? "User disabled." : "User enabled.");
+            } catch (err) {
+              toast.error(`${disabling ? "Couldn't disable the user" : "Couldn't enable the user"}: ${apiErrorMessage(err)}`);
+            }
           }}
         />
       )}
@@ -4280,8 +4696,8 @@ function LeadsView({
       const msg = await adminSendMessage(leadId, content);
       setConvoMessages((m) => ({ ...m, [leadId]: [...(m[leadId] ?? []), msg] }));
       setAdminDraft((d) => ({ ...d, [leadId]: "" }));
-    } catch {
-      // swallow
+    } catch (err) {
+      toast.error(`Message not sent: ${apiErrorMessage(err)}`);
     } finally {
       setSendingMsg(null);
     }
@@ -4734,9 +5150,10 @@ function toListing(property: ApiProperty): Listing {
     status: (property.status as ListingStatus) ?? "Draft",
     owner: property.owner_name ?? "Unassigned",
     createdAt: property.created_at,
-    image: uiProperty.image,
+    // Real first photo only — no stock placeholder (shown as "No photo").
+    image: [...(property.images ?? [])].sort((a, b) => a.display_order - b.display_order)[0]?.url ?? "",
     images: property.images ?? [],
-    areaSqm: property.size_sq_m ?? uiProperty.area,
+    areaSqm: property.size_sq_m ?? undefined,
     bedrooms: property.bedrooms ?? undefined,
     bathrooms: property.bathrooms ?? undefined,
     description: property.description ?? undefined,
@@ -4850,8 +5267,8 @@ function AdminLoginGate({
         return;
       }
       onAuth(response.user, response.access_token);
-    } catch {
-      setError("Invalid email or password.");
+    } catch (err) {
+      setError(loginErrorMessage(err));
     } finally {
       setLoading(false);
     }

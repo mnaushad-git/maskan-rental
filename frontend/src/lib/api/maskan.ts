@@ -17,9 +17,19 @@ const API_BASE_URL =
     : (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api");
 const PROPERTY_IMAGES = [prop1, prop2, prop3, prop4] as const;
 
-export class UnauthorizedError extends Error {
-  constructor(detail: string) {
+/** Non-2xx API response. `status` lets callers tell e.g. 429 from 500. */
+export class ApiError extends Error {
+  status: number;
+  constructor(detail: string, status: number) {
     super(detail);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+export class UnauthorizedError extends ApiError {
+  constructor(detail: string) {
+    super(detail, 401);
     this.name = "UnauthorizedError";
   }
 }
@@ -94,6 +104,10 @@ export type AuthResponse = {
 };
 
 export type AnalyticsSummary = {
+  generated_at: string;
+  window_days: number;
+  /** Sections Maskan doesn't record data for yet — rendered as "not tracked". */
+  unavailable: string[];
   total_properties: number;
   total_users: number;
   kpis: Array<{
@@ -101,15 +115,15 @@ export type AnalyticsSummary = {
     value: string;
     delta: string;
     sub: string;
-    trend: "up" | "down";
+    trend: "up" | "down" | "flat";
     accent: string;
   }>;
   searchDemand: Array<{ day: string; riyadh: number; jeddah: number; dammam: number }>;
-  popularAreas: Array<{ name: string; city: string; searches: number; share: number }>;
+  popularAreas: Array<{ name: string; city: string; listings: number; share: number }>;
   funnel: Array<{ stage: string; value: number; color: string }>;
-  aiTrends: Array<{ label: string; value: number; delta: string }>;
+  aiTrends: Array<{ label: string; value: number; count: number }>;
   dataQuality: Array<{ label: string; value: number; target: number }>;
-  inventory: Array<{ city: string; available: number; reserved: number; rented: number }>;
+  inventory: Array<{ city: string; published: number; pending: number; inactive: number }>;
   activity: Array<{ tone: string; title: string; meta: string; time: string }>;
 };
 
@@ -381,7 +395,7 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
       }
       throw new UnauthorizedError(detail);
     }
-    throw new Error(detail);
+    throw new ApiError(detail, response.status);
   }
 
   if (response.status === 204) {
@@ -4188,4 +4202,33 @@ export async function fetchAdminTransactions(params?: {
 
 export function fetchAdminTransaction(id: number) {
   return requestJson<ApiAdminTransactionDetail>(`/admin/transactions/${id}`);
+}
+
+// ── Identity verification review (admin) ────────────────────────────────────
+// Backed by backend/app/api/routes/verification.py. Users submit a document
+// reference from the mobile app (POST /verification/me); admins review the
+// pending queue here. There is no third-party (Nafath) check — approval is a
+// manual admin decision on the submitted reference.
+
+export type ApiVerificationRequest = {
+  id: number;
+  email: string;
+  full_name: string | null;
+  verification_status: string;
+  is_verified: boolean;
+  verification_document_ref: string | null;
+  verification_submitted_at: string | null;
+  verification_reviewed_at: string | null;
+};
+
+export function fetchPendingVerifications() {
+  return requestJson<ApiVerificationRequest[]>("/verification/admin/pending");
+}
+
+export function approveVerification(userId: number) {
+  return requestJson<ApiVerificationRequest>(`/verification/admin/${userId}/approve`, { method: "POST" });
+}
+
+export function rejectVerification(userId: number) {
+  return requestJson<ApiVerificationRequest>(`/verification/admin/${userId}/reject`, { method: "POST" });
 }

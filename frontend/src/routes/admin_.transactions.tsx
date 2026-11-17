@@ -13,6 +13,8 @@ import {
   type AuthUser,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
+import { AdminBackLink } from "@/components/admin/AdminBackLink";
+import { loginErrorMessage } from "@/lib/adminFeedback";
 import { formatSAR } from "@/lib/maskan-data";
 import { cn } from "@/lib/utils";
 
@@ -65,8 +67,8 @@ function AdminTransactionsLoginGate({
         return;
       }
       onAuth(response.user, response.access_token);
-    } catch {
-      setError("Invalid email or password.");
+    } catch (err) {
+      setError(loginErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -511,7 +513,8 @@ function AdminTransactionsPage() {
   return (
     <div className="min-h-screen bg-surface">
       <header className="border-b border-border bg-background px-6 py-4">
-        <div className="mx-auto flex max-w-6xl items-center gap-2">
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          <AdminBackLink />
           <FileCheck2 className="size-5 text-primary" />
           <h1 className="text-lg font-bold">Transactions</h1>
         </div>

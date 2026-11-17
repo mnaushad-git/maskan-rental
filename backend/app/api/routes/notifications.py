@@ -129,7 +129,7 @@ def _user_from_stream_token(token: str, db: Session) -> UserModel:
         user = db.get(UserModel, int(user_id))
     except JWTError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid stream token") from exc
-    if user is None:
+    if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid stream token")
     return user
 
