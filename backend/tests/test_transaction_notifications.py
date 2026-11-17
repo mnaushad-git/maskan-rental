@@ -346,4 +346,6 @@ def test_render_transaction_cancelled_includes_reason():
 
 
 def test_deep_link_shape_matches_negotiation_viewing_convention():
-    assert f"mymakan://partner/transactions/{42}" == "mymakan://partner/transactions/42"
+    from app.core.deep_links import app_link
+
+    assert app_link("partner/transactions/42") == "maskan://partner/transactions/42"

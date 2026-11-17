@@ -234,7 +234,7 @@ def test_lead_message_from_customer_notifies_mediator_not_customer(db_session, u
 
     notification = db_session.query(Notification).filter(Notification.type == "lead_message").one()
     assert notification.user_id == mediator_user.id
-    assert notification.deep_link == f"myhome://lead/{lead.id}"
+    assert notification.deep_link == f"maskan://lead/{lead.id}"
 
 
 def test_lead_notification_never_notifies_the_actor(db_session, unique_email):

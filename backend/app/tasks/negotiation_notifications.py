@@ -23,11 +23,11 @@ counter offer" / "The mediator proposed SAR X for the {property type} in
 customer -> mediator direction, added in Prompt 4, gets the same title with
 symmetric "The customer proposed..." body wording, since the brief doesn't
 give a separate example string for that direction). `deep_link` stays the
-same `mymakan://partner/negotiations/{id}` string every recipient already
+same `maskan://partner/negotiations/{id}` string every recipient already
 got (unchanged from Prompt 3/4) — this already IS the "deep-link payload
 the frontend can route on" brief §19 asks for: the negotiation id is
 embedded directly in the URL path, the exact same shape
-viewing_notifications.py's `mymakan://partner/viewings/{id}` uses.
+viewing_notifications.py's `maskan://partner/viewings/{id}` uses.
 """
 import logging
 from datetime import datetime, timedelta, timezone
@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
+from app.core.deep_links import app_link
 from app.core.feature_flags import is_enabled
 from app.core.notification_stream import publish_invalidate
 from app.core.outbox import EventType
@@ -347,7 +348,7 @@ def create_negotiation_notification(self, event_type: str, aggregate_id: str, pa
                 entity_type="property_negotiation",
                 entity_id=negotiation.id,
                 property_id=negotiation.property_id,
-                deep_link=f"mymakan://partner/negotiations/{negotiation.id}",
+                deep_link=app_link(f"partner/negotiations/{negotiation.id}"),
                 delivery_status={},
                 meta={"event_type": event_type},
                 trace_id=trace_id,

@@ -53,10 +53,14 @@ export function iconFor(type: string): LucideIcon {
  * returned null for every one of them). Both schemes are accepted below
  * rather than touching five already-shipped backend notification renderers
  * for a cosmetic scheme-name mismatch.
+ *
+ * **Permanent scheme:** the backend now emits `maskan://…` for every
+ * notification type (backend/app/core/deep_links.py); `myhome://` and
+ * `mymakan://` stay accepted for notification rows stored before the switch.
  */
 export function deepLinkToPath(deepLink: string | null, scope: PortalScope): string | null {
   if (!deepLink) return null;
-  const match = deepLink.match(/^(?:myhome|mymakan):\/\/(.+)$/);
+  const match = deepLink.match(/^(?:maskan|myhome|mymakan):\/\/(.+)$/);
   if (!match) return null;
   const path = match[1];
   if (path.startsWith("property/")) return `/${path}`;

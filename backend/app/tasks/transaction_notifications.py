@@ -42,7 +42,7 @@ templates were also a deliberate, documented choice):**
   did NOT cancel (resolved from `cancelled_by`).
 
 Every notification's `deep_link` stays a single
-`mymakan://partner/transactions/{id}` string regardless of recipient —
+`maskan://partner/transactions/{id}` string regardless of recipient —
 same "one string for every recipient" convention
 negotiation_notifications.py/viewing_notifications.py already use (see
 mobile/src/lib/deepLink.ts's `(?:partner/)?` regex, which already tolerates
@@ -56,6 +56,7 @@ from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
+from app.core.deep_links import app_link
 from app.core.feature_flags import is_enabled
 from app.core.notification_stream import publish_invalidate
 from app.core.outbox import EventType
@@ -293,7 +294,7 @@ def create_transaction_notification(self, event_type: str, aggregate_id: str, pa
                 entity_type="property_transaction",
                 entity_id=transaction.id,
                 property_id=transaction.property_id,
-                deep_link=f"mymakan://partner/transactions/{transaction.id}",
+                deep_link=app_link(f"partner/transactions/{transaction.id}"),
                 delivery_status={},
                 meta={"event_type": event_type},
                 trace_id=trace_id,

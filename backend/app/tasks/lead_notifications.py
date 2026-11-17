@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
+from app.core.deep_links import app_link
 from app.core.feature_flags import is_enabled
 from app.core.metrics import lead_notifications_total, notifications_created_total
 from app.core.notification_stream import publish_invalidate
@@ -285,7 +286,7 @@ def create_lead_notification(self, event_type: str, aggregate_id: str, payload: 
                 locale=locale,
                 entity_type="lead",
                 entity_id=lead.id,
-                deep_link=f"myhome://lead/{lead.id}",
+                deep_link=app_link(f"lead/{lead.id}"),
                 delivery_status={},
                 meta={"event_type": event_type},
                 trace_id=trace_id,

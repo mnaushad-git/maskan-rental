@@ -12,10 +12,15 @@
  * negotiation_notifications.py) emit `mymakan://…` — a scheme this resolver
  * never accepted, so tapping a viewing/negotiation push silently did
  * nothing. Both schemes are accepted below.
+ *
+ * **Permanent scheme:** the backend now emits `maskan://…` for every
+ * notification type (backend/app/core/deep_links.py). `myhome://` and
+ * `mymakan://` stay accepted so notification rows already stored in the
+ * database — and links shared before the switch — keep routing.
  */
 export function deepLinkToRoute(deepLink: string | null | undefined): string | null {
   if (!deepLink) return null;
-  const match = deepLink.match(/^(?:myhome|mymakan):\/\/(.+)$/);
+  const match = deepLink.match(/^(?:maskan|myhome|mymakan):\/\/(.+)$/);
   if (!match) return null;
   const path = match[1];
   if (path.startsWith("property/")) return `/${path}`;
