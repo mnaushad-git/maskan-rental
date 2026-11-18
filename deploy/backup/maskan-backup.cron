@@ -1,0 +1,5 @@
+# /etc/cron.d/maskan-backup — nightly database + uploads backup (see maskan-backup.sh).
+# 03:30 Asia/Riyadh = 00:30 UTC (cron uses the server timezone; adjust if not UTC).
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 0 * * * root /usr/local/bin/maskan-backup.sh run >> /var/log/maskan-backup.log 2>&1

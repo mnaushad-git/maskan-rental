@@ -480,9 +480,20 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 Docker is configured with `restart: always` — all services come back
 up on their own if the server ever restarts.
 
+### Uploaded files (photos and private documents)
+
+The backend stores uploads in `/srv/maskan/uploads` on the server, mounted at
+`/app/uploads` (see `docker-compose.prod.yml`), so they survive the update command
+above. **One-time migration** for servers deployed before this mount existed, plus
+nightly database + uploads backups and storage monitoring:
+see [`deploy/uploads/README.md`](deploy/uploads/README.md). Never delete
+`/srv/maskan/uploads`, and never run `docker compose` without `--env-file .env.production`.
+
 ### Backups
 
-Take a manual snapshot in Lightsail once a week:
+Nightly database + uploads backups: `deploy/backup/maskan-backup.sh`
+(installation in `deploy/uploads/README.md`). In addition, take a manual server
+snapshot once a week:
 Lightsail → your instance → **Snapshots** → **Create snapshot**
 This saves your entire server including the database.
 
