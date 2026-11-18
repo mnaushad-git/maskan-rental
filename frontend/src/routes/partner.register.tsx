@@ -5,7 +5,7 @@ import { ArrowLeft, Briefcase, CheckCircle, CreditCard, Eye, EyeOff, ShieldCheck
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
-import { registerPartner, signup, subscribePartnerMock } from "@/lib/api/maskan";
+import { registerPartner, signup, subscribePartner } from "@/lib/api/maskan";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
 
@@ -20,6 +20,7 @@ function PartnerRegisterPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<"form" | "payment" | "done">("form");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const [account, setAccount] = useState({ full_name: "", email: "", password: "", confirmPassword: "" });
@@ -86,7 +87,15 @@ function PartnerRegisterPage() {
     setError("");
     setSubmitting(true);
     try {
-      await subscribePartnerMock();
+      const res = await subscribePartner();
+      if (res.payment_url) {
+        // Real payments: access is granted only after Moyasar confirms the
+        // charge (signed webhook) — send the partner to the payment page.
+        setNotice(t("partnerPortal.subscription.redirecting"));
+        window.location.assign(res.payment_url);
+        return;
+      }
+      if (res.status !== "active") setNotice(t("partnerPortal.subscription.paymentStarted"));
       setStep("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("partnerRegister.paymentFailed"));
@@ -221,9 +230,9 @@ function PartnerRegisterPage() {
                     />
                     <span>
                       {t("partnerRegister.form.agreeToTerms")}
-                      <a href="#" className="font-semibold text-foreground hover:underline">{t("partnerRegister.form.terms")}</a>
+                      <Link to="/terms" target="_blank" className="font-semibold text-foreground hover:underline">{t("partnerRegister.form.terms")}</Link>
                       {t("partnerRegister.form.and")}
-                      <a href="#" className="font-semibold text-foreground hover:underline">{t("partnerRegister.form.privacyPolicy")}</a>.
+                      <Link to="/privacy" target="_blank" className="font-semibold text-foreground hover:underline">{t("partnerRegister.form.privacyPolicy")}</Link>.
                     </span>
                   </label>
                 </div>
@@ -329,18 +338,11 @@ function PartnerRegisterPage() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl border border-border bg-surface p-5">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                  <CreditCard className="size-4" /> {t("partnerRegister.payment.paymentDetailsMock")}
-                </div>
-                <div className="space-y-3">
-                  <Input placeholder={t("partnerRegister.payment.cardNumberPlaceholder")} disabled defaultValue="•••• •••• •••• ••••" />
-                  <div className="grid grid-cols-2 gap-3">
-                    <Input placeholder="MM/YY" disabled defaultValue="••/••" />
-                    <Input placeholder={t("partnerRegister.payment.cvvPlaceholder")} disabled defaultValue="•••" />
-                  </div>
-                </div>
+              <div className="flex items-start gap-2 rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
+                <CreditCard className="mt-0.5 size-4 shrink-0" />
+                <span>{t("partnerPortal.subscription.securePaymentNote")}</span>
               </div>
+              {notice && <div className="rounded-lg border border-border bg-surface p-3 text-sm">{notice}</div>}
               {error && (
                 <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
                   {error}

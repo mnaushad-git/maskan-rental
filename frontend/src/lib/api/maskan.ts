@@ -580,6 +580,44 @@ export function patchPartnerListing(id: number, payload: Partial<PartnerProperty
   });
 }
 
+/** Partner takes a Published / Pending listing off the portal. */
+export function unpublishPartnerListing(id: number) {
+  return requestJson<ApiProperty>(`/properties/partner/${id}/unpublish`, { method: "POST" });
+}
+
+/** Partner sends an Unpublished / Rejected listing back for admin approval. */
+export function resubmitPartnerListing(id: number) {
+  return requestJson<ApiProperty>(`/properties/partner/${id}/resubmit`, { method: "POST" });
+}
+
+/** Partner "delete" — archives the listing; history is preserved server-side. */
+export function archivePartnerListing(id: number) {
+  return requestJson<void>(`/properties/partner/${id}`, { method: "DELETE" });
+}
+
+/** Upload a listing photo from the partner's device (JPEG/PNG/WebP ≤ 8 MB). */
+export async function uploadPartnerPropertyImage(propertyId: number, file: File) {
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/properties/partner/${propertyId}/images/upload`, {
+    method: "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: form,
+  });
+  if (!response.ok) {
+    let detail = `Upload failed (${response.status})`;
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (typeof body.detail === "string") detail = body.detail;
+    } catch {
+      /* ignore parse errors */
+    }
+    throw new ApiError(detail, response.status);
+  }
+  return response.json() as Promise<ApiListingImage>;
+}
+
 // ── Partner Listing Quality (Trust Center, Prompt 8) ────────────────────────
 // Backend: backend/app/api/routes/partner_quality.py (Prompt 3), mounted at
 // /partner/properties. Types mirror backend/app/schemas/partner_quality.py
@@ -1490,24 +1528,31 @@ export function updateMediatorProfile(payload: {
   });
 }
 
-export function subscribePartnerMock() {
-  return requestJson<{ status: string; subscription_expires_at: string }>(
-    "/mediators/me/subscribe",
-    { method: "POST" },
-  );
+/** Result of starting a partner subscription or renewal. With real payments
+ * the backend returns `status: "pending"` and (for a new subscription) a
+ * Moyasar `payment_url` to redirect to — access is granted only after the
+ * payment is confirmed. `status: "active"`/"renewed" only occurs in local
+ * development (mock payments). */
+export type PartnerSubscriptionResult = {
+  status: string;
+  subscription_expires_at?: string | null;
+  payment_url?: string;
+  payment_id?: number;
+  message?: string;
+};
+
+export function subscribePartner() {
+  return requestJson<PartnerSubscriptionResult>("/mediators/me/subscribe", { method: "POST" });
 }
 
-// Distinct from subscribePartnerMock() above — the backend's own
+// Distinct from subscribePartner() above — the backend's own
 // `POST /mediators/me/subscribe` rejects with 400 "Subscription is already
 // active." whenever the mediator already has an active subscription (see
 // P10-003), so a mediator whose subscription IS active (the exact case the
 // "Renew subscription" button targets) must call this endpoint instead to
 // actually extend `subscription_expires_at` by another 30 days.
 export function renewPartnerSubscription() {
-  return requestJson<{ status: string; subscription_expires_at: string }>(
-    "/mediators/me/renew",
-    { method: "POST" },
-  );
+  return requestJson<PartnerSubscriptionResult>("/mediators/me/renew", { method: "POST" });
 }
 
 export function addPartnerArea(area_name: string, city: string) {

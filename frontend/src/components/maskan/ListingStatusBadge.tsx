@@ -1,8 +1,10 @@
-import { CheckCircle2, Clock, CircleDashed, ShieldAlert, X } from "lucide-react";
+import { Archive, CheckCircle2, Clock, CircleDashed, EyeOff, ShieldAlert, X } from "lucide-react";
 import { Badge } from "./Badges";
 import { useLanguage } from "@/lib/i18n/context";
 
-export type ListingStatus = "Draft" | "Pending Approval" | "Published" | "Suspended" | "Rejected";
+// "Unpublished" (partner took it off the portal) and "Archived" (partner
+// deleted it; history preserved) come from the partner listing lifecycle.
+export type ListingStatus = "Draft" | "Pending Approval" | "Published" | "Suspended" | "Rejected" | "Unpublished" | "Archived";
 
 // Single source of truth for listing-workflow status → tone/icon/label.
 // Previously admin.tsx and partner.tsx each had their own version of this
@@ -16,6 +18,8 @@ const STATUS_CONFIG: Record<ListingStatus, { tone: "success" | "warning" | "neut
   Draft: { tone: "neutral", icon: <CircleDashed className="size-3" /> },
   Suspended: { tone: "destructive", icon: <ShieldAlert className="size-3" /> },
   Rejected: { tone: "destructive", icon: <X className="size-3" /> },
+  Unpublished: { tone: "neutral", icon: <EyeOff className="size-3" /> },
+  Archived: { tone: "neutral", icon: <Archive className="size-3" /> },
 };
 
 export function ListingStatusBadge({ status }: { status: ListingStatus | (string & {}) }) {

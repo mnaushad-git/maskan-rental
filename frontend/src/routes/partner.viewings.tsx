@@ -1,6 +1,8 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarClock, MapPin } from "lucide-react";
+import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/adminFeedback";
+import { AlertTriangle, ArrowLeft, CalendarClock, MapPin, RotateCw } from "lucide-react";
 import { Badge } from "@/components/maskan/Badges";
 import { EmptyState } from "@/components/maskan/EmptyState";
 import { Button } from "@/components/ui/button";
@@ -74,12 +76,14 @@ function PartnerViewingsPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("new");
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
+    setLoadError(null);
     fetchPartnerViewings()
       .then(setItems)
-      .catch(() => {})
+      .catch((err) => setLoadError(apiErrorMessage(err)))
       .finally(() => setLoading(false));
   }
 
@@ -101,8 +105,8 @@ function PartnerViewingsPage() {
     try {
       const updated = await confirmViewing(id);
       setItems((prev) => prev.map((v) => (v.id === id ? updated : v)));
-    } catch {
-      // best-effort — the detail page has full error handling for this action
+    } catch (err) {
+      toast.error(t("partnerViewings.detail.confirmFailed") + " " + apiErrorMessage(err));
     } finally {
       setBusyId(null);
     }
@@ -113,8 +117,8 @@ function PartnerViewingsPage() {
     try {
       const updated = await completeViewing(id);
       setItems((prev) => prev.map((v) => (v.id === id ? updated : v)));
-    } catch {
-      // best-effort — the detail page has full error handling for this action
+    } catch (err) {
+      toast.error(t("partnerViewings.detail.completeFailed") + " " + apiErrorMessage(err));
     } finally {
       setBusyId(null);
     }
@@ -160,6 +164,17 @@ function PartnerViewingsPage() {
               {Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-40 rounded-2xl" />
               ))}
+            </div>
+          ) : loadError ? (
+            <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+              <AlertTriangle className="size-4 shrink-0 text-destructive" />
+              <div className="min-w-0 flex-1">
+                <span className="font-semibold text-destructive">{t("partnerPortal.errors.viewingsLoadFailed")}</span>
+                <span className="ms-1 text-muted-foreground">{loadError}</span>
+              </div>
+              <Button size="sm" variant="outline" onClick={load}>
+                <RotateCw className="size-3.5" /> {t("partnerPortal.errors.retry")}
+              </Button>
             </div>
           ) : filtered.length === 0 ? (
             <EmptyState icon={CalendarClock} title={t(`partnerViewings.empty.${tab}`)} />

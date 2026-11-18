@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     ENV: str = "development"
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
+    # Optional public origin that serves /api (e.g. https://maskan.example).
+    # Used to build absolute URLs for uploaded listing photos; defaults to
+    # FRONTEND_ORIGIN in production (same-domain /api) or localhost:API_PORT.
+    PUBLIC_API_ORIGIN: str | None = None
     FRONTEND_ORIGIN: str = "http://localhost:5173"
     DATABASE_URL: str = "postgresql://maskan_app:maskan_dev_123@localhost:5433/maskan"
     SECRET_KEY: str = "maskan-dev-secret-key-change-me"

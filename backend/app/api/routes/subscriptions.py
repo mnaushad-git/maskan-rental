@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import _sync_subscription_expiry, get_current_user, get_db, get_premium_user
 from app.core.config import settings
+from app.core.payment_mode import require_payment_mode
 from app.core.moyasar import get_payment_gateway_provider
 from app.core.outbox import EventType, record_event
 from app.models.payment import Payment
@@ -19,7 +20,11 @@ router = APIRouter()
 
 
 def _real_payments_enabled() -> bool:
-    return bool(settings.USE_REAL_PAYMENTS and settings.MOYASAR_SECRET_KEY)
+    """True → start a real Moyasar charge. False → mock activation, which
+    payment_mode() permits only in development/test. Raises 503 when paid
+    activation isn't safely available (e.g. production without Moyasar or
+    its webhook secret) instead of silently activating for free."""
+    return require_payment_mode() == "real"
 
 
 @router.get("/me", response_model=SubscriptionOut)

@@ -157,7 +157,8 @@ def download_document(
     except TransactionDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     media_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
-    return FileResponse(path, media_type=media_type)
+    filename = transaction_service.document_download_name(transaction, document_id, path)
+    return FileResponse(path, media_type=media_type, filename=filename)
 
 
 @router.post(

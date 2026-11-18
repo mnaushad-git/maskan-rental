@@ -37,17 +37,22 @@ async def moyasar_webhook(
     """
     body = await request.body()
 
-    # Verify signature when secret is configured
-    if settings.MOYASAR_WEBHOOK_SECRET:
-        if not x_moyasar_signature:
-            raise HTTPException(status_code=400, detail="Missing webhook signature.")
-        expected = hmac.new(
-            settings.MOYASAR_WEBHOOK_SECRET.encode(),
-            body,
-            hashlib.sha256,
-        ).hexdigest()
-        if not hmac.compare_digest(expected, x_moyasar_signature):
-            raise HTTPException(status_code=400, detail="Invalid webhook signature.")
+    # A webhook can grant paid access, so it is only ever trusted when it is
+    # signed. Previously an unset MOYASAR_WEBHOOK_SECRET skipped verification
+    # entirely, letting anyone POST a forged "payment.paid" and activate any
+    # subscription. Fail closed: no secret configured → refuse every webhook.
+    if not settings.MOYASAR_WEBHOOK_SECRET:
+        logger.error("Moyasar webhook received but MOYASAR_WEBHOOK_SECRET is not configured — rejected")
+        raise HTTPException(status_code=503, detail="Payment webhooks are not configured.")
+    if not x_moyasar_signature:
+        raise HTTPException(status_code=400, detail="Missing webhook signature.")
+    expected = hmac.new(
+        settings.MOYASAR_WEBHOOK_SECRET.encode(),
+        body,
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(expected, x_moyasar_signature):
+        raise HTTPException(status_code=400, detail="Invalid webhook signature.")
 
     try:
         import json
@@ -81,26 +86,60 @@ async def moyasar_webhook(
     return {"status": "ok"}
 
 
+def _amount_matches(data: dict, payment: Payment) -> bool:
+    """Moyasar reports amounts in halalas. When the webhook carries an amount
+    or currency, it must match the payment we created."""
+    amount = data.get("amount")
+    if amount is not None:
+        try:
+            if int(amount) != int(round(float(payment.amount) * 100)):
+                return False
+        except (TypeError, ValueError):
+            return False
+    currency = data.get("currency")
+    if currency and payment.currency and str(currency).upper() != str(payment.currency).upper():
+        return False
+    return True
+
+
+def _extend(expires_at: datetime | None) -> datetime:
+    now = datetime.now(timezone.utc)
+    base = expires_at if expires_at and expires_at > now else now
+    return base + timedelta(days=30)
+
+
 def _handle_payment_paid(data: dict, db: Session) -> None:
+    """Grant access ONLY for a payment Maskan itself created (pending row with
+    this gateway id). The subscriber is taken from that row — never from the
+    webhook's metadata — and the paid amount must match."""
     gateway_id = data.get("id")
-    metadata = data.get("metadata", {})
-    payment_type = metadata.get("payment_type")
-    mediator_id = metadata.get("mediator_id")
-    user_id = metadata.get("user_id")
+    payment = (
+        db.query(Payment).filter(Payment.gateway_payment_id == gateway_id).first() if gateway_id else None
+    )
+    if payment is None:
+        logger.warning("payment.paid for unknown gateway payment %s — ignored", gateway_id)
+        return
+    if payment.status != "pending":
+        logger.info("payment.paid for payment %s in status %s — ignored", payment.id, payment.status)
+        return
+    if not _amount_matches(data, payment):
+        logger.error("payment.paid amount/currency mismatch for payment %s — ignored", payment.id)
+        return
 
-    payment = db.query(Payment).filter(Payment.gateway_payment_id == gateway_id).first()
-    if payment:
-        payment.status = "paid"
-        payment.paid_at = datetime.now(timezone.utc)
-        payment.gateway_raw = data
+    payment.status = "paid"
+    payment.paid_at = datetime.now(timezone.utc)
+    payment.gateway_raw = data
+    card_token = (data.get("source") or {}).get("token")
 
-    if payment_type == "subscription" and mediator_id:
-        mediator = db.get(Mediator, int(mediator_id))
+    if payment.payment_type == "subscription" and payment.mediator_id:
+        mediator = db.get(Mediator, payment.mediator_id)
         if mediator:
-            card_token = data.get("source", {}).get("token")
+            if mediator.subscription_status != "active":
+                mediator.subscription_started_at = datetime.now(timezone.utc)
+            mediator.subscription_expires_at = _extend(
+                mediator.subscription_expires_at if mediator.subscription_status == "active" else None
+            )
             mediator.subscription_status = "active"
-            mediator.subscription_started_at = datetime.now(timezone.utc)
-            mediator.subscription_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
             if card_token:
                 mediator.moyasar_card_token = card_token
             record_event(
@@ -111,14 +150,16 @@ def _handle_payment_paid(data: dict, db: Session) -> None:
                 payload={"mediator_id": mediator.id, "subscription_status": mediator.subscription_status},
             )
             CacheService().delete("mediator-public", str(mediator.id))
-    elif payment_type == "subscription" and user_id:
-        user = db.get(User, int(user_id))
+    elif payment.payment_type == "subscription" and payment.user_id:
+        user = db.get(User, payment.user_id)
         if user:
-            card_token = data.get("source", {}).get("token")
+            if user.subscription_status != "active":
+                user.subscription_started_at = datetime.now(timezone.utc)
+            user.subscription_expires_at = _extend(
+                user.subscription_expires_at if user.subscription_status == "active" else None
+            )
             user.subscription_status = "active"
             user.subscription_tier = "premium"
-            user.subscription_started_at = datetime.now(timezone.utc)
-            user.subscription_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
             if card_token:
                 user.moyasar_card_token = card_token
             record_event(
@@ -129,15 +170,13 @@ def _handle_payment_paid(data: dict, db: Session) -> None:
                 payload={"user_id": user.id, "subscription_status": user.subscription_status},
             )
 
-    if payment:
-        record_event(
-            db,
-            event_type=EventType.PAYMENT_COMPLETED,
-            aggregate_type="payment",
-            aggregate_id=payment.id,
-            payload={"payment_id": payment.id, "gateway_payment_id": gateway_id, "payment_type": payment_type},
-        )
-
+    record_event(
+        db,
+        event_type=EventType.PAYMENT_COMPLETED,
+        aggregate_type="payment",
+        aggregate_id=payment.id,
+        payload={"payment_id": payment.id, "gateway_payment_id": gateway_id, "payment_type": payment.payment_type},
+    )
     db.commit()
     logger.info(f"Payment paid: {gateway_id}")
 

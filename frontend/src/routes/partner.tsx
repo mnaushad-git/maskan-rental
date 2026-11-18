@@ -1,9 +1,17 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { NotFoundComponent } from "@/routes/__root";
 import {
   AlertTriangle,
+  Archive,
+  Bell,
   Briefcase,
+  ClipboardList,
+
+  RotateCw,
+  Send,
+  Upload,
   Building2,
   CalendarClock,
   CheckCircle,
@@ -64,8 +72,14 @@ import {
   updateMediatorProfile,
   fetchMediatorReviews,
   fetchMediatorReviewSummary,
-  subscribePartnerMock,
+  subscribePartner,
   renewPartnerSubscription,
+  unpublishPartnerListing,
+  resubmitPartnerListing,
+  archivePartnerListing,
+  uploadPartnerPropertyImage,
+  ApiError,
+  UnauthorizedError,
   type ApiAreaSummary,
   type ApiPartner,
   type ApiLeadDetail,
@@ -84,6 +98,8 @@ import {
 import { formatSAR } from "@/lib/maskan-data";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
+import { apiErrorMessage } from "@/lib/adminFeedback";
+import { NotificationBell } from "@/components/maskan/NotificationBell";
 
 export const Route = createFileRoute("/partner")({
   head: () => ({ meta: [{ title: "Partner Dashboard — Maskan" }] }),
@@ -135,6 +151,13 @@ function PartnerDashboard() {
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loading, setLoading] = useState(true);
   const [noProfile, setNoProfile] = useState(false);
+  // Load errors — an outage must never render as "Become a partner", "0
+  // properties" or "No new leads right now".
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [leadsError, setLeadsError] = useState<string | null>(null);
+  const [listingsError, setListingsError] = useState<string | null>(null);
+  const [areaError, setAreaError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [availableAreas, setAvailableAreas] = useState<ApiAreaSummary[]>([]);
   const [newArea, setNewArea] = useState({ area_name: "", city: "Riyadh" });
   const [addingArea, setAddingArea] = useState(false);
@@ -150,37 +173,69 @@ function PartnerDashboard() {
   const [projectFormOpen, setProjectFormOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ApiProject | null>(null);
 
+  async function loadLeads() {
+    const [l, avail] = await Promise.allSettled([fetchPartnerLeads(), fetchAvailableLeads()]);
+    if (l.status === "fulfilled") setLeads(l.value);
+    if (avail.status === "fulfilled") setAvailableLeads(avail.value);
+    const failed = l.status === "rejected" ? l.reason : avail.status === "rejected" ? avail.reason : null;
+    setLeadsError(failed ? apiErrorMessage(failed) : null);
+  }
+
   async function reloadLeads() {
-    const [profile, l, avail] = await Promise.all([
-      fetchMyPartnerProfile().catch(() => null),
-      fetchPartnerLeads().catch(() => []),
-      fetchAvailableLeads().catch(() => []),
-    ]);
+    const profile = await fetchMyPartnerProfile().catch(() => null);
     if (profile) setPartner(profile);
-    setLeads(l as ApiLeadDetail[]);
-    setAvailableLeads(avail as ApiLeadAvailable[]);
+    await loadLeads();
   }
 
   useEffect(() => {
     if (pathname !== "/partner" || !user) return;
-    Promise.all([
-      fetchMyPartnerProfile().catch(() => null),
-      fetchPartnerLeads().catch(() => []),
-      fetchAvailableLeads().catch(() => []),
-      fetchAreas().catch(() => []),
-    ]).then(([m, l, avail, areas]) => {
-      if (!m) {
-        setNoProfile(true);
+    let cancelled = false;
+    setProfileError(null);
+    (async () => {
+      let m: ApiPartner;
+      try {
+        m = await fetchMyPartnerProfile();
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof UnauthorizedError) {
+          clearAuth();
+        } else if (err instanceof ApiError && err.status === 404) {
+          // Genuinely no partner profile yet → offer registration.
+          setNoProfile(true);
+        } else {
+          setProfileError(apiErrorMessage(err));
+        }
         setLoading(false);
         return;
       }
+      if (cancelled) return;
+      setNoProfile(false);
       setPartner(m);
-      setLeads(l as ApiLeadDetail[]);
-      setAvailableLeads(avail as ApiLeadAvailable[]);
-      setAvailableAreas(areas as ApiAreaSummary[]);
+      const [, areas] = await Promise.all([loadLeads(), fetchAreas().catch(() => [] as ApiAreaSummary[])]);
+      if (cancelled) return;
+      setAvailableAreas(areas);
       setLoading(false);
-    });
-  }, [user, pathname]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, pathname, reloadKey]);
+
+  // Returning from the payment page (Moyasar success/back URLs point here).
+  useEffect(() => {
+    if (typeof window === "undefined" || pathname !== "/partner") return;
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("subscription");
+    if (!result) return;
+    if (result === "success") toast.success(t("partnerPortal.subscription.returnedSuccess"));
+    else toast.info(t("partnerPortal.subscription.returnedCancelled"));
+    setView("subscription");
+    params.delete("subscription");
+    const qs = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   useEffect(() => {
     // Gate on `user` the same way the profile/leads effect above does — this
@@ -195,9 +250,10 @@ function PartnerDashboard() {
     if (!user) return;
     if ((view === "properties" || view === "dashboard") && !loadingListings) {
       setLoadingListings(true);
+      setListingsError(null);
       fetchPartnerListings()
         .then(setListings)
-        .catch(() => {})
+        .catch((err) => setListingsError(apiErrorMessage(err)))
         .finally(() => setLoadingListings(false));
     }
     if (view === "projects" && !loadingProjects) {
@@ -207,7 +263,8 @@ function PartnerDashboard() {
         .catch(() => {})
         .finally(() => setLoadingProjects(false));
     }
-  }, [view, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, user, reloadKey]);
 
   async function handleConfirmAccept(leadId: number) {
     setAcceptingId(leadId);
@@ -227,18 +284,49 @@ function PartnerDashboard() {
     e.preventDefault();
     if (!newArea.area_name.trim()) return;
     setAddingArea(true);
+    setAreaError(null);
     try {
       const area = await addPartnerArea(newArea.area_name.trim(), newArea.city);
       setPartner((m) => (m ? { ...m, areas: [...m.areas, area] } : m));
       setNewArea({ area_name: "", city: "Riyadh" });
+    } catch (err) {
+      setAreaError(t("partnerPortal.errors.areaAddFailed", { error: apiErrorMessage(err) }));
     } finally {
       setAddingArea(false);
     }
   }
 
   async function handleRemoveArea(area_id: number) {
-    await removePartnerArea(area_id);
-    setPartner((m) => (m ? { ...m, areas: m.areas.filter((a) => a.id !== area_id) } : m));
+    setAreaError(null);
+    try {
+      await removePartnerArea(area_id);
+      setPartner((m) => (m ? { ...m, areas: m.areas.filter((a) => a.id !== area_id) } : m));
+    } catch (err) {
+      setAreaError(t("partnerPortal.errors.areaRemoveFailed", { error: apiErrorMessage(err) }));
+    }
+  }
+
+  async function handleListingAction(l: ApiProperty, action: "unpublish" | "resubmit" | "archive") {
+    const confirmKey =
+      action === "unpublish"
+        ? "partnerPortal.listings.confirmUnpublish"
+        : action === "resubmit"
+          ? "partnerPortal.listings.confirmResubmit"
+          : "partnerPortal.listings.confirmArchive";
+    if (!window.confirm(t(confirmKey, { title: l.title }))) return;
+    try {
+      if (action === "archive") {
+        await archivePartnerListing(l.id);
+        setListings((ls) => ls.filter((x) => x.id !== l.id));
+        toast.success(t("partnerPortal.listings.archived"));
+      } else {
+        const updated = action === "unpublish" ? await unpublishPartnerListing(l.id) : await resubmitPartnerListing(l.id);
+        setListings((ls) => ls.map((x) => (x.id === l.id ? updated : x)));
+        toast.success(t(action === "unpublish" ? "partnerPortal.listings.unpublished" : "partnerPortal.listings.resubmitted"));
+      }
+    } catch (err) {
+      toast.error(t("partnerPortal.listings.actionFailed", { error: apiErrorMessage(err) }));
+    }
   }
 
   // Returns the saved property (with its id) — PartnerListingForm needs it
@@ -248,9 +336,9 @@ function PartnerDashboard() {
   // Listing Quality panel.
   async function handleSaveListing(
     payload: PartnerPropertyPayload,
-    imageUrls: string[],
+    media: ListingMediaItem[],
     editId?: number,
-  ): Promise<ApiProperty> {
+  ): Promise<{ saved: ApiProperty; photoErrors: string[] }> {
     let saved: ApiProperty;
     if (editId) {
       saved = await patchPartnerListing(editId, payload);
@@ -259,22 +347,26 @@ function PartnerDashboard() {
       saved = await createPartnerListing(payload);
       setListings((ls) => [saved, ...ls]);
     }
-    // Sync images
-    const existingImages = saved.images ?? [];
-    const existingUrls = new Set(existingImages.map((i) => i.url));
-    const newUrlSet = new Set(imageUrls);
-    await Promise.all([
-      ...imageUrls
-        .filter((u) => !existingUrls.has(u))
-        .map((u) => addPartnerPropertyImage(saved.id, u)),
-      ...existingImages
-        .filter((i) => !newUrlSet.has(i.url))
-        .map((i) => deletePartnerPropertyImage(saved.id, i.id)),
-    ]);
-    // Re-fetch to get updated images
+    // Sync photos by image id — URLs of non-public listings are signed and
+    // change on every response, so comparing URLs would delete and re-add
+    // the same photo.
+    const keepIds = new Set(media.flatMap((m) => (m.kind === "existing" ? [m.id] : [])));
+    const photoErrors: string[] = [];
+    for (const img of saved.images ?? []) {
+      if (!keepIds.has(img.id)) {
+        await deletePartnerPropertyImage(saved.id, img.id).catch((err) => photoErrors.push(apiErrorMessage(err)));
+      }
+    }
+    for (const m of media) {
+      if (m.kind === "url") {
+        await addPartnerPropertyImage(saved.id, m.url).catch((err) => photoErrors.push(apiErrorMessage(err)));
+      } else if (m.kind === "file") {
+        await uploadPartnerPropertyImage(saved.id, m.file).catch((err) => photoErrors.push(`${m.file.name}: ${apiErrorMessage(err)}`));
+      }
+    }
     const fresh = await fetchPartnerListings();
     setListings(fresh);
-    return saved;
+    return { saved: fresh.find((l) => l.id === saved.id) ?? saved, photoErrors };
   }
 
   async function handleSaveProject(payload: PartnerProjectPayload, editId?: number) {
@@ -300,6 +392,23 @@ function PartnerDashboard() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+      </div>
+    );
+
+  if (profileError)
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center">
+        <AlertTriangle className="size-8 text-destructive" />
+        <p className="max-w-sm text-sm text-muted-foreground">{t("partnerPortal.errors.profileLoadFailed")}</p>
+        <p className="max-w-sm text-xs text-muted-foreground">{profileError}</p>
+        <div className="flex gap-2">
+          <Button onClick={() => { setLoading(true); setReloadKey((k) => k + 1); }}>
+            <RotateCw className="size-4" /> {t("partnerPortal.errors.retry")}
+          </Button>
+          <Button variant="outline" onClick={clearAuth}>
+            <LogOut className="size-4" /> {t("partnerDashboard.sidebar.signOut")}
+          </Button>
+        </div>
       </div>
     );
 
@@ -416,6 +525,22 @@ function PartnerDashboard() {
       onClick: () => navigate({ to: "/partner/transactions" }),
     },
     {
+      // Property Request marketplace (/partner/requests) — previously only
+      // reachable by typing the URL.
+      key: "requests",
+      icon: ClipboardList,
+      label: t("partnerPortal.nav.propertyRequests"),
+      active: false,
+      onClick: () => navigate({ to: "/partner/requests" }),
+    },
+    {
+      key: "notifications",
+      icon: Bell,
+      label: t("partnerPortal.nav.notifications"),
+      active: false,
+      onClick: () => navigate({ to: "/partner/notifications" }),
+    },
+    {
       key: "messages",
       icon: MessageSquare,
       label: t("partnerDashboard.sidebar.navMessages"),
@@ -469,7 +594,7 @@ function PartnerDashboard() {
     <div className="flex min-h-screen bg-surface">
       {/* ── Left sidebar ── */}
       <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-e border-border bg-background lg:flex">
-        <div className="flex items-center gap-2.5 border-b border-border px-4 py-5">
+        <div className="flex items-center gap-2 border-b border-border px-3 py-5">
           <div className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
             <Briefcase className="size-4" />
           </div>
@@ -478,6 +603,9 @@ function PartnerDashboard() {
             <div className="truncate text-xs text-muted-foreground">
               {user?.full_name ?? user?.email}
             </div>
+          </div>
+          <div className="ms-auto">
+            <NotificationBell />
           </div>
         </div>
 
@@ -510,7 +638,7 @@ function PartnerDashboard() {
             ) : (
               <Clock className="size-3" />
             )}
-            {partner!.subscription_status}
+            {subscriptionStatusLabel(t, partner!.subscription_status)}
           </Badge>
           <button
             type="button"
@@ -535,13 +663,16 @@ function PartnerDashboard() {
                 {t("partnerDashboard.sidebar.brand")}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={clearAuth}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-            >
-              <LogOut className="size-4" /> Sign out
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <NotificationBell />
+              <button
+                type="button"
+                onClick={clearAuth}
+                className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+              >
+                <LogOut className="size-4" /> {t("partnerDashboard.sidebar.signOut")}
+              </button>
+            </div>
           </div>
           {/* Horizontally scrollable, non-growing pills — same pattern as the
               customer TopNav's mobile strip, needed once the nav grew past a
@@ -568,7 +699,14 @@ function PartnerDashboard() {
 
         <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-8">
           {/* ══ LEADS VIEW ══ */}
-          {view === "leads" && (
+          {view === "leads" && leadsError && (
+            <LoadErrorBox
+              message={t("partnerPortal.errors.leadsLoadFailed")}
+              detail={leadsError}
+              onRetry={() => void loadLeads()}
+            />
+          )}
+          {view === "leads" && !leadsError && (
             <div className="space-y-8">
               {/* Available Leads */}
                 <section className="space-y-3">
@@ -831,9 +969,11 @@ function PartnerDashboard() {
           {view === "dashboard" && (
             <PartnerOverviewView
               partner={partner!}
-              newLeadsCount={availableLeads.length}
-              activeLeadsCount={acceptedLeads.length}
-              listingsCount={listings.length}
+              newLeadsCount={leadsError ? null : availableLeads.length}
+              activeLeadsCount={leadsError ? null : acceptedLeads.length}
+              listingsCount={listingsError ? null : listings.length}
+              loadError={leadsError ?? listingsError}
+              onRetry={() => setReloadKey((k) => k + 1)}
               onGo={setView}
             />
           )}
@@ -849,14 +989,17 @@ function PartnerDashboard() {
                     setListingFormOpen(false);
                     setEditingListing(null);
                   }}
-                  onSave={(payload, imageUrls) =>
-                    handleSaveListing(payload, imageUrls, editingListing?.id)
+                  onSave={(payload, media, savedId) =>
+                    handleSaveListing(payload, media, savedId ?? editingListing?.id)
                   }
                 />
               ) : (
                 <PartnerListingsView
                   listings={listings}
                   loading={loadingListings}
+                  error={listingsError}
+                  onRetry={() => setReloadKey((k) => k + 1)}
+                  onAction={handleListingAction}
                   filter={listingFilter}
                   onFilterChange={setListingFilter}
                   onAdd={() => setListingFormOpen(true)}
@@ -897,6 +1040,7 @@ function PartnerDashboard() {
               addingArea={addingArea}
               onAddArea={handleAddArea}
               onRemoveArea={handleRemoveArea}
+              error={areaError}
             />
           )}
 
@@ -942,20 +1086,31 @@ function PartnerDashboard() {
 
 // ── Listings list view ───────────────────────────────────────────────────────
 
+// Partner listing lifecycle (backend PARTNER_EDITABLE_STATUSES): edits are
+// allowed while Published / Pending / Rejected / Unpublished and re-enter
+// admin review; Suspended / Hidden are admin locks.
+const PARTNER_EDITABLE = new Set(["Published", "Pending Approval", "Rejected", "Unpublished"]);
+
 function PartnerListingsView({
   listings,
   loading,
+  error,
+  onRetry,
   filter,
   onFilterChange,
   onAdd,
   onEdit,
+  onAction,
 }: {
   listings: ApiProperty[];
   loading: boolean;
+  error: string | null;
+  onRetry: () => void;
   filter: ListingFilter;
   onFilterChange: (f: ListingFilter) => void;
   onAdd: () => void;
   onEdit: (l: ApiProperty) => void;
+  onAction: (l: ApiProperty, action: "unpublish" | "resubmit" | "archive") => void;
 }) {
   const { t } = useLanguage();
   const filtered = filter === "all" ? listings : listings.filter((l) => l.listing_type === filter);
@@ -1011,7 +1166,11 @@ function PartnerListingsView({
         </div>
       )}
 
-      {!loading && filtered.length === 0 && (
+      {!loading && error && (
+        <LoadErrorBox message={t("partnerPortal.errors.listingsLoadFailed")} detail={error} onRetry={onRetry} />
+      )}
+
+      {!loading && !error && filtered.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border py-16 text-center space-y-3">
           <Home className="mx-auto size-10 text-muted-foreground/40" />
           <p className="text-sm text-muted-foreground">
@@ -1025,10 +1184,10 @@ function PartnerListingsView({
         </div>
       )}
 
-      {!loading && filtered.length > 0 && (
+      {!loading && !error && filtered.length > 0 && (
         <div className="space-y-3">
           {filtered.map((l) => {
-            const canEdit = l.status === "Published";
+            const canEdit = PARTNER_EDITABLE.has(l.status);
             return (
               <div key={l.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
                 <div className="flex items-start justify-between gap-4">
@@ -1059,15 +1218,47 @@ function PartnerListingsView({
                       </p>
                     )}
                     {l.status === "Rejected" && (
-                      <p className="text-xs text-destructive">
-                        {t("partnerDashboard.listingsView.rejectedContact")}
-                      </p>
+                      <p className="text-xs text-destructive">{t("partnerPortal.listings.rejectedNote")}</p>
+                    )}
+                    {l.status === "Unpublished" && (
+                      <p className="text-xs text-muted-foreground">{t("partnerPortal.listings.unpublishedNote")}</p>
+                    )}
+                    {!canEdit && (
+                      <p className="text-xs text-muted-foreground">{t("partnerPortal.listings.lockedNote")}</p>
+                    )}
+                    {canEdit && (
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        {(l.status === "Published" || l.status === "Pending Approval") && (
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => onAction(l, "unpublish")}>
+                            <EyeOff className="size-3.5" /> {t("partnerPortal.listings.unpublish")}
+                          </Button>
+                        )}
+                        {(l.status === "Unpublished" || l.status === "Rejected") && (
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => onAction(l, "resubmit")}>
+                            <Send className="size-3.5" /> {t("partnerPortal.listings.resubmit")}
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs text-destructive hover:bg-destructive/10"
+                          title={t("partnerPortal.listings.archiveTitle")}
+                          onClick={() => onAction(l, "archive")}
+                        >
+                          <Archive className="size-3.5" /> {t("partnerPortal.listings.archive")}
+                        </Button>
+                      </div>
                     )}
                   </div>
                   <button
                     type="button"
                     disabled={!canEdit}
                     onClick={() => canEdit && onEdit(l)}
+                    aria-label={
+                      canEdit
+                        ? t("partnerDashboard.listingsView.editTitle")
+                        : t("partnerDashboard.listingsView.editLockedTitle")
+                    }
                     title={
                       canEdit
                         ? t("partnerDashboard.listingsView.editTitle")
@@ -1161,7 +1352,11 @@ function PartnerListingForm({
   areas: ApiAreaSummary[];
   editing: ApiProperty | null;
   onClose: () => void;
-  onSave: (p: PartnerPropertyPayload, imageUrls: string[]) => Promise<ApiProperty>;
+  onSave: (
+    p: PartnerPropertyPayload,
+    media: ListingMediaItem[],
+    savedId?: number,
+  ) => Promise<{ saved: ApiProperty; photoErrors: string[] }>;
 }) {
   const { t, lang } = useLanguage();
   const [form, setForm] = useState<ListingFormState>({
@@ -1171,8 +1366,9 @@ function PartnerListingForm({
     listingType: editing?.listing_type ?? "rent",
     rent: editing && editing.listing_type !== "sale" ? String(editing.monthly_rent ?? "") : "",
     salePrice: editing && editing.listing_type === "sale" ? String(editing.sale_price ?? "") : "",
-    bedrooms: editing?.bedrooms != null ? String(editing.bedrooms) : "3",
-    bathrooms: editing?.bathrooms != null ? String(editing.bathrooms) : "2",
+    // Blank unless known — never pre-filled with made-up counts.
+    bedrooms: editing?.bedrooms != null ? String(editing.bedrooms) : "",
+    bathrooms: editing?.bathrooms != null ? String(editing.bathrooms) : "",
     size: editing?.size_sq_m != null ? String(editing.size_sq_m) : "",
     owner_name: editing?.owner_name ?? "",
     description: editing?.description ?? "",
@@ -1182,11 +1378,35 @@ function PartnerListingForm({
     whatsapp_phone: editing?.whatsapp_phone ?? "",
     whatsappSameAsCall: !editing || editing.whatsapp_phone === editing.contact_phone,
   });
-  const [media, setMedia] = useState<string[]>(
-    editing?.images?.length
-      ? editing.images.sort((a, b) => a.display_order - b.display_order).map((i) => i.url)
-      : [],
-  );
+  const [media, setMedia] = useState<ListingMediaItem[]>(() => toMediaItems(editing));
+  // Set after the first successful save, so a retry (e.g. after a failed
+  // photo upload) updates that listing instead of creating a duplicate.
+  const [savedId, setSavedId] = useState<number | undefined>(editing?.id);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function addFiles(files: FileList | null) {
+    if (!files) return;
+    const accepted: ListingMediaItem[] = [];
+    for (const file of Array.from(files)) {
+      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+        toast.error(t("partnerPortal.photos.invalidType", { name: file.name }));
+        continue;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        toast.error(t("partnerPortal.photos.tooLarge", { name: file.name }));
+        continue;
+      }
+      accepted.push({ kind: "file", file, preview: URL.createObjectURL(file) });
+    }
+    setMedia((m) => {
+      const next = [...m, ...accepted];
+      if (next.length > 20) {
+        toast.error(t("partnerPortal.photos.tooMany"));
+        return next.slice(0, 20);
+      }
+      return next;
+    });
+  }
   const [urlInput, setUrlInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1330,7 +1550,7 @@ function PartnerListingForm({
     setSaving(true);
     setError(null);
     try {
-      const saved = await onSave(
+      const { saved, photoErrors } = await onSave(
         {
           title: form.title.trim() || "Untitled listing",
           city: form.city.trim(),
@@ -1349,7 +1569,15 @@ function PartnerListingForm({
           whatsapp_phone: whatsappPhone.trim(),
         },
         media,
+        savedId,
       );
+      setSavedId(saved.id);
+      setMedia(toMediaItems(saved));
+      if (photoErrors.length > 0) {
+        setError(t("partnerPortal.photos.someFailed", { error: photoErrors.join("; ") }));
+        setSaving(false);
+        return;
+      }
       // Listing Quality panel now has a real, saved property id — refresh it
       // (edit mode only; a freshly-created listing closes the form below
       // before the panel would ever be shown again for it).
@@ -1698,16 +1926,23 @@ function PartnerListingForm({
           {/* Photo thumbnails */}
           {media.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
-              {media.map((url, i) => (
+              {media.map((item, i) => (
                 <div
-                  key={i}
+                  key={item.kind === "existing" ? `img-${item.id}` : item.kind === "file" ? item.preview : item.url}
                   className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-border bg-surface-2"
                 >
-                  <img src={url} alt="" className="size-full object-cover" />
+                  <img src={item.kind === "file" ? item.preview : item.url} alt="" className="size-full object-cover" />
+                  {item.kind === "file" && (
+                    <span className="absolute inset-x-1 bottom-1 truncate rounded bg-background/90 px-1.5 py-0.5 text-[10px]">
+                      {t("partnerPortal.photos.pendingUpload")}
+                    </span>
+                  )}
                   <button
                     type="button"
+                    aria-label={t("partnerPortal.photos.removePhoto")}
+                    title={t("partnerPortal.photos.removePhoto")}
                     onClick={() => setMedia((m) => m.filter((_, idx) => idx !== i))}
-                    className="absolute end-1 top-1 grid size-6 place-items-center rounded-md bg-background/90 opacity-0 transition-opacity hover:bg-background group-hover:opacity-100"
+                    className="absolute end-1 top-1 grid size-6 place-items-center rounded-md bg-background/90 opacity-100 transition-opacity hover:bg-background sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
                   >
                     <X className="size-3.5" />
                   </button>
@@ -1729,7 +1964,7 @@ function PartnerListingForm({
                 if (e.key === "Enter") {
                   e.preventDefault();
                   const val = urlInput.trim();
-                  if (val && !media.includes(val)) setMedia((m) => [...m, val]);
+                  if (val && !media.some((m) => m.kind === "url" && m.url === val)) setMedia((m) => [...m, { kind: "url", url: val }]);
                   setUrlInput("");
                 }
               }}
@@ -1742,13 +1977,30 @@ function PartnerListingForm({
               variant="outline"
               onClick={() => {
                 const val = urlInput.trim();
-                if (val && !media.includes(val)) setMedia((m) => [...m, val]);
+                if (val && !media.some((m) => m.kind === "url" && m.url === val)) setMedia((m) => [...m, { kind: "url", url: val }]);
                 setUrlInput("");
               }}
               disabled={!urlInput.trim()}
             >
               <Plus className="size-4" /> {t("partnerDashboard.listingForm.add")}
             </Button>
+          </div>
+          <div className="space-y-1">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="size-4" /> {t("partnerPortal.photos.upload")}
+            </Button>
+            <p className="text-[11px] text-muted-foreground">{t("partnerPortal.photos.uploadHint")}</p>
           </div>
           <p className="text-[11px] text-muted-foreground">
             {t("partnerDashboard.listingForm.firstPhotoNote")}
@@ -2107,16 +2359,20 @@ function PartnerOverviewView({
   newLeadsCount,
   activeLeadsCount,
   listingsCount,
+  loadError,
+  onRetry,
   onGo,
 }: {
   partner: ApiPartner;
-  newLeadsCount: number;
-  activeLeadsCount: number;
-  listingsCount: number;
+  newLeadsCount: number | null;
+  activeLeadsCount: number | null;
+  listingsCount: number | null;
+  loadError: string | null;
+  onRetry: () => void;
   onGo: (v: PartnerView) => void;
 }) {
   const { t } = useLanguage();
-  const stats: Array<{ label: string; value: number; icon: typeof Home; onClick: () => void }> = [
+  const stats: Array<{ label: string; value: number | null; icon: typeof Home; onClick: () => void }> = [
     {
       label: t("partnerDashboard.dashboard.newLeads"),
       value: newLeadsCount,
@@ -2147,6 +2403,11 @@ function PartnerOverviewView({
     <div>
       <h1 className="text-2xl font-bold tracking-tight">{t("partnerDashboard.dashboard.heading")}</h1>
       <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.dashboard.subtitle")}</p>
+      {loadError && (
+        <div className="mt-4">
+          <LoadErrorBox message={t("partnerPortal.errors.listingsLoadFailed")} detail={loadError} onRetry={onRetry} />
+        </div>
+      )}
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {stats.map((s) => (
@@ -2157,7 +2418,7 @@ function PartnerOverviewView({
             className="rounded-2xl border border-border bg-card p-5 text-start shadow-card transition-colors hover:border-primary/40"
           >
             <s.icon className="size-5 text-primary" />
-            <div className="mt-3 text-2xl font-bold tracking-tight">{s.value}</div>
+            <div className="mt-3 text-2xl font-bold tracking-tight">{s.value ?? "—"}</div>
             <div className="mt-0.5 text-xs text-muted-foreground">{s.label}</div>
           </button>
         ))}
@@ -2173,7 +2434,7 @@ function PartnerOverviewView({
               ) : (
                 <Clock className="size-3" />
               )}
-              {partner.subscription_status}
+              {subscriptionStatusLabel(t, partner.subscription_status)}
             </Badge>
           </div>
           <Button size="sm" variant="outline" onClick={() => onGo("subscription")}>
@@ -2414,6 +2675,7 @@ function PartnerAreaCoverageView({
   addingArea,
   onAddArea,
   onRemoveArea,
+  error,
 }: {
   partner: ApiPartner;
   availableAreas: ApiAreaSummary[];
@@ -2422,12 +2684,18 @@ function PartnerAreaCoverageView({
   addingArea: boolean;
   onAddArea: (e: React.FormEvent) => void;
   onRemoveArea: (area_id: number) => void;
+  error: string | null;
 }) {
   const { t } = useLanguage();
   return (
     <div className="max-w-xl">
       <h1 className="text-2xl font-bold tracking-tight">{t("partnerDashboard.coveredAreas.heading")}</h1>
       <p className="mt-1 text-sm text-muted-foreground">{t("partnerDashboard.coveredAreas.subtitle")}</p>
+      {error && (
+        <div role="alert" className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
       <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-card space-y-3">
         {partner.areas.length === 0 && (
           <p className="text-sm text-muted-foreground">
@@ -2442,7 +2710,10 @@ function PartnerAreaCoverageView({
               <span className="text-xs text-muted-foreground">{area.city}</span>
             </div>
             <button
+              type="button"
               onClick={() => onRemoveArea(area.id)}
+              aria-label={t("partnerPortal.errors.removeArea", { area: area.area_name })}
+              title={t("partnerPortal.errors.removeArea", { area: area.area_name })}
               className="text-muted-foreground hover:text-destructive transition-colors"
             >
               <Trash2 className="size-3.5" />
@@ -2500,7 +2771,7 @@ function PartnerAreaCoverageView({
 }
 
 // ── Subscription ─────────────────────────────────────────────────────────────
-// Reuses the existing mock subscribe/renew endpoints — subscribePartnerMock
+// Uses the subscribe/renew endpoints — subscribePartner
 // (POST /mediators/me/subscribe, the same one activated from
 // partner.register.tsx) for a not-yet-subscribed mediator, and
 // renewPartnerSubscription (POST /mediators/me/renew) for an already-active
@@ -2517,6 +2788,7 @@ function PartnerSubscriptionView({
   const { t, lang } = useLanguage();
   const [renewing, setRenewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const active = partner.subscription_status === "active";
 
   async function handleRenew() {
@@ -2538,10 +2810,21 @@ function PartnerSubscriptionView({
       // badge/button would misreport a just-renewed subscription as not
       // active). /me/subscribe's `status` ("active") IS already the right
       // enum value, so only the renew branch needs the override.
-      const res = active ? await renewPartnerSubscription() : await subscribePartnerMock();
+      const res = active ? await renewPartnerSubscription() : await subscribePartner();
+      if (res.payment_url) {
+        // Real payments: access is granted only once Moyasar confirms the
+        // charge via its signed webhook.
+        setNotice(t("partnerPortal.subscription.redirecting"));
+        window.location.assign(res.payment_url);
+        return;
+      }
+      if (res.status === "pending") {
+        setNotice(t("partnerPortal.subscription.paymentStarted"));
+        return;
+      }
       onRenewed({
-        subscription_status: active ? "active" : res.status,
-        subscription_expires_at: res.subscription_expires_at,
+        subscription_status: "active",
+        subscription_expires_at: res.subscription_expires_at ?? partner.subscription_expires_at ?? "",
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : t("partnerDashboard.subscriptionView.failed"));
@@ -2559,12 +2842,12 @@ function PartnerSubscriptionView({
           <span className="text-sm text-muted-foreground">{t("partnerDashboard.subscriptionView.status")}</span>
           <Badge tone={active ? "success" : "warning"}>
             {active ? <CheckCircle className="size-3" /> : <Clock className="size-3" />}
-            {partner.subscription_status}
+            {subscriptionStatusLabel(t, partner.subscription_status)}
           </Badge>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">{t("partnerDashboard.subscriptionView.tier")}</span>
-          <span className="text-sm font-medium">{partner.subscription_tier}</span>
+          <span className="text-sm font-medium">{subscriptionTierLabel(t, partner.subscription_tier)}</span>
         </div>
         {partner.subscription_expires_at && (
           <div className="flex items-center justify-between">
@@ -2579,6 +2862,7 @@ function PartnerSubscriptionView({
           </div>
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}
+        {notice && <p className="text-sm text-muted-foreground">{notice}</p>}
         <Button className="w-full" onClick={() => void handleRenew()} disabled={renewing}>
           {renewing
             ? t("partnerDashboard.subscriptionView.renewing")
@@ -3208,6 +3492,49 @@ function PartnerLoginGate() {
           </a>
         </p>
       </div>
+    </div>
+  );
+}
+
+// ── Shared helpers (Partner Portal fixes) ────────────────────────────────────
+
+type ListingMediaItem =
+  | { kind: "existing"; id: number; url: string }
+  | { kind: "url"; url: string }
+  | { kind: "file"; file: File; preview: string };
+
+function toMediaItems(listing: ApiProperty | null | undefined): ListingMediaItem[] {
+  return [...(listing?.images ?? [])]
+    .sort((a, b) => a.display_order - b.display_order)
+    .map((i) => ({ kind: "existing" as const, id: i.id, url: i.url }));
+}
+
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
+
+function subscriptionStatusLabel(t: TFn, status: string): string {
+  const key = `partnerPortal.subscription.status.${status}`;
+  const label = t(key);
+  return label === key ? status : label;
+}
+
+function subscriptionTierLabel(t: TFn, tier: string): string {
+  const key = `partnerPortal.subscription.tier.${tier}`;
+  const label = t(key);
+  return label === key ? tier : label;
+}
+
+function LoadErrorBox({ message, detail, onRetry }: { message: string; detail?: string | null; onRetry: () => void }) {
+  const { t } = useLanguage();
+  return (
+    <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+      <AlertTriangle className="size-4 shrink-0 text-destructive" />
+      <div className="min-w-0 flex-1">
+        <span className="font-semibold text-destructive">{message}</span>
+        {detail && <span className="ms-1 text-muted-foreground">{detail}</span>}
+      </div>
+      <Button size="sm" variant="outline" onClick={onRetry}>
+        <RotateCw className="size-3.5" /> {t("partnerPortal.errors.retry")}
+      </Button>
     </div>
   );
 }

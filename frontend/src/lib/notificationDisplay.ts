@@ -84,5 +84,12 @@ export function deepLinkToPath(deepLink: string | null, scope: PortalScope): str
   if (negotiationMatch) {
     return scope === "partner" ? `/partner/negotiations/${negotiationMatch[1]}` : `/negotiations/${negotiationMatch[1]}`;
   }
+  // Transaction / document notifications carry partner/transactions/{id}
+  // (transaction_notifications.py) — previously unmapped, so neither portal
+  // could open them.
+  const transactionMatch = path.match(/^(?:partner\/)?transactions\/(\d+)$/);
+  if (transactionMatch) {
+    return scope === "partner" ? `/partner/transactions/${transactionMatch[1]}` : `/transaction/${transactionMatch[1]}`;
+  }
   return null;
 }

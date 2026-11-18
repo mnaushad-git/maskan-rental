@@ -204,7 +204,7 @@ def _render(notification_key: str, negotiation: PropertyNegotiation, *, locale: 
 def _enqueue(event) -> None:
     from app.core.jobs import enqueue
 
-    enqueue(create_negotiation_notification, event.event_type, event.aggregate_id, event.payload, event.trace_id)
+    enqueue(create_negotiation_notification, event.event_type, event.aggregate_id, event.payload, event.trace_id, event_id=str(event.id))
 
 
 @register_handler(EventType.NEGOTIATION_SUBMITTED)
@@ -316,7 +316,9 @@ def _recipient_locale(db: Session, user_id: int) -> str:
     retry_backoff_max=60,
     max_retries=5,
 )
-def create_negotiation_notification(self, event_type: str, aggregate_id: str, payload: dict, trace_id: str | None = None) -> dict:
+def create_negotiation_notification(
+    self, event_type: str, aggregate_id: str, payload: dict, trace_id: str | None = None, event_id: str | None = None
+) -> dict:
     if not is_enabled("negotiations"):
         return {"skipped": "feature_disabled"}
 
@@ -331,7 +333,13 @@ def create_negotiation_notification(self, event_type: str, aggregate_id: str, pa
         recipients = _recipients_for_event(db, event_type, negotiation, payload)
         created = 0
         for user_id, notification_key in recipients:
-            dedupe_key = f"{event_type}:{aggregate_id}:{user_id}"[:160]
+            # One notification per outbox event per recipient. Keying on the
+            # event id (not event_type+aggregate) keeps Celery retries and
+            # re-published events idempotent while still notifying for a
+            # *second* counter-offer / document upload / reschedule on the
+            # same record. Messages queued before this change carry no
+            # event_id and keep the old key.
+            dedupe_key = (f"negotiation:{event_id}:{user_id}" if event_id else f"{event_type}:{aggregate_id}:{user_id}")[:160]
 
             if db.scalar(select(Notification.id).where(Notification.dedupe_key == dedupe_key)) is not None:
                 continue

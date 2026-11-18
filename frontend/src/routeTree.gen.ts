@@ -10,11 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ViewingsRouteImport } from './routes/viewings'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SavedSearchesRouteImport } from './routes/saved-searches'
 import { Route as SavedRouteImport } from './routes/saved'
 import { Route as PropertyRequestsRouteImport } from './routes/property-requests'
 import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PartnersRouteImport } from './routes/partners'
 import { Route as PartnerRouteImport } from './routes/partner'
 import { Route as NotificationsRouteImport } from './routes/notifications'
@@ -43,6 +45,7 @@ import { Route as PartnerViewingsRouteImport } from './routes/partner.viewings'
 import { Route as PartnerTransactionsRouteImport } from './routes/partner.transactions'
 import { Route as PartnerRequestsRouteImport } from './routes/partner.requests'
 import { Route as PartnerRegisterRouteImport } from './routes/partner.register'
+import { Route as PartnerNotificationsRouteImport } from './routes/partner.notifications'
 import { Route as PartnerNegotiationsRouteImport } from './routes/partner.negotiations'
 import { Route as NegotiationsIdRouteImport } from './routes/negotiations.$id'
 import { Route as LeadNewRouteImport } from './routes/lead.new'
@@ -68,6 +71,11 @@ const ViewingsRoute = ViewingsRouteImport.update({
   path: '/viewings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
@@ -91,6 +99,11 @@ const PropertyRequestsRoute = PropertyRequestsRouteImport.update({
 const ProjectsRoute = ProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PartnersRoute = PartnersRouteImport.update({
@@ -233,6 +246,11 @@ const PartnerRegisterRoute = PartnerRegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => PartnerRoute,
 } as any)
+const PartnerNotificationsRoute = PartnerNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => PartnerRoute,
+} as any)
 const PartnerNegotiationsRoute = PartnerNegotiationsRouteImport.update({
   id: '/negotiations',
   path: '/negotiations',
@@ -348,11 +366,13 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof NotificationsRoute
   '/partner': typeof PartnerRouteWithChildren
   '/partners': typeof PartnersRoute
+  '/privacy': typeof PrivacyRoute
   '/projects': typeof ProjectsRoute
   '/property-requests': typeof PropertyRequestsRouteWithChildren
   '/saved': typeof SavedRoute
   '/saved-searches': typeof SavedSearchesRoute
   '/search': typeof SearchRoute
+  '/terms': typeof TermsRoute
   '/viewings': typeof ViewingsRouteWithChildren
   '/property/': typeof PropertyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
@@ -367,6 +387,7 @@ export interface FileRoutesByFullPath {
   '/lead/new': typeof LeadNewRoute
   '/negotiations/$id': typeof NegotiationsIdRoute
   '/partner/negotiations': typeof PartnerNegotiationsRouteWithChildren
+  '/partner/notifications': typeof PartnerNotificationsRoute
   '/partner/register': typeof PartnerRegisterRoute
   '/partner/requests': typeof PartnerRequestsRouteWithChildren
   '/partner/transactions': typeof PartnerTransactionsRouteWithChildren
@@ -403,11 +424,13 @@ export interface FileRoutesByTo {
   '/notifications': typeof NotificationsRoute
   '/partner': typeof PartnerRouteWithChildren
   '/partners': typeof PartnersRoute
+  '/privacy': typeof PrivacyRoute
   '/projects': typeof ProjectsRoute
   '/property-requests': typeof PropertyRequestsRouteWithChildren
   '/saved': typeof SavedRoute
   '/saved-searches': typeof SavedSearchesRoute
   '/search': typeof SearchRoute
+  '/terms': typeof TermsRoute
   '/viewings': typeof ViewingsRouteWithChildren
   '/property': typeof PropertyRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
@@ -422,6 +445,7 @@ export interface FileRoutesByTo {
   '/lead/new': typeof LeadNewRoute
   '/negotiations/$id': typeof NegotiationsIdRoute
   '/partner/negotiations': typeof PartnerNegotiationsRouteWithChildren
+  '/partner/notifications': typeof PartnerNotificationsRoute
   '/partner/register': typeof PartnerRegisterRoute
   '/partner/requests': typeof PartnerRequestsRouteWithChildren
   '/partner/transactions': typeof PartnerTransactionsRouteWithChildren
@@ -459,11 +483,13 @@ export interface FileRoutesById {
   '/notifications': typeof NotificationsRoute
   '/partner': typeof PartnerRouteWithChildren
   '/partners': typeof PartnersRoute
+  '/privacy': typeof PrivacyRoute
   '/projects': typeof ProjectsRoute
   '/property-requests': typeof PropertyRequestsRouteWithChildren
   '/saved': typeof SavedRoute
   '/saved-searches': typeof SavedSearchesRoute
   '/search': typeof SearchRoute
+  '/terms': typeof TermsRoute
   '/viewings': typeof ViewingsRouteWithChildren
   '/property/': typeof PropertyRoute
   '/admin_/analytics': typeof AdminAnalyticsRoute
@@ -478,6 +504,7 @@ export interface FileRoutesById {
   '/lead/new': typeof LeadNewRoute
   '/negotiations/$id': typeof NegotiationsIdRoute
   '/partner/negotiations': typeof PartnerNegotiationsRouteWithChildren
+  '/partner/notifications': typeof PartnerNotificationsRoute
   '/partner/register': typeof PartnerRegisterRoute
   '/partner/requests': typeof PartnerRequestsRouteWithChildren
   '/partner/transactions': typeof PartnerTransactionsRouteWithChildren
@@ -516,11 +543,13 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/partner'
     | '/partners'
+    | '/privacy'
     | '/projects'
     | '/property-requests'
     | '/saved'
     | '/saved-searches'
     | '/search'
+    | '/terms'
     | '/viewings'
     | '/property/'
     | '/admin/analytics'
@@ -535,6 +564,7 @@ export interface FileRouteTypes {
     | '/lead/new'
     | '/negotiations/$id'
     | '/partner/negotiations'
+    | '/partner/notifications'
     | '/partner/register'
     | '/partner/requests'
     | '/partner/transactions'
@@ -571,11 +601,13 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/partner'
     | '/partners'
+    | '/privacy'
     | '/projects'
     | '/property-requests'
     | '/saved'
     | '/saved-searches'
     | '/search'
+    | '/terms'
     | '/viewings'
     | '/property'
     | '/admin/analytics'
@@ -590,6 +622,7 @@ export interface FileRouteTypes {
     | '/lead/new'
     | '/negotiations/$id'
     | '/partner/negotiations'
+    | '/partner/notifications'
     | '/partner/register'
     | '/partner/requests'
     | '/partner/transactions'
@@ -626,11 +659,13 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/partner'
     | '/partners'
+    | '/privacy'
     | '/projects'
     | '/property-requests'
     | '/saved'
     | '/saved-searches'
     | '/search'
+    | '/terms'
     | '/viewings'
     | '/property/'
     | '/admin_/analytics'
@@ -645,6 +680,7 @@ export interface FileRouteTypes {
     | '/lead/new'
     | '/negotiations/$id'
     | '/partner/negotiations'
+    | '/partner/notifications'
     | '/partner/register'
     | '/partner/requests'
     | '/partner/transactions'
@@ -682,11 +718,13 @@ export interface RootRouteChildren {
   NotificationsRoute: typeof NotificationsRoute
   PartnerRoute: typeof PartnerRouteWithChildren
   PartnersRoute: typeof PartnersRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProjectsRoute: typeof ProjectsRoute
   PropertyRequestsRoute: typeof PropertyRequestsRouteWithChildren
   SavedRoute: typeof SavedRoute
   SavedSearchesRoute: typeof SavedSearchesRoute
   SearchRoute: typeof SearchRoute
+  TermsRoute: typeof TermsRoute
   ViewingsRoute: typeof ViewingsRouteWithChildren
   PropertyRoute: typeof PropertyRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
@@ -711,6 +749,13 @@ declare module '@tanstack/react-router' {
       path: '/viewings'
       fullPath: '/viewings'
       preLoaderRoute: typeof ViewingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/search': {
@@ -746,6 +791,13 @@ declare module '@tanstack/react-router' {
       path: '/projects'
       fullPath: '/projects'
       preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/partners': {
@@ -942,6 +994,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/partner/register'
       preLoaderRoute: typeof PartnerRegisterRouteImport
+      parentRoute: typeof PartnerRoute
+    }
+    '/partner/notifications': {
+      id: '/partner/notifications'
+      path: '/notifications'
+      fullPath: '/partner/notifications'
+      preLoaderRoute: typeof PartnerNotificationsRouteImport
       parentRoute: typeof PartnerRoute
     }
     '/partner/negotiations': {
@@ -1142,6 +1201,7 @@ const PartnerViewingsRouteWithChildren = PartnerViewingsRoute._addFileChildren(
 
 interface PartnerRouteChildren {
   PartnerNegotiationsRoute: typeof PartnerNegotiationsRouteWithChildren
+  PartnerNotificationsRoute: typeof PartnerNotificationsRoute
   PartnerRegisterRoute: typeof PartnerRegisterRoute
   PartnerRequestsRoute: typeof PartnerRequestsRouteWithChildren
   PartnerTransactionsRoute: typeof PartnerTransactionsRouteWithChildren
@@ -1151,6 +1211,7 @@ interface PartnerRouteChildren {
 
 const PartnerRouteChildren: PartnerRouteChildren = {
   PartnerNegotiationsRoute: PartnerNegotiationsRouteWithChildren,
+  PartnerNotificationsRoute: PartnerNotificationsRoute,
   PartnerRegisterRoute: PartnerRegisterRoute,
   PartnerRequestsRoute: PartnerRequestsRouteWithChildren,
   PartnerTransactionsRoute: PartnerTransactionsRouteWithChildren,
@@ -1205,11 +1266,13 @@ const rootRouteChildren: RootRouteChildren = {
   NotificationsRoute: NotificationsRoute,
   PartnerRoute: PartnerRouteWithChildren,
   PartnersRoute: PartnersRoute,
+  PrivacyRoute: PrivacyRoute,
   ProjectsRoute: ProjectsRoute,
   PropertyRequestsRoute: PropertyRequestsRouteWithChildren,
   SavedRoute: SavedRoute,
   SavedSearchesRoute: SavedSearchesRoute,
   SearchRoute: SearchRoute,
+  TermsRoute: TermsRoute,
   ViewingsRoute: ViewingsRouteWithChildren,
   PropertyRoute: PropertyRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,

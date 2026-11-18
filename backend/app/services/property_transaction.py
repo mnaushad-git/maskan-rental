@@ -824,3 +824,15 @@ def to_admin_transaction_detail_out(db: Session, transaction: PropertyTransactio
     base.update(_admin_participant_fields(transaction))
     base["timeline"] = list_transaction_timeline(db, transaction.id)
     return base
+
+
+def document_download_name(transaction: PropertyTransaction, document_id: int, path: Path) -> str:
+    """Readable filename for a downloaded document, e.g.
+    "MYM-04234 National ID.pdf" (stored files use random names)."""
+    import re
+
+    doc = next((d for d in transaction.documents if d.id == document_id), None)
+    label = doc.label if doc else "document"
+    base = re.sub(r"[^\w\s.-]+", " ", f"{transaction.reference or ''} {label}", flags=re.UNICODE)
+    base = re.sub(r"\s+", " ", base).strip()[:120] or "document"
+    return base + path.suffix

@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import and_, case, func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -11,7 +11,9 @@ from app.api.deps import get_admin_user, get_current_user, get_db, get_mediator_
 from app.api.routes.reviews import get_mediator_summary
 from app.core.audit import record_audit
 from app.core.config import settings
-from app.core.roles import is_admin_user
+from app.api.property_access import can_view_property, get_visible_property, is_owner_or_admin
+from app.services import listing_media
+from app.services.listing_media import resolve_image_url
 from app.core.feature_flags import is_enabled
 from app.core.geo import coords_for
 from app.core.metrics import properties_published_total
@@ -23,6 +25,8 @@ from app.models.listing_image import ListingImage
 from app.models.mediator import Mediator
 from app.models.property import Property
 from app.models.property_negotiation import PropertyNegotiation
+from app.models.property_transaction import PropertyTransaction
+from app.models.property_viewing import PROPERTY_VIEWING_INACTIVE_STATUSES, PropertyViewing
 from app.models.property_report import PROPERTY_REPORT_ACTIVE_STATUSES, PropertyReport
 from app.models.review import Review
 from app.models.user import User
@@ -61,6 +65,13 @@ from app.services import (
 )
 
 router = APIRouter()
+
+# Partner listing lifecycle (see PARTNER_EDITABLE_STATUSES / unpublish /
+# resubmit / archive below). "Suspended" and "Hidden" are admin actions and
+# stay locked for partners.
+UNPUBLISHED_STATUS = "Unpublished"
+ARCHIVED_STATUS = "Archived"
+PARTNER_EDITABLE_STATUSES = ("Published", "Pending Approval", "Rejected", UNPUBLISHED_STATUS)
 
 
 def _require_property_intelligence_enabled() -> None:
@@ -199,7 +210,9 @@ def list_partner_properties(
 ):
     _, mediator = mediator_user
     return db.scalars(
-        select(Property).where(Property.mediator_id == mediator.id).order_by(Property.id.desc())
+        select(Property)
+        .where(Property.mediator_id == mediator.id, Property.status != ARCHIVED_STATUS)
+        .order_by(Property.id.desc())
     ).all()
 
 
@@ -241,18 +254,22 @@ def update_partner_property(
     db: Session = Depends(get_db),
 ):
     _, mediator = mediator_user
-    prop = db.get(Property, property_id)
-    if not prop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
-    if prop.mediator_id != mediator.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your listing")
-    if prop.status != "Published":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only published listings can be edited")
+    prop = _get_owned_listing(db, property_id, mediator)
+    if prop.status not in PARTNER_EDITABLE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A listing that is '{prop.status}' can't be edited. Contact Maskan support.",
+        )
 
+    was_published = prop.status == "Published"
     changed_fields = payload.model_dump(exclude_unset=True)
     for field, value in changed_fields.items():
         setattr(prop, field, value)
-    prop.status = "Pending Approval"  # Re-submit for approval after any edit
+    # Moderation workflow: any edit to a Published, Pending or Rejected listing
+    # (re)enters admin review. A partner-unpublished listing stays unpublished
+    # until the partner explicitly resubmits it.
+    if prop.status != UNPUBLISHED_STATUS:
+        prop.status = "Pending Approval"
 
     record_event(
         db,
@@ -261,17 +278,125 @@ def update_partner_property(
         aggregate_id=prop.id,
         payload={"property_id": prop.id, "status": prop.status, "changed_fields": list(changed_fields.keys())},
     )
-    record_event(
-        db,
-        event_type=EventType.PROPERTY_UNPUBLISHED,
-        aggregate_type="property",
-        aggregate_id=prop.id,
-        payload={"property_id": prop.id},
-    )
+    if was_published:
+        record_event(
+            db,
+            event_type=EventType.PROPERTY_UNPUBLISHED,
+            aggregate_type="property",
+            aggregate_id=prop.id,
+            payload={"property_id": prop.id},
+        )
 
     db.commit()
     db.refresh(prop)
     return prop
+
+
+def _get_owned_listing(db: Session, property_id: int, mediator: Mediator) -> Property:
+    prop = db.get(Property, property_id)
+    if not prop or prop.status == ARCHIVED_STATUS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
+    if prop.mediator_id != mediator.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your listing")
+    return prop
+
+
+def _active_deal_counts(db: Session, property_id: int) -> tuple[int, int, int]:
+    negotiations = db.scalar(
+        select(func.count(PropertyNegotiation.id)).where(
+            PropertyNegotiation.property_id == property_id,
+            PropertyNegotiation.status.in_(("submitted", "countered")),
+        )
+    ) or 0
+    transactions = db.scalar(
+        select(func.count(PropertyTransaction.id)).where(
+            PropertyTransaction.property_id == property_id,
+            PropertyTransaction.status.notin_(("completed", "cancelled")),
+        )
+    ) or 0
+    viewings = db.scalar(
+        select(func.count(PropertyViewing.id)).where(
+            PropertyViewing.property_id == property_id,
+            PropertyViewing.status.notin_(PROPERTY_VIEWING_INACTIVE_STATUSES),
+        )
+    ) or 0
+    return int(negotiations), int(transactions), int(viewings)
+
+
+@router.post("/partner/{property_id}/unpublish", response_model=PropertyOut)
+def unpublish_partner_property(
+    property_id: int,
+    mediator_user: tuple[User, Mediator] = Depends(get_mediator_user),
+    db: Session = Depends(get_db),
+):
+    """Partner takes their own listing off the portal (Published or Pending →
+    Unpublished). Existing viewings/offers/transactions are untouched and the
+    customers involved keep access to the listing page."""
+    user, mediator = mediator_user
+    prop = _get_owned_listing(db, property_id, mediator)
+    if prop.status not in ("Published", "Pending Approval"):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"A listing that is '{prop.status}' can't be unpublished.")
+    was_published = prop.status == "Published"
+    previous = prop.status
+    prop.status = UNPUBLISHED_STATUS
+    if was_published:
+        record_event(db, event_type=EventType.PROPERTY_UNPUBLISHED, aggregate_type="property", aggregate_id=prop.id, payload={"property_id": prop.id})
+    record_audit(db, user_id=user.id, action="partner.listing.unpublished", entity_type="property", entity_id=prop.id, metadata={"from": previous})
+    db.commit()
+    db.refresh(prop)
+    return prop
+
+
+@router.post("/partner/{property_id}/resubmit", response_model=PropertyOut)
+def resubmit_partner_property(
+    property_id: int,
+    mediator_user: tuple[User, Mediator] = Depends(get_mediator_user),
+    db: Session = Depends(get_db),
+):
+    """Send an Unpublished or Rejected listing back for admin approval."""
+    user, mediator = mediator_user
+    prop = _get_owned_listing(db, property_id, mediator)
+    if prop.status not in (UNPUBLISHED_STATUS, "Rejected"):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"A listing that is '{prop.status}' can't be resubmitted.")
+    previous = prop.status
+    prop.status = "Pending Approval"
+    record_event(db, event_type=EventType.PROPERTY_UPDATED, aggregate_type="property", aggregate_id=prop.id, payload={"property_id": prop.id, "status": prop.status, "changed_fields": ["status"]})
+    record_audit(db, user_id=user.id, action="partner.listing.resubmitted", entity_type="property", entity_id=prop.id, metadata={"from": previous})
+    db.commit()
+    db.refresh(prop)
+    return prop
+
+
+@router.delete("/partner/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
+def archive_partner_property(
+    property_id: int,
+    mediator_user: tuple[User, Mediator] = Depends(get_mediator_user),
+    db: Session = Depends(get_db),
+):
+    """Partner "delete" = archive (soft delete). The row, its images, and all
+    viewing/offer/transaction/audit history are preserved; it disappears from
+    the partner's portfolio and the portal. Refused while a deal is in
+    progress so no customer is left mid-process."""
+    user, mediator = mediator_user
+    prop = _get_owned_listing(db, property_id, mediator)
+    negotiations, transactions, viewings = _active_deal_counts(db, prop.id)
+    if negotiations or transactions or viewings:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This listing has activity in progress "
+                f"({viewings} viewing(s), {negotiations} offer(s), {transactions} transaction(s)). "
+                "Unpublish it instead, or finish or cancel that activity first."
+            ),
+        )
+    previous = prop.status
+    was_published = previous == "Published"
+    prop.status = ARCHIVED_STATUS
+    if was_published:
+        record_event(db, event_type=EventType.PROPERTY_UNPUBLISHED, aggregate_type="property", aggregate_id=prop.id, payload={"property_id": prop.id})
+    record_audit(db, user_id=user.id, action="partner.listing.archived", entity_type="property", entity_id=prop.id, metadata={"from": previous})
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{property_id}", response_model=PropertyOut)
@@ -280,37 +405,19 @@ def get_property(
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ):
-    property_obj = db.get(Property, property_id)
-    if not property_obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
+    # Non-public listings (Pending Approval / Rejected / Draft / Suspended /
+    # Hidden) are only readable by the owner, admins and engaged customers —
+    # see app/api/property_access.py. Previously only "Hidden" was blocked, so
+    # an unreviewed listing's contact phone, licence and photos were readable
+    # by anyone who guessed its id.
+    property_obj = get_visible_property(db, property_id, current_user)
 
-    # P15: admin_trust.py's own "hide" action (ADMIN_HIDDEN_STATUS) is
-    # written on the explicit assumption that "every existing
-    # Property.status == 'Published' filter across search/matching/
-    # comparables would already exclude a 'Hidden' row" — true for the list/
-    # search/similar/comparable endpoints, but this single-property lookup
-    # had no status check at all, so a Hidden (admin-moderated-off) listing
-    # remained fully fetchable by anyone with the ID or a direct link,
-    # authenticated or not — defeating the moderation action entirely.
-    # Scoped to only the admin-moderation "Hidden" status (not every non-
-    # Published status) so a customer/mediator's own legitimate access to a
-    # property tied to their saved/lead/viewing/negotiation/transaction
-    # history in another status (e.g. still Pending Approval) is unaffected.
-    if property_obj.status == "Hidden":
-        is_owning_mediator = False
-        if current_user is not None:
-            mediator = db.query(Mediator).filter(Mediator.user_id == current_user.id).first()
-            is_owning_mediator = bool(mediator and mediator.id == property_obj.mediator_id)
-        is_admin_caller = bool(
-            current_user
-            and is_admin_user(current_user)
-        )
-        if not is_owning_mediator and not is_admin_caller:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
-
-    property_obj.views_count = (property_obj.views_count or 0) + 1
-    db.commit()
-    db.refresh(property_obj)
+    # Count customer views only — the owning partner editing/previewing and
+    # admins moderating must not inflate the listing's view count.
+    if not is_owner_or_admin(db, property_obj, current_user):
+        property_obj.views_count = (property_obj.views_count or 0) + 1
+        db.commit()
+        db.refresh(property_obj)
 
     result = PropertyOut.model_validate(property_obj)
     if property_obj.mediator_id:
@@ -325,10 +432,9 @@ def get_similar_properties(
     property_id: int,
     limit: int = Query(default=6, ge=1, le=20),
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
-    base = db.get(Property, property_id)
-    if not base:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
+    base = get_visible_property(db, property_id, current_user)
 
     base_price = base.monthly_rent if base.listing_type != "sale" else base.sale_price
     price_col = Property.sale_price if base.listing_type == "sale" else Property.monthly_rent
@@ -412,7 +518,11 @@ def _assemble_property_intelligence(db: Session, prop: Property, criteria: HomeF
         ComparablePropertySummaryOut(
             property_id=c.property.id,
             title=c.property.title,
-            image_url=(c.property.listing_images[0].url if c.property.listing_images else c.property.image_url),
+            image_url=(
+                resolve_image_url(c.property.listing_images[0].url, c.property.status)
+                if c.property.listing_images
+                else c.property.image_url
+            ),
             price=_price_for_intel(c.property),
             price_difference=c.price_difference,
             price_per_sqm=c.price_per_sqm,
@@ -482,13 +592,14 @@ def get_property_intelligence(
     districts: list[str] = Query(default=[]),
     required_amenities: list[str] = Query(default=[]),
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
     # Personalization criteria decision — see tracking doc's "APIs" section:
     # only the handful of fields the brief needs (budget/bedrooms/districts/
     # amenities) are accepted as query params rather than the full
     # HomeFinderCriteria shape.
     prop = _load_property_for_intelligence(db, property_id)
-    if not prop:
+    if not prop or not can_view_property(db, prop, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
 
     criteria = None
@@ -539,7 +650,7 @@ def get_property_ai_summary(
     current_user: User | None = Depends(get_optional_current_user),
 ):
     prop = _load_property_for_intelligence(db, property_id)
-    if not prop:
+    if not prop or not can_view_property(db, prop, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
 
     # Prompt 6: an optional negotiation_id grounds the draft in a real,
@@ -630,9 +741,13 @@ def _build_trust_assessment(db: Session, prop: Property) -> trust_assessment_ser
 
 
 @router.get("/{property_id}/trust", response_model=TrustAssessmentOut)
-def get_property_trust(property_id: int, db: Session = Depends(get_db)):
+def get_property_trust(
+    property_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
     prop = _load_property_for_intelligence(db, property_id)
-    if not prop:
+    if not prop or not can_view_property(db, prop, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
 
     assessment = _build_trust_assessment(db, prop)
@@ -666,7 +781,7 @@ def get_property_trust_summary(
     a deterministic paragraph (never an error state) if the AI call fails
     for any reason."""
     prop = _load_property_for_intelligence(db, property_id)
-    if not prop:
+    if not prop or not can_view_property(db, prop, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
 
     assessment = _build_trust_assessment(db, prop)
@@ -701,13 +816,17 @@ def get_property_trust_summary(
 
 
 @router.get("/{property_id}/duplicate-check", response_model=DuplicateAwarenessOut)
-def get_property_duplicate_check(property_id: int, db: Session = Depends(get_db)):
+def get_property_duplicate_check(
+    property_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
     """Lightweight duplicate-awareness check (spec section 17) — possible-
     duplicate + confidence + reasons only. Never auto-merges/hides/deletes;
     Prompt 8's partner UI surfaces this as a "may already exist" warning
     with a compare/continue-anyway choice, never a hard block."""
     prop = _load_property_for_intelligence(db, property_id)
-    if not prop:
+    if not prop or not can_view_property(db, prop, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
     result = duplicate_detection_service.find_possible_duplicates(db, prop)
     return DuplicateAwarenessOut.from_result(result)
@@ -726,7 +845,7 @@ def report_property(
     creating a duplicate row; a *different* reason, or resubmitting after
     the earlier one was Resolved/Dismissed, is allowed."""
     prop = db.get(Property, property_id)
-    if not prop:
+    if not prop or not can_view_property(db, prop, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
 
     existing_active = db.scalars(
@@ -892,9 +1011,13 @@ class ImagePayload(BaseModel):
 
 
 @router.get("/{property_id}/images", response_model=list[ListingImageOut])
-def list_property_images(property_id: int, db: Session = Depends(get_db)):
+def list_property_images(
+    property_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
     prop = db.get(Property, property_id)
-    if not prop:
+    if not prop or not can_view_property(db, prop, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
     return prop.listing_images
 
@@ -919,6 +1042,36 @@ def add_property_image(
     return img
 
 
+def _owned_editable_listing(db: Session, property_id: int, mediator: Mediator) -> Property:
+    prop = _get_owned_listing(db, property_id, mediator)
+    if prop.status not in PARTNER_EDITABLE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Photos can't be changed while a listing is '{prop.status}'.",
+        )
+    return prop
+
+
+def _photo_change_needs_review(prop: Property) -> None:
+    # A photo change is a listing edit: a Published listing re-enters review
+    # exactly like a text edit (previously photos bypassed moderation).
+    if prop.status == "Published":
+        prop.status = "Pending Approval"
+
+
+def _require_external_url(url: str) -> str:
+    url = url.strip()
+    if listing_media.MEDIA_PREFIX in url:
+        # Copying a (signed) Maskan media URL from another listing is not an
+        # external image — uploaded photos are attached only via /upload.
+        raise HTTPException(status_code=422, detail="Upload this photo from your device instead of pasting its Maskan link.")
+    if not (url.startswith("https://") or url.startswith("http://")):
+        # Local media can only come from an upload — otherwise a partner could
+        # attach another listing's private photo path to their own listing.
+        raise HTTPException(status_code=422, detail="Image URL must start with http:// or https://")
+    return url
+
+
 @router.post("/partner/{property_id}/images", response_model=ListingImageOut, status_code=status.HTTP_201_CREATED)
 def add_partner_property_image(
     property_id: int,
@@ -927,14 +1080,35 @@ def add_partner_property_image(
     db: Session = Depends(get_db),
 ):
     _, mediator = mediator_user
-    prop = db.get(Property, property_id)
-    if not prop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
-    if prop.mediator_id != mediator.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your listing")
-    next_order = len(prop.listing_images)
-    img = ListingImage(property_id=property_id, url=payload.url.strip(), display_order=next_order)
+    prop = _owned_editable_listing(db, property_id, mediator)
+    url = _require_external_url(payload.url)
+    if len(prop.listing_images) >= listing_media.MAX_IMAGES_PER_LISTING:
+        raise HTTPException(status_code=409, detail=f"A listing can have at most {listing_media.MAX_IMAGES_PER_LISTING} photos.")
+    img = ListingImage(property_id=property_id, url=url, display_order=len(prop.listing_images))
     db.add(img)
+    _photo_change_needs_review(prop)
+    db.commit()
+    db.refresh(img)
+    return img
+
+
+@router.post("/partner/{property_id}/images/upload", response_model=ListingImageOut, status_code=status.HTTP_201_CREATED)
+async def upload_partner_property_image(
+    property_id: int,
+    file: UploadFile = File(...),
+    mediator_user: tuple[User, Mediator] = Depends(get_mediator_user),
+    db: Session = Depends(get_db),
+):
+    """Upload a photo from the partner's device (JPEG/PNG/WebP, ≤ 8 MB)."""
+    _, mediator = mediator_user
+    prop = _owned_editable_listing(db, property_id, mediator)
+    try:
+        url = await listing_media.save_listing_image(prop.id, len(prop.listing_images), file)
+    except listing_media.ListingMediaError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    img = ListingImage(property_id=property_id, url=url, display_order=len(prop.listing_images))
+    db.add(img)
+    _photo_change_needs_review(prop)
     db.commit()
     db.refresh(img)
     return img
@@ -950,8 +1124,10 @@ def delete_property_image(
     img = db.get(ListingImage, image_id)
     if not img or img.property_id != property_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    url = img.url
     db.delete(img)
     db.commit()
+    listing_media.delete_listing_image_file(property_id, url)
 
 
 @router.delete("/partner/{property_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -962,14 +1138,15 @@ def delete_partner_property_image(
     db: Session = Depends(get_db),
 ):
     _, mediator = mediator_user
-    prop = db.get(Property, property_id)
-    if not prop or prop.mediator_id != mediator.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your listing")
+    prop = _owned_editable_listing(db, property_id, mediator)
     img = db.get(ListingImage, image_id)
     if not img or img.property_id != property_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+    url = img.url
     db.delete(img)
+    _photo_change_needs_review(prop)
     db.commit()
+    listing_media.delete_listing_image_file(property_id, url)
 
 
 @router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)

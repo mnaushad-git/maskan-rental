@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { documentFileName, saveBlob } from "@/lib/documentDownload";
 import { AlertTriangle, Download, Loader2, Trash2, Upload } from "lucide-react";
 import { Badge } from "@/components/maskan/Badges";
 import { Button } from "@/components/ui/button";
@@ -84,12 +85,7 @@ export function TransactionDocumentCard({
     setError(null);
     try {
       const blob = await downloadTransactionDocument(transactionId, document.id);
-      const url = URL.createObjectURL(blob);
-      const a = window.document.createElement("a");
-      a.href = url;
-      a.download = document.label;
-      a.click();
-      URL.revokeObjectURL(url);
+      saveBlob(blob, documentFileName(document.label, blob.type));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("transactionPage.documents.downloadFailed"));
     } finally {

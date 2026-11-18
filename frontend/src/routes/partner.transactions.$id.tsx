@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { documentFileName, saveBlob } from "@/lib/documentDownload";
 import { useEffect, useState } from "react";
 import {
   Activity,
@@ -417,9 +418,7 @@ function PartnerDocumentCard({
     setError(null);
     try {
       const blob = await downloadTransactionDocumentAsPartner(transactionId, document.id);
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      saveBlob(blob, documentFileName(document.label, blob.type));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("partnerTransactions.detail.documents.downloadFailed"));
     } finally {

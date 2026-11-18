@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
 
 class PropertyBase(BaseModel):
@@ -167,6 +167,23 @@ class ListingImageOut(BaseModel):
     id: int
     url: str
     display_order: int
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_uploaded_url(cls, data):
+        # Uploaded photos are stored as a relative /api/media/... path; expose
+        # an absolute URL, signed when the listing isn't public (see
+        # app/services/listing_media.py). External URLs pass through.
+        from app.services.listing_media import is_local_media, resolve_image_url
+
+        if isinstance(data, dict) or not is_local_media(getattr(data, "url", None)):
+            return data
+        prop = getattr(data, "property", None)
+        return {
+            "id": data.id,
+            "url": resolve_image_url(data.url, getattr(prop, "status", None)),
+            "display_order": data.display_order,
+        }
 
 
 class PropertyOut(PropertyBase):

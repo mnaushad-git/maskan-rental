@@ -120,7 +120,7 @@ export const Route = createFileRoute("/admin")({
 
 // ---------- Types ----------
 
-type ListingStatus = "Draft" | "Pending Approval" | "Published" | "Suspended" | "Rejected";
+type ListingStatus = "Draft" | "Pending Approval" | "Published" | "Suspended" | "Rejected" | "Unpublished" | "Archived";
 
 type Listing = {
   id: string;

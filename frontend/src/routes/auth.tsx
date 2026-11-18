@@ -246,13 +246,13 @@ function AuthPage() {
                   />
                   <span>
                     {t("auth.agreeToTerms")}
-                    <a href="#" className="font-semibold text-foreground hover:underline">
+                    <Link to="/terms" target="_blank" className="font-semibold text-foreground hover:underline">
                       {t("auth.terms")}
-                    </a>
+                    </Link>
                     {t("auth.and")}
-                    <a href="#" className="font-semibold text-foreground hover:underline">
+                    <Link to="/privacy" target="_blank" className="font-semibold text-foreground hover:underline">
                       {t("auth.privacyPolicy")}
-                    </a>
+                    </Link>
                     .
                   </span>
                 </label>
