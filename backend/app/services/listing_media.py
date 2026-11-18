@@ -83,11 +83,29 @@ async def save_listing_image(property_id: int, current_count: int, file: UploadF
     return MEDIA_PREFIX + key
 
 
-def delete_listing_image_file(property_id: int, url: str | None) -> None:
+def is_referenced(db, url: str) -> bool:
+    """True if any listing_images row (any property) still points at this file."""
+    from sqlalchemy import func, select
+
+    from app.models.listing_image import ListingImage
+
+    key = media_key(url)
+    return bool(
+        db.scalar(
+            select(func.count(ListingImage.id)).where(
+                (ListingImage.url == MEDIA_PREFIX + key) | ListingImage.url.contains(f"/listing-images/{key}")
+            )
+        )
+    )
+
+
+def delete_listing_image_file(db, property_id: int, url: str | None) -> None:
+    """Remove an uploaded photo's file after its row was deleted — but only if
+    no other record still references it (never delete a shared file)."""
     if not is_local_media(url):
         return
     key = media_key(url)
-    if not _KEY_RE.match(key):
+    if not _KEY_RE.match(key) or is_referenced(db, url):
         return
     path = disk_path(property_id, key)
     try:

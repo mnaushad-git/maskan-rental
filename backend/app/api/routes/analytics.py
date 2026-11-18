@@ -63,12 +63,14 @@ def analytics_summary(db: Session = Depends(get_db), _admin: User = Depends(get_
     returned empty, so the dashboard can say so instead of inventing them."""
     now = datetime.now(timezone.utc)
 
-    total_properties = db.scalar(select(func.count(Property.id))) or 0
+    # Archived = deleted by a partner/admin (row kept for history) — never part of inventory.
+    live = Property.status != "Archived"
+    total_properties = db.scalar(select(func.count(Property.id)).where(live)) or 0
     total_users = db.scalar(select(func.count(User.id))) or 0
     total_leads = db.scalar(select(func.count(Lead.id))) or 0
     total_viewings = db.scalar(select(func.count(PropertyViewing.id))) or 0
     total_transactions = db.scalar(select(func.count(PropertyTransaction.id))) or 0
-    total_views = db.scalar(select(func.coalesce(func.sum(Property.views_count), 0))) or 0
+    total_views = db.scalar(select(func.coalesce(func.sum(Property.views_count), 0)).where(live)) or 0
 
     new_properties, _ = _window_counts(db, Property.created_at, now)
     new_leads, _ = _window_counts(db, Lead.created_at, now)
@@ -107,6 +109,7 @@ def analytics_summary(db: Session = Depends(get_db), _admin: User = Depends(get_
 
     area_rows = db.execute(
         select(Property.area.label("name"), Property.city.label("city"), func.count(Property.id).label("count"))
+        .where(live)
         .group_by(Property.area, Property.city)
         .order_by(func.count(Property.id).desc())
         .limit(7)
@@ -124,17 +127,21 @@ def analytics_summary(db: Session = Depends(get_db), _admin: User = Depends(get_
             func.sum(case((Property.status == "Pending Approval", 1), else_=0)).label("pending"),
             func.sum(case((Property.status.notin_(["Published", "Pending Approval"]), 1), else_=0)).label("inactive"),
         )
+        .where(live)
         .group_by(Property.city)
         .order_by(func.count(Property.id).desc())
     ).all()
 
-    with_photos = db.scalar(select(func.count(func.distinct(ListingImage.property_id)))) or 0
-    geocoded = db.scalar(
-        select(func.count(Property.id)).where(Property.latitude.isnot(None), Property.longitude.isnot(None))
+    with_photos = db.scalar(
+        select(func.count(func.distinct(ListingImage.property_id))).join(Property, Property.id == ListingImage.property_id).where(live)
     ) or 0
-    with_partner = db.scalar(select(func.count(Property.id)).where(Property.mediator_id.isnot(None))) or 0
+    geocoded = db.scalar(
+        select(func.count(Property.id)).where(live, Property.latitude.isnot(None), Property.longitude.isnot(None))
+    ) or 0
+    with_partner = db.scalar(select(func.count(Property.id)).where(live, Property.mediator_id.isnot(None))) or 0
     complete_details = db.scalar(
         select(func.count(Property.id)).where(
+            live,
             Property.size_sq_m.isnot(None), Property.bedrooms.isnot(None), Property.bathrooms.isnot(None)
         )
     ) or 0

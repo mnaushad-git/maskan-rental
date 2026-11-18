@@ -323,6 +323,21 @@ def _active_deal_counts(db: Session, property_id: int) -> tuple[int, int, int]:
     return int(negotiations), int(transactions), int(viewings)
 
 
+def _ensure_can_archive(db: Session, property_id: int) -> None:
+    """Archiving (partner or admin) is refused while any deal is in progress,
+    so no customer is left mid-process."""
+    negotiations, transactions, viewings = _active_deal_counts(db, property_id)
+    if negotiations or transactions or viewings:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This listing has activity in progress "
+                f"({viewings} viewing(s), {negotiations} offer(s), {transactions} transaction(s)). "
+                "Unpublish it instead, or finish or cancel that activity first."
+            ),
+        )
+
+
 @router.post("/partner/{property_id}/unpublish", response_model=PropertyOut)
 def unpublish_partner_property(
     property_id: int,
@@ -379,16 +394,7 @@ def archive_partner_property(
     progress so no customer is left mid-process."""
     user, mediator = mediator_user
     prop = _get_owned_listing(db, property_id, mediator)
-    negotiations, transactions, viewings = _active_deal_counts(db, prop.id)
-    if negotiations or transactions or viewings:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "This listing has activity in progress "
-                f"({viewings} viewing(s), {negotiations} offer(s), {transactions} transaction(s)). "
-                "Unpublish it instead, or finish or cancel that activity first."
-            ),
-        )
+    _ensure_can_archive(db, prop.id)
     previous = prop.status
     was_published = previous == "Published"
     prop.status = ARCHIVED_STATUS
@@ -930,6 +936,9 @@ def update_property(
     if not property_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
 
+    if payload.status == ARCHIVED_STATUS and property_obj.status != ARCHIVED_STATUS:
+        _ensure_can_archive(db, property_obj.id)
+
     previous_status = property_obj.status
     previous_monthly_rent = property_obj.monthly_rent
     previous_sale_price = property_obj.sale_price
@@ -1034,8 +1043,9 @@ def add_property_image(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
     if admin is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
+    url = _require_external_url(payload.url)
     next_order = len(prop.listing_images)
-    img = ListingImage(property_id=property_id, url=payload.url.strip(), display_order=next_order)
+    img = ListingImage(property_id=property_id, url=url, display_order=next_order)
     db.add(img)
     db.commit()
     db.refresh(img)
@@ -1127,7 +1137,7 @@ def delete_property_image(
     url = img.url
     db.delete(img)
     db.commit()
-    listing_media.delete_listing_image_file(property_id, url)
+    listing_media.delete_listing_image_file(db, property_id, url)
 
 
 @router.delete("/partner/{property_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -1146,18 +1156,35 @@ def delete_partner_property_image(
     db.delete(img)
     _photo_change_needs_review(prop)
     db.commit()
-    listing_media.delete_listing_image_file(property_id, url)
+    listing_media.delete_listing_image_file(db, property_id, url)
 
 
 @router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_property(
     property_id: int,
-    _admin: User = Depends(get_admin_user),
+    admin: User = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
+    """Admin "delete" = archive (soft delete), the same as the partner action.
+
+    The row is never removed: properties.id is referenced with ON DELETE
+    CASCADE by transactions (and their documents), negotiations, viewings,
+    reports, bookings and more, so a hard delete silently wiped customers'
+    deal history. Archiving hides the listing from the portal and the
+    partner's portfolio and keeps every related record. Refused while a
+    viewing, offer or transaction is still in progress."""
     property_obj = db.get(Property, property_id)
     if not property_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
-
-    db.delete(property_obj)
+    if property_obj.status == ARCHIVED_STATUS:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    _ensure_can_archive(db, property_obj.id)
+    previous = property_obj.status
+    property_obj.status = ARCHIVED_STATUS
+    if previous == "Published":
+        record_event(db, event_type=EventType.PROPERTY_UNPUBLISHED, aggregate_type="property",
+                     aggregate_id=property_obj.id, payload={"property_id": property_obj.id})
+    record_audit(db, user_id=admin.id, action="admin.listing.archived", entity_type="property",
+                 entity_id=property_obj.id, metadata={"from": previous})
     db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

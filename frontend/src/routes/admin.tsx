@@ -102,6 +102,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { apiErrorMessage, confirmAdminAction, loginErrorMessage } from "@/lib/adminFeedback";
 import { LoadErrorNotice } from "@/components/admin/LoadErrorNotice";
+import { SafeMarkdown } from "@/components/admin/SafeMarkdown";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -149,6 +150,9 @@ type Listing = {
   mediatorName?: string | null;
   mediatorVerified?: boolean;
 };
+
+/** A photo in the admin listing form: existing photos keep their image id. */
+type AdminMediaItem = { id?: number; url: string };
 
 // ---------- Page ----------
 
@@ -366,7 +370,11 @@ function AdminPage() {
 
   const stats = useMemo(
     () => ({
-      total: listings.length,
+      // "total" = listing records that still exist for the business (every
+      // status except Archived/deleted). "published" = live inventory.
+      total: listings.filter((l) => l.status !== "Archived").length,
+      archived: listings.filter((l) => l.status === "Archived").length,
+      unpublished: listings.filter((l) => l.status === "Unpublished").length,
       pending: listings.filter((l) => l.status === "Pending Approval").length,
       published: listings.filter((l) => l.status === "Published").length,
       rejected: listings.filter((l) => l.status === "Rejected").length,
@@ -387,7 +395,8 @@ function AdminPage() {
   const filtered = useMemo(() => {
     setPage(0);
     const list = listings.filter((l) => {
-      if (statusFilter !== "All" && l.status !== statusFilter) return false;
+      // "All" never includes deleted (archived) listings — use the Deleted filter.
+      if (statusFilter === "All" ? l.status === "Archived" : l.status !== statusFilter) return false;
       if (transactionTypeFilter !== "all" && l.listingType !== transactionTypeFilter) return false;
       if (cityFilter !== "All" && l.city !== cityFilter) return false;
       if (districtFilter !== "All" && l.district !== districtFilter) return false;
@@ -497,7 +506,7 @@ function AdminPage() {
         const fresh = await fetchAdminProperties();
         setListings(fresh.map(toListing));
       } catch (err) {
-        alert(`Failed to update status: ${err instanceof Error ? err.message : String(err)}`);
+        toast.error(`Failed to update status: ${err instanceof Error ? err.message : String(err)}`);
       }
       return;
     }
@@ -508,22 +517,28 @@ function AdminPage() {
       const updated = await patchProjectAdmin(id, { listing_status });
       setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
     } catch (err) {
-      alert(`Failed to update status: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(`Failed to update status: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
   async function remove(id: string) {
     const numericId = Number(id);
     const title = listings.find((l) => l.id === id)?.title ?? `#${id}`;
-    if (!confirmAdminAction(`Permanently delete the listing "${title}"? This cannot be undone.`)) return;
+    if (
+      !confirmAdminAction(
+        `Delete the listing "${title}"? It will be removed from the portal and the partner's listings. ` +
+          "Its viewing, offer and transaction history is kept. Listings with activity in progress can't be deleted.",
+      )
+    )
+      return;
     if (Number.isFinite(numericId)) {
       const ok = await adminAction(() => removeProperty(numericId), {
-        success: "Listing deleted.",
+        success: "Listing deleted (archived — history kept).",
         failure: "Couldn't delete the listing",
       });
       if (!ok) return;
     }
-    setListings((prev) => prev.filter((l) => l.id !== id));
+    setListings((prev) => prev.map((l) => (l.id === id ? { ...l, status: "Archived" as ListingStatus } : l)));
     setSelected((prev) => {
       const n = new Set(prev);
       n.delete(id);
@@ -556,12 +571,12 @@ function AdminPage() {
       const fresh = await fetchAdminProperties();
       setListings(fresh.map(toListing));
     } catch (err) {
-      alert(`Failed to update status: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(`Failed to update status: ${err instanceof Error ? err.message : String(err)}`);
     }
     setSelected(new Set());
   }
 
-  async function saveListing(data: Listing, newImageUrls: string[]) {
+  async function saveListing(data: Listing, media: AdminMediaItem[]) {
     const numericId = Number(data.id);
     const listingType = data.listingType ?? "rent";
     const payload = {
@@ -588,26 +603,30 @@ function AdminPage() {
         ? patchProperty(numericId, payload)
         : createProperty({ ...payload, external_id: `MSK-${Date.now()}` } as Parameters<typeof createProperty>[0]));
 
-      // Sync images: add new URLs, delete removed ones
-      const existingImages = saved.images ?? [];
-      const existingUrls = new Set(existingImages.map((i) => i.url));
-      const newUrlSet = new Set(newImageUrls);
-
-      await Promise.all([
-        ...newImageUrls
-          .filter((u) => !existingUrls.has(u))
-          .map((u) => addPropertyImage(saved.id, u)),
-        ...existingImages
-          .filter((i) => !newUrlSet.has(i.url))
-          .map((i) => deletePropertyImage(saved.id, i.id)),
-      ]);
+      // Sync photos by stable image id. Photos of non-public listings come
+      // back with short-lived *signed* URLs that differ on every response, so
+      // comparing URLs made every save re-add the signed URL as an "external"
+      // image and delete the real upload (and its file).
+      const keepIds = new Set(media.flatMap((m) => (m.id != null ? [m.id] : [])));
+      const photoErrors: string[] = [];
+      for (const img of saved.images ?? []) {
+        if (!keepIds.has(img.id)) {
+          await deletePropertyImage(saved.id, img.id).catch((e) => photoErrors.push(apiErrorMessage(e)));
+        }
+      }
+      for (const m of media) {
+        if (m.id == null) {
+          await addPropertyImage(saved.id, m.url).catch((e) => photoErrors.push(apiErrorMessage(e)));
+        }
+      }
 
       const fresh = await fetchAdminProperties();
       setListings(fresh.map(toListing));
       setFormOpen(false);
-      toast.success(Number.isFinite(numericId) ? "Listing updated." : "Listing created.");
+      if (photoErrors.length) toast.error(`Listing saved, but some photos failed: ${photoErrors.join("; ")}`);
+      else toast.success(Number.isFinite(numericId) ? "Listing updated." : "Listing created.");
     } catch (err) {
-      alert(`Failed to save listing: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(`Failed to save listing: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -2096,9 +2115,9 @@ function AdminAIPanel({
                 {m.role === "user" ? "A" : <Sparkles className="size-3.5" />}
               </div>
               <div
-                className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${m.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-surface-2 text-foreground rounded-tl-sm"}`}
+                className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${m.role === "user" ? "whitespace-pre-wrap bg-primary text-primary-foreground rounded-tr-sm" : "bg-surface-2 text-foreground rounded-tl-sm"}`}
               >
-                {m.content}
+                {m.role === "user" ? m.content : <SafeMarkdown text={m.content} />}
               </div>
             </div>
           ))}
@@ -2241,7 +2260,7 @@ function AdminDashboardOverview({
   onRetry,
   onGo,
 }: {
-  stats: { total: number; pending: number; published: number; rejected: number };
+  stats: { total: number; pending: number; published: number; rejected: number; unpublished: number; archived: number };
   mediatorCount: number;
   leadCount: number;
   userCount: number;
@@ -2274,7 +2293,7 @@ function AdminDashboardOverview({
         <StatCard
           label="Total properties"
           value={lst(stats.total)}
-          delta="All listings"
+          delta={errors.listings ? "Unavailable" : `${stats.published} live · ${stats.unpublished} unpublished · ${stats.archived} deleted (not counted)`}
           icon={<Home className="size-4" />}
           tone="primary"
         />
@@ -2377,18 +2396,22 @@ function StatusFilter({
     draft: number;
     suspended: number;
     rejected: number;
+    unpublished: number;
+    archived: number;
   };
 }) {
-  const options: { label: ListingStatus | "All"; count: number }[] = [
-    { label: "All", count: stats.total },
-    { label: "Published", count: stats.published },
-    { label: "Pending Approval", count: stats.pending },
-    { label: "Draft", count: stats.draft },
-    { label: "Suspended", count: stats.suspended },
-    { label: "Rejected", count: stats.rejected },
+  const options: { label: ListingStatus | "All"; text: string; count: number }[] = [
+    { label: "All", text: "All", count: stats.total },
+    { label: "Published", text: "Published", count: stats.published },
+    { label: "Pending Approval", text: "Pending Approval", count: stats.pending },
+    { label: "Draft", text: "Draft", count: stats.draft },
+    { label: "Suspended", text: "Suspended", count: stats.suspended },
+    { label: "Rejected", text: "Rejected", count: stats.rejected },
+    { label: "Unpublished", text: "Unpublished", count: stats.unpublished },
+    { label: "Archived", text: "Deleted", count: stats.archived },
   ];
   return (
-    <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1">
+    <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-surface p-1">
       {options.map((o) => (
         <button
           key={o.label}
@@ -2401,7 +2424,7 @@ function StatusFilter({
               : "text-muted-foreground hover:text-foreground",
           )}
         >
-          {o.label}
+          {o.text}
           <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
             {o.count}
           </span>
@@ -2808,7 +2831,7 @@ function ListingFormDrawer({
 }: {
   listing: Listing | Partial<Listing> | null;
   onClose: () => void;
-  onSave: (l: Listing, imageUrls: string[]) => void | Promise<void>;
+  onSave: (l: Listing, media: AdminMediaItem[]) => void | Promise<void>;
 }) {
   const isEdit = !!listing?.id;
   const [areas, setAreas] = useState<ApiAreaSummary[]>([]);
@@ -2840,9 +2863,11 @@ function ListingFormDrawer({
   // stock placeholder (mapApiProperty fallback) — seeding the form with it
   // made every save of a photo-less listing POST that stock photo as a real
   // property image.
-  const [media, setMedia] = useState<string[]>(
+  // Existing photos carry their image id (the stable identity); pasted URLs
+  // have none until saved.
+  const [media, setMedia] = useState<AdminMediaItem[]>(
     listing?.images?.length
-      ? [...listing.images].sort((a, b) => a.display_order - b.display_order).map((i) => i.url)
+      ? [...listing.images].sort((a, b) => a.display_order - b.display_order).map((i) => ({ id: i.id, url: i.url }))
       : [],
   );
   const [urlInput, setUrlInput] = useState("");
@@ -2858,7 +2883,7 @@ function ListingFormDrawer({
   function submit(nextStatus: ListingStatus) {
     const rentNum = parseFloat(form.rent);
     if (!form.district) {
-      alert("Please select a district.");
+      toast.error("Please select a district.");
       return;
     }
     const optionalInt = (raw: string, label: string): number | undefined | null => {
@@ -2866,7 +2891,7 @@ function ListingFormDrawer({
       if (!v) return undefined;
       const n = Number(v);
       if (!Number.isInteger(n) || n < 0) {
-        alert(`${label} must be a whole number of 0 or more.`);
+        toast.error(`${label} must be a whole number of 0 or more.`);
         return null;
       }
       return n;
@@ -2876,7 +2901,7 @@ function ListingFormDrawer({
     const areaSqm = optionalInt(form.area, "Area (m²)");
     if (bedrooms === null || bathrooms === null || areaSqm === null) return;
     if (!rentNum || rentNum <= 0) {
-      alert(
+      toast.error(
         form.listingType === "sale"
           ? "Please enter a valid sale price."
           : "Please enter a valid monthly rent.",
@@ -2894,7 +2919,7 @@ function ListingFormDrawer({
         status: nextStatus,
         owner: form.owner || "Unassigned",
         createdAt: listing?.createdAt ?? new Date().toISOString().slice(0, 10),
-        image: media[0] ?? "",
+        image: media[0]?.url ?? "",
         images: listing?.images ?? [],
         areaSqm,
         bedrooms,
@@ -3111,12 +3136,12 @@ function ListingFormDrawer({
               {/* Thumbnail grid */}
               {media.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
-                  {media.map((url, i) => (
+                  {media.map((item, i) => (
                     <div
-                      key={i}
+                      key={item.id != null ? `img-${item.id}` : item.url}
                       className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-border bg-surface-2"
                     >
-                      <img src={url} alt="" className="size-full object-cover" />
+                      <img src={item.url} alt="" className="size-full object-cover" />
                       <button
                         type="button"
                         onClick={() => setMedia((m) => m.filter((_, idx) => idx !== i))}
@@ -3144,7 +3169,7 @@ function ListingFormDrawer({
                     if (e.key === "Enter") {
                       e.preventDefault();
                       const trimmed = urlInput.trim();
-                      if (trimmed && !media.includes(trimmed)) setMedia((m) => [...m, trimmed]);
+                      if (trimmed && !media.some((m) => m.url === trimmed)) setMedia((m) => [...m, { url: trimmed }]);
                       setUrlInput("");
                     }
                   }}
@@ -3157,7 +3182,7 @@ function ListingFormDrawer({
                   variant="outline"
                   onClick={() => {
                     const trimmed = urlInput.trim();
-                    if (trimmed && !media.includes(trimmed)) setMedia((m) => [...m, trimmed]);
+                    if (trimmed && !media.some((m) => m.url === trimmed)) setMedia((m) => [...m, { url: trimmed }]);
                     setUrlInput("");
                   }}
                   disabled={!urlInput.trim()}
@@ -3618,7 +3643,7 @@ function UserEditDrawer({
 
   async function submit() {
     if (!form.email.trim()) {
-      alert("Email is required.");
+      toast.error("Email is required.");
       return;
     }
     setSaving(true);
@@ -3632,7 +3657,7 @@ function UserEditDrawer({
       if (form.password.trim()) payload.password = form.password;
       await onSave(payload);
     } catch (err) {
-      alert(`Failed to update user: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(`Failed to update user: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSaving(false);
     }
@@ -3765,11 +3790,11 @@ function UserFormDrawer({
 
   async function submit() {
     if (!form.email.trim()) {
-      alert("Email is required.");
+      toast.error("Email is required.");
       return;
     }
     if (!form.password.trim()) {
-      alert("Password is required.");
+      toast.error("Password is required.");
       return;
     }
     setSaving(true);
@@ -3782,7 +3807,7 @@ function UserFormDrawer({
         role: form.role,
       });
     } catch (err) {
-      alert(`Failed to create user: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(`Failed to create user: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSaving(false);
     }
@@ -3947,19 +3972,19 @@ function PartnerFormDrawer({
 
   async function submit() {
     if (!form.email.trim()) {
-      alert("Email is required.");
+      toast.error("Email is required.");
       return;
     }
     if (!form.password.trim()) {
-      alert("Password is required.");
+      toast.error("Password is required.");
       return;
     }
     if (!form.license_number.trim()) {
-      alert("License number is required.");
+      toast.error("License number is required.");
       return;
     }
     if (!form.phone.trim()) {
-      alert("Phone is required.");
+      toast.error("Phone is required.");
       return;
     }
     setSaving(true);
@@ -3977,7 +4002,7 @@ function PartnerFormDrawer({
         subscription_status: form.subscription_status,
       });
     } catch (err) {
-      alert(`Failed to add partner: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(`Failed to add partner: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSaving(false);
     }
@@ -4412,19 +4437,19 @@ function NewLeadDrawer({
 
   async function submit() {
     if (!form.area_name.trim()) {
-      alert("District / area is required.");
+      toast.error("District / area is required.");
       return;
     }
     if (!form.customer_name.trim()) {
-      alert("Customer name is required.");
+      toast.error("Customer name is required.");
       return;
     }
     if (!form.customer_phone.trim()) {
-      alert("Customer phone is required.");
+      toast.error("Customer phone is required.");
       return;
     }
     if (!form.customer_email.trim()) {
-      alert("Customer email is required.");
+      toast.error("Customer email is required.");
       return;
     }
     setSaving(true);
@@ -4442,7 +4467,7 @@ function NewLeadDrawer({
         requirements_note: form.requirements_note || undefined,
       });
     } catch (err) {
-      alert(`Failed to create lead: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(`Failed to create lead: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSaving(false);
     }
