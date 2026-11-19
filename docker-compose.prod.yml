@@ -71,6 +71,13 @@ services:
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
     command: >
       sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+    # Persistent uploads (listing photos + PRIVATE transaction documents).
+    # Host directory outside the repo/build context; the container path must
+    # stay exactly /app/uploads — transaction documents store absolute paths
+    # under it. See deploy/uploads/README.md before changing. Only the backend
+    # reads/writes uploads (the worker does not), so only it mounts this.
+    volumes:
+      - /srv/maskan/uploads:/app/uploads
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 15s
