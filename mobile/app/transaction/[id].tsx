@@ -251,7 +251,7 @@ export default function TransactionDetailScreen() {
         {/* Activity — client-derived timeline, same timestamps-only approach as web's TransactionActivityTimeline.tsx */}
         <ActivitySection transaction={transaction} />
 
-        {/* Ask myMakan panel */}
+        {/* Ask Maskan panel */}
         {showAsk && <AskMyMakanPanel transactionId={transaction.id} />}
 
         {/* Actions */}

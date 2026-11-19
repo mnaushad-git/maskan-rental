@@ -101,14 +101,14 @@ def compute_mediator_trust(
     in_grace_period = _is_new_partner_grace_period(mediator, review_count, listing_count, now)
 
     reason_parts = []
-    reason_parts.append("Verified by myMakan" if mediator.is_verified else "Not yet verified by myMakan")
+    reason_parts.append("Verified by Maskan" if mediator.is_verified else "Not yet verified by Maskan")
     if review_count > 0 and avg_rating is not None:
         reason_parts.append(f"{avg_rating:.1f}★ average from {review_count} review{'s' if review_count != 1 else ''}")
     else:
         reason_parts.append("no reviews yet")
-    reason_parts.append(f"{listing_count} listing{'s' if listing_count != 1 else ''} on myMakan")
+    reason_parts.append(f"{listing_count} listing{'s' if listing_count != 1 else ''} on Maskan")
     if in_grace_period:
-        reason_parts.append("new myMakan partner — trust history still building, not counted against the overall score yet")
+        reason_parts.append("new Maskan partner — trust history still building, not counted against the overall score yet")
     reason = "; ".join(reason_parts) + "."
 
     return MediatorTrustResult(

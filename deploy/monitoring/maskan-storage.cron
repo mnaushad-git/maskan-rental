@@ -1,0 +1,5 @@
+# /etc/cron.d/maskan-storage — disk-space, backup-age and uploads-mount watchdog
+# (see maskan-storage-check.sh). Logs state changes to syslog: journalctl -t maskan-storage
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+*/15 * * * * root /usr/local/bin/maskan-storage-check.sh >/dev/null 2>&1

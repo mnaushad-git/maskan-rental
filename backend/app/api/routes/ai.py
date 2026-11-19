@@ -51,7 +51,7 @@ def _customer_tools(db: Session) -> list:
         max_monthly_rent: float | None = None,
         min_bedrooms: int | None = None,
     ) -> str:
-        """Search published property listings on the myMakan platform.
+        """Search published property listings on the Maskan platform.
 
         Args:
             city: Filter by city, e.g. Riyadh, Jeddah.
@@ -91,7 +91,7 @@ def _customer_tools(db: Session) -> list:
 
     @beta_tool
     def get_area_score(district: str) -> str:
-        """Get myMakan's platform intelligence score and overview for one district/area.
+        """Get Maskan's platform intelligence score and overview for one district/area.
 
         Args:
             district: The district/area name, e.g. Al Yasmin, Al Malqa.
@@ -372,7 +372,7 @@ def _enforce_free_chat_cap(request: Request, user: User | None) -> None:
     if not result.allowed:
         raise HTTPException(
             status_code=403,
-            detail="You've reached today's free AI Advisor chat limit. Upgrade to myHome Premium for unlimited chats.",
+            detail="You've reached today's free AI Advisor chat limit. Upgrade to Maskan Premium for unlimited chats.",
         )
 
 

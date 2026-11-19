@@ -2,8 +2,7 @@ import { Image, Platform, type ImageSourcePropType } from "react-native";
 import type { Property as UiProperty, Project as UiProject } from "@/lib/maskan-data";
 import type { SearchProperty as UiSearchProperty } from "@/lib/maskan-search-data";
 import { readStoredToken, clearStoredAuth } from "@/lib/auth-storage";
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
+import { API_BASE_URL } from "@/lib/config";
 
 function resolveLocalImage(mod: ImageSourcePropType): string {
   if (typeof Image.resolveAssetSource === "function") return Image.resolveAssetSource(mod).uri;
@@ -215,7 +214,7 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     badges,
     status: property.status === "Published" ? "Available" : property.status === "Suspended" ? "Reserved" : "Available",
     pricePerSqm: estimatedArea > 0 ? Math.round(displayPrice / estimatedArea) : 0,
-    agent: property.mediator_agent_name ?? property.owner_name ?? "myMakan Agent",
+    agent: property.mediator_agent_name ?? property.owner_name ?? "Maskan Agent",
     agentPhone: property.call_phone ?? property.mediator_phone ?? null,
     agentWhatsapp: property.whatsapp_number ?? property.mediator_phone ?? null,
     agentProfileImage: property.mediator_profile_image_url ?? null,
@@ -433,6 +432,24 @@ export function login(payload: { email: string; password: string }) {
 
 export function fetchMe(token: string) {
   return requestJson<AuthUser>("/auth/me", { headers: { Authorization: `Bearer ${token}` } });
+}
+
+// ── Self-service account deletion (Google Play policy) ────────────────────
+// Backend: POST /auth/me/delete re-authenticates with the password (a wrong
+// password is 403, not 401, so it never signs the user out by itself).
+
+export type AccountDeletionBlocker = { code: string; count: number; message: string };
+export type AccountDeletionEligibility = { eligible: boolean; blockers: AccountDeletionBlocker[] };
+
+export function fetchAccountDeletionEligibility() {
+  return requestJson<AccountDeletionEligibility>("/auth/me/deletion-eligibility");
+}
+
+export function deleteMyAccount(password: string, confirmation: string) {
+  return requestJson<{ status: "deleted"; message: string }>("/auth/me/delete", {
+    method: "POST",
+    body: JSON.stringify({ password, confirmation }),
+  });
 }
 
 // ── Renter identity verification (mock — no real Nafath call) ─────────────

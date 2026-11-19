@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
+from app.core.deep_links import app_link
 from app.core.feature_flags import is_enabled
 from app.core.notification_stream import publish_invalidate
 from app.core.outbox import EventType
@@ -93,7 +94,7 @@ def _render(notification_key: str, viewing: PropertyViewing, *, locale: str, ext
 def _enqueue(event) -> None:
     from app.core.jobs import enqueue
 
-    enqueue(create_viewing_notification, event.event_type, event.aggregate_id, event.payload, event.trace_id)
+    enqueue(create_viewing_notification, event.event_type, event.aggregate_id, event.payload, event.trace_id, event_id=str(event.id))
 
 
 @register_handler(EventType.VIEWING_REQUESTED)
@@ -187,7 +188,9 @@ def _recipient_locale(db: Session, user_id: int) -> str:
     retry_backoff_max=60,
     max_retries=5,
 )
-def create_viewing_notification(self, event_type: str, aggregate_id: str, payload: dict, trace_id: str | None = None) -> dict:
+def create_viewing_notification(
+    self, event_type: str, aggregate_id: str, payload: dict, trace_id: str | None = None, event_id: str | None = None
+) -> dict:
     if not is_enabled("visit_management"):
         return {"skipped": "feature_disabled"}
 
@@ -202,7 +205,13 @@ def create_viewing_notification(self, event_type: str, aggregate_id: str, payloa
         recipients = _recipients_for_event(db, event_type, viewing, payload)
         created = 0
         for user_id, notification_key in recipients:
-            dedupe_key = f"{event_type}:{aggregate_id}:{user_id}"[:160]
+            # One notification per outbox event per recipient. Keying on the
+            # event id (not event_type+aggregate) keeps Celery retries and
+            # re-published events idempotent while still notifying for a
+            # *second* counter-offer / document upload / reschedule on the
+            # same record. Messages queued before this change carry no
+            # event_id and keep the old key.
+            dedupe_key = (f"viewing:{event_id}:{user_id}" if event_id else f"{event_type}:{aggregate_id}:{user_id}")[:160]
 
             if db.scalar(select(Notification.id).where(Notification.dedupe_key == dedupe_key)) is not None:
                 continue
@@ -219,7 +228,7 @@ def create_viewing_notification(self, event_type: str, aggregate_id: str, payloa
                 entity_type="property_viewing",
                 entity_id=viewing.id,
                 property_id=viewing.property_id,
-                deep_link=f"mymakan://partner/viewings/{viewing.id}",
+                deep_link=app_link(f"partner/viewings/{viewing.id}"),
                 delivery_status={},
                 meta={"event_type": event_type},
                 trace_id=trace_id,

@@ -832,10 +832,10 @@ def test_render_counter_received_customer_direction_uses_symmetric_copy():
 
 
 def test_render_deep_link_shape_matches_viewing_notifications_convention():
-    """Documents (rather than changes) that deep_link stays the same
-    `mymakan://partner/negotiations/{id}` string every recipient already
-    got — this already embeds the negotiation id the frontend routes on,
+    """deep_link stays one `maskan://partner/negotiations/{id}` string for
+    every recipient — it embeds the negotiation id the frontend routes on,
     the exact same shape viewing_notifications.py uses for viewings."""
+    from app.core.deep_links import app_link
+
     negotiation = _fake_negotiation(id=42)
-    deep_link = f"mymakan://partner/negotiations/{negotiation.id}"
-    assert deep_link == "mymakan://partner/negotiations/42"
+    assert app_link(f"partner/negotiations/{negotiation.id}") == "maskan://partner/negotiations/42"

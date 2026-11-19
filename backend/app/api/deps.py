@@ -7,6 +7,7 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.roles import is_admin_user
 from app.db.session import SessionLocal
 from app.models.user import User
 from app.models.mediator import Mediator
@@ -24,15 +25,27 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 
-def _decode_user(token: str, db: Session) -> User | None:
+def user_from_token(token: str, db: Session) -> User | None:
+    """Resolve a bearer JWT to an *active* user, or None.
+
+    Disabled accounts (`is_active = False`) resolve to None, so a token
+    issued before an admin disabled the account stops authorizing requests
+    immediately — on every protected route, optional-auth route and the SSE
+    notification stream — instead of living out its 30-day lifetime."""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         user_id = payload.get("sub")
         if user_id is None:
             return None
-        return db.get(User, int(user_id))
-    except JWTError:
+        user = db.get(User, int(user_id))
+    except (JWTError, ValueError, TypeError):
         return None
+    if user is None or not user.is_active:
+        return None
+    return user
+
+
+_decode_user = user_from_token
 
 
 def get_current_user(
@@ -60,7 +73,7 @@ def get_admin_user(
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if user.email not in settings.admin_emails and not user.is_admin:
+    if not is_admin_user(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user
 
@@ -81,7 +94,7 @@ def get_optional_admin_user(
     if not token:
         return None
     user = _decode_user(token, db)
-    if user is None or (user.email not in settings.admin_emails and not user.is_admin):
+    if user is None or not is_admin_user(user):
         return None
     return user
 

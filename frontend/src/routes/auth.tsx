@@ -24,11 +24,11 @@ import { useLanguage } from "@/lib/i18n/context";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in or create your myMakan account" },
+      { title: "Sign in or create your Maskan account" },
       {
         name: "description",
         content:
-          "Access your saved homes, AI Advisor and area insights. Sign in or create a free myMakan account.",
+          "Access your saved homes, AI Advisor and area insights. Sign in or create a free Maskan account.",
       },
     ],
   }),
@@ -246,13 +246,13 @@ function AuthPage() {
                   />
                   <span>
                     {t("auth.agreeToTerms")}
-                    <a href="#" className="font-semibold text-foreground hover:underline">
+                    <Link to="/terms" target="_blank" className="font-semibold text-foreground hover:underline">
                       {t("auth.terms")}
-                    </a>
+                    </Link>
                     {t("auth.and")}
-                    <a href="#" className="font-semibold text-foreground hover:underline">
+                    <Link to="/privacy" target="_blank" className="font-semibold text-foreground hover:underline">
                       {t("auth.privacyPolicy")}
-                    </a>
+                    </Link>
                     .
                   </span>
                 </label>

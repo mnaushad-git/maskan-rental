@@ -25,9 +25,9 @@ test("AI Home Finder interprets a real query and hands off into Property Intelli
     .fill("I need a 3 bedroom apartment to rent in Riyadh, ideally in Al Yasmin, with parking.");
   await page.getByRole("button", { name: "Find My Best Matches" }).click();
 
-  // Step 2: "Here is what myMakan understood" — the AI's structured criteria,
+  // Step 2: "Here is what Maskan understood" — the AI's structured criteria,
   // editable before the deterministic search actually runs.
-  await expect(page.getByText("Here is what myMakan understood")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Here is what Maskan understood")).toBeVisible({ timeout: 30_000 });
 
   await page.getByRole("button", { name: "Find My Best Matches" }).click();
 

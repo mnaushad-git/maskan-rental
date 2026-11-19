@@ -1,0 +1,17 @@
+# Copy to /etc/maskan-backup.conf (chown root:root; chmod 600). All optional.
+APP_DIR=/root/maskan-rental
+# The file this server is deployed with — Hostinger VPS: docker-compose.hostinger.yml
+COMPOSE_FILE=docker-compose.prod.yml
+ENV_FILE=.env.production
+UPLOADS_DIR=/srv/maskan/uploads
+BACKUP_DIR=/var/backups/maskan
+KEEP_DAILY=7
+KEEP_WEEKLY=4
+# Encrypted off-server copy (recommended). Import ONLY the public key on the VPS:
+#   gpg --import maskan-backup-public.asc
+# Keep the private key off the server (e.g. on your own computer).
+GPG_RECIPIENT=
+ENCRYPT_LOCAL=0
+# Any machine you control with SSH key access (no cloud service needed), e.g.
+#   OFFSITE_TARGET=backup@home-nas.example:/volume1/maskan
+OFFSITE_TARGET=

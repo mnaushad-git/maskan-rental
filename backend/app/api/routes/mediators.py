@@ -12,6 +12,7 @@ from app.api.deps import get_admin_user, get_current_user, get_db, get_mediator_
 from app.api.routes.reviews import get_mediator_summary
 from app.core.cache import CacheService
 from app.core.config import settings
+from app.core.payment_mode import require_payment_mode
 from app.core.moyasar import get_payment_gateway_provider
 from app.core.outbox import EventType, record_event
 from app.models.lead import LeadAssignment
@@ -113,7 +114,11 @@ def update_my_mediator_profile(
 # instant-activation mock.
 
 def _real_payments_enabled() -> bool:
-    return bool(settings.USE_REAL_PAYMENTS and settings.MOYASAR_SECRET_KEY)
+    """True → start a real Moyasar charge. False → mock activation, which
+    payment_mode() permits only in development/test. Raises 503 when paid
+    activation isn't safely available (e.g. production without Moyasar or
+    its webhook secret) instead of silently activating for free."""
+    return require_payment_mode() == "real"
 
 
 @router.post("/me/subscribe")
@@ -135,10 +140,10 @@ def subscribe_mediator(
     if _real_payments_enabled():
         result = get_payment_gateway_provider().create_subscription_invoice(
             amount_sar=settings.SUBSCRIPTION_FEE_SAR,
-            description=f"myMakan mediator subscription (SAR {settings.SUBSCRIPTION_FEE_SAR}/month)",
+            description=f"Maskan mediator subscription (SAR {settings.SUBSCRIPTION_FEE_SAR}/month)",
             metadata={"payment_type": "subscription", "mediator_id": str(mediator.id)},
-            success_url=f"{settings.FRONTEND_ORIGIN}/mediator/subscription?status=success",
-            back_url=f"{settings.FRONTEND_ORIGIN}/mediator/subscription?status=cancelled",
+            success_url=f"{settings.FRONTEND_ORIGIN}/partner?subscription=success",
+            back_url=f"{settings.FRONTEND_ORIGIN}/partner?subscription=cancelled",
         )
         if not result.success:
             raise HTTPException(status_code=502, detail=f"Could not start payment with Moyasar: {result.error}")
@@ -199,7 +204,7 @@ def renew_subscription(
         result = get_payment_gateway_provider().charge_saved_card(
             token=mediator.moyasar_card_token,
             amount_sar=settings.SUBSCRIPTION_FEE_SAR,
-            description=f"myMakan mediator subscription renewal (SAR {settings.SUBSCRIPTION_FEE_SAR}/month)",
+            description=f"Maskan mediator subscription renewal (SAR {settings.SUBSCRIPTION_FEE_SAR}/month)",
             metadata={"payment_type": "subscription", "mediator_id": str(mediator.id)},
         )
         if not result.success:

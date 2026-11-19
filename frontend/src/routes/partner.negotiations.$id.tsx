@@ -28,7 +28,7 @@ export const Route = createFileRoute("/partner/negotiations/$id")({
   validateSearch: (s: Record<string, unknown>): { action?: "counter" | "reject" } => ({
     action: s.action === "counter" || s.action === "reject" ? s.action : undefined,
   }),
-  head: () => ({ meta: [{ title: "Negotiation — myMakan Partner" }] }),
+  head: () => ({ meta: [{ title: "Negotiation — Maskan Partner" }] }),
   component: PartnerNegotiationDetailPage,
 });
 

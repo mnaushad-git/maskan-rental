@@ -28,7 +28,7 @@ def test_verified_mediator_with_strong_signals_scores_high():
     result = compute_mediator_trust(mediator, review_count=20, avg_rating=4.8, listing_count=10)
     assert result.score >= 85
     assert result.is_verified is True
-    assert "Verified by myMakan" in result.reason
+    assert "Verified by Maskan" in result.reason
 
 
 def test_unverified_mediator_with_no_reviews_scores_low():

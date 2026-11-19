@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { LogOut, Globe, FileText, FileCheck2, ChevronRight, Map, BookOpen, Scale, Calculator, Bell, BellRing, Settings, SearchCheck, ShieldCheck, Sparkles, Search, Heart, ClipboardList, CalendarClock, Handshake } from "lucide-react-native";
+import { LogOut, Globe, FileText, FileCheck2, ChevronRight, Map, BookOpen, Scale, Calculator, Bell, BellRing, Settings, SearchCheck, ShieldCheck, Sparkles, Search, Heart, ClipboardList, CalendarClock, Handshake, UserX } from "lucide-react-native";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/i18n/context";
 import { colors } from "@/lib/colors";
@@ -228,6 +228,18 @@ export default function ProfileScreen() {
           <Text className="text-sm font-medium" style={{ color: colors.destructive }}>
             {t("navAuth.signOut")}
           </Text>
+        </Pressable>
+      )}
+
+      {user && (
+        <Pressable
+          onPress={() => router.push("/delete-account")}
+          accessibilityRole="button"
+          className="flex-row items-center gap-3 rounded-xl px-4 py-3"
+        >
+          <UserX size={18} color={colors.neutral400} />
+          <Text className="flex-1 text-sm text-muted-foreground">{t("deleteAccount.profileLink")}</Text>
+          <ChevronRight size={18} color={colors.neutral400} />
         </Pressable>
       )}
     </SafeAreaView>

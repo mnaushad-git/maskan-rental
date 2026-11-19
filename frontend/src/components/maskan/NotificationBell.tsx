@@ -27,6 +27,9 @@ const PREVIEW_LIMIT = 6;
  * (useNotificationStream), with polling as a fallback safety net. */
 export function NotificationBell() {
   const { user, scope } = useAuth();
+  // Partner portal: its own notification center, and no customer-only
+  // notification-settings link (that page uses the customer session).
+  const viewAllTo = scope === "partner" ? "/partner/notifications" : "/notifications";
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<ApiNotificationRecord[]>([]);
@@ -196,12 +199,13 @@ export function NotificationBell() {
 
             <div className="border-t border-border px-4 py-2.5">
               <Link
-                to="/notifications"
+                to={viewAllTo}
                 onClick={() => setOpen(false)}
                 className="text-xs font-medium text-primary hover:underline"
               >
                 {t("notifications.viewAll")}
               </Link>
+              {scope !== "partner" && (
               <Link
                 to="/notification-settings"
                 onClick={() => setOpen(false)}
@@ -209,6 +213,7 @@ export function NotificationBell() {
               >
                 {t("notifications.settingsLink")}
               </Link>
+              )}
             </div>
           </div>
         </>

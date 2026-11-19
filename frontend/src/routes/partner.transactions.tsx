@@ -12,7 +12,7 @@ import { statusTone, readinessText, nbaText } from "@/lib/transactionWorkspace";
 import { fetchPartnerTransactions, type ApiPartnerPropertyTransaction } from "@/lib/api/maskan";
 
 export const Route = createFileRoute("/partner/transactions")({
-  head: () => ({ meta: [{ title: "Transactions — myMakan Partner" }] }),
+  head: () => ({ meta: [{ title: "Transactions — Maskan Partner" }] }),
   component: PartnerTransactionsPage,
 });
 

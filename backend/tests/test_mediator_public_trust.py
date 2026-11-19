@@ -100,7 +100,7 @@ def test_verified_mediator_gets_the_one_allowed_verification_label(client, db_se
     resp = client.get(f"/api/v1/mediators/{mediator.id}/public")
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body["verification_label"] == "✓ Verified by myMakan"
+    assert body["verification_label"] == "✓ Verified by Maskan"
     assert body["verification_label"] == MEDIATOR_VERIFIED_LABEL
 
 

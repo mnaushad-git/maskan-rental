@@ -16,8 +16,8 @@ from app.models.ai_call_log import AICallLog
 def test_get_prompt_returns_registered_definition():
     prompt = get_prompt("customer_advisor")
     assert prompt is CUSTOMER_ADVISOR
-    assert prompt.version == 1
-    assert "myMakan AI" in prompt.template
+    assert prompt.version == 2
+    assert "Maskan AI" in prompt.template
 
 
 def test_get_prompt_unknown_name_raises():
@@ -147,7 +147,7 @@ def test_log_ai_call_writes_row_without_prompt_text(db_session, monkeypatch):
     row = db_session.query(AICallLog).filter(AICallLog.feature == "customer_chat").one()
     assert row.model == "claude-sonnet-4-6"
     assert row.prompt_name == "customer_advisor"
-    assert row.prompt_version == 1
+    assert row.prompt_version == 2
     assert row.status == "ok"
     assert row.cost_estimate_usd == pytest.approx(gateway.estimate_cost_usd("claude-sonnet-4-6", 100, 50))
     # No raw prompt or response text anywhere on the row.

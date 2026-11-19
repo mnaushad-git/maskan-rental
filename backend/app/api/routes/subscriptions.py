@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import _sync_subscription_expiry, get_current_user, get_db, get_premium_user
 from app.core.config import settings
+from app.core.payment_mode import require_payment_mode
 from app.core.moyasar import get_payment_gateway_provider
 from app.core.outbox import EventType, record_event
 from app.models.payment import Payment
@@ -19,7 +20,11 @@ router = APIRouter()
 
 
 def _real_payments_enabled() -> bool:
-    return bool(settings.USE_REAL_PAYMENTS and settings.MOYASAR_SECRET_KEY)
+    """True → start a real Moyasar charge. False → mock activation, which
+    payment_mode() permits only in development/test. Raises 503 when paid
+    activation isn't safely available (e.g. production without Moyasar or
+    its webhook secret) instead of silently activating for free."""
+    return require_payment_mode() == "real"
 
 
 @router.get("/me", response_model=SubscriptionOut)
@@ -48,7 +53,7 @@ def subscribe(
     if _real_payments_enabled():
         result = get_payment_gateway_provider().create_subscription_invoice(
             amount_sar=settings.RENTER_PREMIUM_FEE_SAR,
-            description=f"myMakan renter premium subscription (SAR {settings.RENTER_PREMIUM_FEE_SAR}/month)",
+            description=f"Maskan renter premium subscription (SAR {settings.RENTER_PREMIUM_FEE_SAR}/month)",
             metadata={"payment_type": "subscription", "user_id": str(current_user.id)},
             success_url=f"{settings.FRONTEND_ORIGIN}/premium?status=success",
             back_url=f"{settings.FRONTEND_ORIGIN}/premium?status=cancelled",
@@ -114,7 +119,7 @@ def renew_subscription(
         result = get_payment_gateway_provider().charge_saved_card(
             token=current_user.moyasar_card_token,
             amount_sar=settings.RENTER_PREMIUM_FEE_SAR,
-            description=f"myMakan renter premium subscription renewal (SAR {settings.RENTER_PREMIUM_FEE_SAR}/month)",
+            description=f"Maskan renter premium subscription renewal (SAR {settings.RENTER_PREMIUM_FEE_SAR}/month)",
             metadata={"payment_type": "subscription", "user_id": str(current_user.id)},
         )
         if not result.success:

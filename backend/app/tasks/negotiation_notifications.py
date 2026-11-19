@@ -23,11 +23,11 @@ counter offer" / "The mediator proposed SAR X for the {property type} in
 customer -> mediator direction, added in Prompt 4, gets the same title with
 symmetric "The customer proposed..." body wording, since the brief doesn't
 give a separate example string for that direction). `deep_link` stays the
-same `mymakan://partner/negotiations/{id}` string every recipient already
+same `maskan://partner/negotiations/{id}` string every recipient already
 got (unchanged from Prompt 3/4) — this already IS the "deep-link payload
 the frontend can route on" brief §19 asks for: the negotiation id is
 embedded directly in the URL path, the exact same shape
-viewing_notifications.py's `mymakan://partner/viewings/{id}` uses.
+viewing_notifications.py's `maskan://partner/viewings/{id}` uses.
 """
 import logging
 from datetime import datetime, timedelta, timezone
@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
+from app.core.deep_links import app_link
 from app.core.feature_flags import is_enabled
 from app.core.notification_stream import publish_invalidate
 from app.core.outbox import EventType
@@ -203,7 +204,7 @@ def _render(notification_key: str, negotiation: PropertyNegotiation, *, locale: 
 def _enqueue(event) -> None:
     from app.core.jobs import enqueue
 
-    enqueue(create_negotiation_notification, event.event_type, event.aggregate_id, event.payload, event.trace_id)
+    enqueue(create_negotiation_notification, event.event_type, event.aggregate_id, event.payload, event.trace_id, event_id=str(event.id))
 
 
 @register_handler(EventType.NEGOTIATION_SUBMITTED)
@@ -315,7 +316,9 @@ def _recipient_locale(db: Session, user_id: int) -> str:
     retry_backoff_max=60,
     max_retries=5,
 )
-def create_negotiation_notification(self, event_type: str, aggregate_id: str, payload: dict, trace_id: str | None = None) -> dict:
+def create_negotiation_notification(
+    self, event_type: str, aggregate_id: str, payload: dict, trace_id: str | None = None, event_id: str | None = None
+) -> dict:
     if not is_enabled("negotiations"):
         return {"skipped": "feature_disabled"}
 
@@ -330,7 +333,13 @@ def create_negotiation_notification(self, event_type: str, aggregate_id: str, pa
         recipients = _recipients_for_event(db, event_type, negotiation, payload)
         created = 0
         for user_id, notification_key in recipients:
-            dedupe_key = f"{event_type}:{aggregate_id}:{user_id}"[:160]
+            # One notification per outbox event per recipient. Keying on the
+            # event id (not event_type+aggregate) keeps Celery retries and
+            # re-published events idempotent while still notifying for a
+            # *second* counter-offer / document upload / reschedule on the
+            # same record. Messages queued before this change carry no
+            # event_id and keep the old key.
+            dedupe_key = (f"negotiation:{event_id}:{user_id}" if event_id else f"{event_type}:{aggregate_id}:{user_id}")[:160]
 
             if db.scalar(select(Notification.id).where(Notification.dedupe_key == dedupe_key)) is not None:
                 continue
@@ -347,7 +356,7 @@ def create_negotiation_notification(self, event_type: str, aggregate_id: str, pa
                 entity_type="property_negotiation",
                 entity_id=negotiation.id,
                 property_id=negotiation.property_id,
-                deep_link=f"mymakan://partner/negotiations/{negotiation.id}",
+                deep_link=app_link(f"partner/negotiations/{negotiation.id}"),
                 delivery_status={},
                 meta={"event_type": event_type},
                 trace_id=trace_id,

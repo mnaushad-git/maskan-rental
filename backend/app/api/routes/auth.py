@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.core.config import settings
+from app.core.roles import is_admin_user
 from app.core.rate_limit import rate_limit_dependency
 from app.models.user import User
 from passlib.context import CryptContext
@@ -111,7 +112,7 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
             id=user.id,
             email=user.email,
             full_name=user.full_name,
-            is_admin=user.email in settings.admin_emails,
+            is_admin=is_admin_user(user),
             verification_status=user.verification_status,
             is_verified=user.is_verified,
         ),
@@ -138,7 +139,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
             id=user.id,
             email=user.email,
             full_name=user.full_name,
-            is_admin=user.email in settings.admin_emails,
+            is_admin=is_admin_user(user),
             verification_status=user.verification_status,
             is_verified=user.is_verified,
         ),
@@ -151,7 +152,7 @@ def me(current_user: User = Depends(get_current_user)):
         id=current_user.id,
         email=current_user.email,
         full_name=current_user.full_name,
-        is_admin=current_user.email in settings.admin_emails,
+        is_admin=is_admin_user(current_user),
         verification_status=current_user.verification_status,
         is_verified=current_user.is_verified,
     )
@@ -160,3 +161,85 @@ def me(current_user: User = Depends(get_current_user)):
 @router.post("/logout")
 def logout():
     return {"message": "logged out"}
+
+
+# ── Self-service account deletion (Google Play policy) ─────────────────────
+# Logic lives in app/services/account_deletion.py; these routes only handle
+# re-authentication, confirmation and HTTP mapping. A wrong password returns
+# 403, never 401: clients treat any 401 as "session expired" and sign out.
+
+ACCOUNT_DELETION_CONFIRMATION = "DELETE"
+
+_BLOCKER_MESSAGES = {
+    "partner_account": "Partner accounts can't be deleted from the app. Please contact Maskan support.",
+    "active_transactions": "You have a property transaction in progress. Complete or cancel it first.",
+    "active_negotiations": "You have an open offer or negotiation. Withdraw it or wait for it to close first.",
+    "upcoming_viewings": "You have a viewing that is requested or scheduled. Cancel it first.",
+    "upcoming_bookings": "You have an upcoming booking. Cancel it or wait until it ends.",
+    "open_contracts": "You have a contract that is in draft, awaiting signature or active.",
+    "open_leads": "You have an open enquiry with a partner. Wait for it to be closed first.",
+    "active_property_requests": "You have an active property request. Cancel it first.",
+    "pending_payments": "You have a payment that is still processing. Try again once it completes.",
+}
+
+
+class DeletionBlockerOut(BaseModel):
+    code: str
+    count: int
+    message: str
+
+
+class DeletionEligibilityResponse(BaseModel):
+    eligible: bool
+    blockers: list[DeletionBlockerOut]
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str
+    confirmation: str
+
+
+def _blockers_out(blockers) -> list[DeletionBlockerOut]:
+    return [DeletionBlockerOut(code=b.code, count=b.count, message=_BLOCKER_MESSAGES.get(b.code, b.code)) for b in blockers]
+
+
+@router.get("/me/deletion-eligibility", response_model=DeletionEligibilityResponse)
+def account_deletion_eligibility(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from app.services.account_deletion import find_blockers
+
+    if is_admin_user(current_user):
+        return DeletionEligibilityResponse(eligible=False, blockers=[DeletionBlockerOut(
+            code="admin_account", count=1, message="Admin accounts can't be deleted from the app.")])
+    blockers = _blockers_out(find_blockers(db, current_user))
+    return DeletionEligibilityResponse(eligible=not blockers, blockers=blockers)
+
+
+@router.post(
+    "/me/delete",
+    dependencies=[Depends(rate_limit_dependency("account_delete", limit=5, window_seconds=3600, by_user=True))],
+)
+def delete_my_account(
+    body: DeleteAccountRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.account_deletion import delete_account, find_blockers
+
+    if body.confirmation.strip().upper() != ACCOUNT_DELETION_CONFIRMATION:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=f'Type {ACCOUNT_DELETION_CONFIRMATION} to confirm account deletion.')
+    if not verify_password(body.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password is incorrect.")
+    if is_admin_user(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin accounts can't be deleted from the app.")
+    blockers = find_blockers(db, current_user)
+    if blockers:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=" ".join(b.message for b in _blockers_out(blockers)))
+    try:
+        delete_account(db, current_user)
+    except ValueError:  # blocker appeared between the check and the delete
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="Your account changed while deleting. Please try again.")
+    return {"status": "deleted", "message": "Your account has been deleted and you have been signed out."}

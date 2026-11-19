@@ -12,7 +12,7 @@ import { formatSAR } from "@/lib/maskan-data";
 import { useLanguage } from "@/lib/i18n/context";
 
 export const Route = createFileRoute("/partner/leads/$leadId")({
-  head: () => ({ meta: [{ title: "Lead Detail — myMakan Partner" }] }),
+  head: () => ({ meta: [{ title: "Lead Detail — Maskan Partner" }] }),
   component: MediatorLeadDetail,
 });
 
@@ -29,6 +29,7 @@ function MediatorLeadDetail() {
   const [showCloseMenu, setShowCloseMenu] = useState(false);
   const [closureNote, setClosureNote] = useState("");
   const [error, setError] = useState("");
+  const [sendError, setSendError] = useState("");
   // Distinct from `error` above (which is only for action-button failures,
   // e.g. accept/reject/closure) — this tracks the initial `fetchLead` call
   // itself so a 403/404/network failure renders "Unable to load this lead"
@@ -106,10 +107,14 @@ function MediatorLeadDetail() {
     e.preventDefault();
     if (!draft.trim()) return;
     setSending(true);
+    setSendError("");
     try {
       const msg = await sendLeadMessage(Number(leadId), draft.trim());
       setMessages(m => [...m, msg]);
       setDraft("");
+    } catch (err) {
+      // The draft stays in the box so the partner can retry.
+      setSendError(t("partnerPortal.errors.messageSendFailed", { error: err instanceof Error ? err.message : String(err) }));
     } finally {
       setSending(false);
     }
@@ -341,10 +346,13 @@ function MediatorLeadDetail() {
                 rows={2}
                 className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none disabled:opacity-50"
               />
-              <Button type="submit" size="icon" disabled={sending || !draft.trim() || !canSeeContact}>
+              <Button type="submit" size="icon" aria-label={t("partnerLeadDetail.typeMessage")} disabled={sending || !draft.trim() || !canSeeContact}>
                 <Send className="size-4" />
               </Button>
             </form>
+            {sendError && (
+              <p role="alert" className="px-4 pb-3 text-sm text-destructive">{sendError}</p>
+            )}
           </div>
         </div>
       </main>

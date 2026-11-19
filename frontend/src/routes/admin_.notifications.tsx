@@ -37,6 +37,7 @@ import {
   type AuthUser,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
+import { loginErrorMessage } from "@/lib/adminFeedback";
 import { cn } from "@/lib/utils";
 
 // This route is intentionally self-contained (no imports from routes/admin.tsx
@@ -47,7 +48,7 @@ import { cn } from "@/lib/utils";
 // across the two large route files.
 export const Route = createFileRoute("/admin_/notifications")({
   head: () => ({
-    meta: [{ title: "Notification Operations — myMakan Admin" }],
+    meta: [{ title: "Notification Operations — Maskan Admin" }],
   }),
   component: AdminNotificationsPage,
 });
@@ -97,8 +98,8 @@ function AdminNotificationsLoginGate({
         return;
       }
       onAuth(response.user, response.access_token);
-    } catch {
-      setError("Invalid email or password.");
+    } catch (err) {
+      setError(loginErrorMessage(err));
     } finally {
       setLoading(false);
     }

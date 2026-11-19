@@ -2,8 +2,82 @@
 import type { TranslationDict } from "./en";
 
 export const ar: TranslationDict = {
+  legal: {
+    termsTitle: "شروط الاستخدام",
+    privacyTitle: "سياسة الخصوصية",
+    notPublishedTitle: "لم تُنشر بعد",
+    notPublishedBody: "لم يتم نشر {{document}} الخاصة بمسكن بعد. ستكون متاحة هنا قبل الإطلاق العام لمسكن.",
+    openPolicy: "فتح {{document}}",
+    externalNote: "{{document}} مستضافة على موقع سياسات مسكن.",
+    back: "رجوع",
+  },
+  partnerPortal: {
+    nav: {
+      propertyRequests: "طلبات العقارات",
+      notifications: "الإشعارات",
+    },
+    subscription: {
+      status: {
+        active: "نشط",
+        inactive: "غير نشط",
+        pending_payment: "بانتظار الدفع",
+        cancelled: "ملغى",
+        expired: "منتهي",
+      },
+      tier: {
+        standard: "قياسي",
+        premium: "مميز",
+      },
+      redirecting: "جارٍ التحويل إلى صفحة الدفع الآمن…",
+      paymentStarted: "بدأت عملية الدفع. أكملها في صفحة الدفع — سيُفعَّل اشتراكك فور تأكيد الدفع.",
+      returnedSuccess: "شكرًا — جارٍ تأكيد الدفع. سيُفعَّل اشتراكك فور اكتماله.",
+      returnedCancelled: "تم إلغاء الدفع. لم يتغير اشتراكك.",
+      securePaymentNote: "ستُكمل الدفع بأمان عبر صفحة الدفع من ميسّر. يُفعَّل اشتراكك فور تأكيد الدفع.",
+    },
+    listings: {
+      unpublish: "إلغاء النشر",
+      resubmit: "إعادة الإرسال للموافقة",
+      archive: "حذف",
+      archiveTitle: "حذف الإعلان",
+      confirmUnpublish: "إلغاء نشر \"{{title}}\"؟ سيُخفى من بوابة مسكن. لن تتأثر المعاينات والعروض والمعاملات الحالية.",
+      confirmResubmit: "إرسال \"{{title}}\" لموافقة الإدارة؟ سيُنشر مجددًا بعد الموافقة.",
+      confirmArchive: "حذف \"{{title}}\"؟ سيُزال من إعلاناتك ومن البوابة، مع الاحتفاظ بسجل المعاينات والعروض والمعاملات.",
+      unpublished: "تم إلغاء نشر الإعلان.",
+      resubmitted: "تم إرسال الإعلان للموافقة.",
+      archived: "تم حذف الإعلان.",
+      actionFailed: "تعذّر تحديث الإعلان: {{error}}",
+      unpublishedNote: "مخفي من البوابة. عدّله أو أعد إرساله للموافقة لنشره مجددًا.",
+      rejectedNote: "لم توافق عليه مسكن. عدّل الإعلان وأعد إرساله للموافقة.",
+      lockedNote: "هذا الإعلان مقفل من قبل مسكن. تواصل مع الدعم لإجراء تغييرات.",
+    },
+    photos: {
+      upload: "رفع صور",
+      uploadHint: "JPEG أو PNG أو WebP · حتى 8 ميغابايت للصورة · 20 صورة كحد أقصى",
+      pendingUpload: "تُرفع عند الحفظ",
+      removePhoto: "إزالة الصورة",
+      invalidType: "{{name}} ليست صورة JPEG أو PNG أو WebP.",
+      tooLarge: "حجم {{name}} أكبر من 8 ميغابايت.",
+      tooMany: "يمكن أن يحتوي الإعلان على 20 صورة كحد أقصى.",
+      someFailed: "تم حفظ الإعلان، لكن تعذّر رفع بعض الصور: {{error}}. احفظ مرة أخرى لإعادة المحاولة.",
+    },
+    errors: {
+      retry: "إعادة المحاولة",
+      profileLoadFailed: "تعذّر تحميل ملفك كشريك. تحقق من الاتصال وحاول مرة أخرى.",
+      listingsLoadFailed: "تعذّر تحميل إعلاناتك.",
+      leadsLoadFailed: "تعذّر تحميل العملاء المحتملين.",
+      viewingsLoadFailed: "تعذّر تحميل طلبات المعاينة.",
+      messageSendFailed: "لم تُرسل رسالتك: {{error}}",
+      areaAddFailed: "تعذّرت إضافة المنطقة: {{error}}",
+      areaRemoveFailed: "تعذّرت إزالة المنطقة: {{error}}",
+      removeArea: "إزالة {{area}}",
+    },
+    notifications: {
+      heading: "الإشعارات",
+      backToDashboard: "لوحة التحكم",
+    },
+  },
   common: {
-    brand: "ماي مكان",
+    brand: "مسكن",
     loading: "جارٍ التحميل…",
     viewAll: "عرض الكل",
     signIn: "تسجيل الدخول",
@@ -37,20 +111,20 @@ export const ar: TranslationDict = {
     trust: {
       // Kept identical to the English string on purpose — the backend never
       // localizes this exact phrase (see en.ts's comment on this key).
-      verified: "✓ Verified by myMakan",
+      verified: "✓ Verified by Maskan",
       complete: "{{percent}}% مكتمل",
       recentlyUpdated: "تم التحديث مؤخرًا",
     },
   },
   verification: {
     title: "التحقق",
-    mymakan: "ماي مكان",
-    verifiedLabel: "✓ Verified by myMakan",
-    notVerifiedLabel: "لم يتم التحقق منه بعد بواسطة ماي مكان",
+    mymakan: "مسكن",
+    verifiedLabel: "✓ Verified by Maskan",
+    notVerifiedLabel: "لم يتم التحقق منه بعد بواسطة مسكن",
     notConnected: "غير متصل",
-    explainerTitle: "ماذا تعني علامة \"موثّق من ماي مكان\"؟",
+    explainerTitle: "ماذا تعني علامة \"موثّق من مسكن\"؟",
     explainer:
-      "\"✓ Verified by myMakan\" تعني أن فريقنا راجع بيانات حساب هذا الوسيط. هذا ليس تحققًا حكوميًا أو من REGA أو إيجار أو نفاذ.",
+      "\"✓ Verified by Maskan\" تعني أن فريقنا راجع بيانات حساب هذا الوسيط. هذا ليس تحققًا حكوميًا أو من REGA أو إيجار أو نفاذ.",
   },
   listingCategories: {
     rent: "إيجار",
@@ -226,7 +300,7 @@ export const ar: TranslationDict = {
   },
   notificationSettings: {
     heading: "إعدادات الإشعارات",
-    subtitle: "اختر كيف ومتى تصلك إشعارات ماي مكان.",
+    subtitle: "اختر كيف ومتى تصلك إشعارات مسكن.",
     loading: "جارٍ تحميل إعدادات الإشعارات...",
     unableToLoad: "تعذر تحميل إعدادات الإشعارات.",
     saveError: "تعذر حفظ هذا التغيير. حاول مرة أخرى.",
@@ -243,7 +317,7 @@ export const ar: TranslationDict = {
       inApp: "داخل التطبيق",
       inAppDesc: "إظهار الإشعارات في الجرس ومركز الإشعارات.",
       push: "الإشعارات الفورية",
-      pushDesc: "لتطبيق ماي مكان للجوال — يتطلب تثبيت التطبيق والسماح بالإشعارات.",
+      pushDesc: "لتطبيق مسكن للجوال — يتطلب تثبيت التطبيق والسماح بالإشعارات.",
       email: "البريد الإلكتروني",
       emailDesc: "إرسال نسخة من الإشعارات المؤهلة إلى بريدك الإلكتروني.",
     },
@@ -282,7 +356,7 @@ export const ar: TranslationDict = {
         label: "توصيات الذكاء الاصطناعي",
         desc: "اقتراحات مخصصة مدعومة بالذكاء الاصطناعي.",
       },
-      product_announcements: { label: "إعلانات المنتج", desc: "أخبار وتحديثات حول ماي مكان." },
+      product_announcements: { label: "إعلانات المنتج", desc: "أخبار وتحديثات حول مسكن." },
       security: {
         label: "تنبيهات الأمان",
         desc: "إشعارات تسجيل الدخول وأمان الحساب. مفعّلة دائمًا.",
@@ -335,7 +409,7 @@ export const ar: TranslationDict = {
   },
   footer: {
     tagline:
-      "ماي مكان هي منصة استئجار العقارات المدعومة بالذكاء الاصطناعي في المملكة العربية السعودية. بحث أذكى، أسعار عادلة، ومنازل أفضل.",
+      "مسكن هي منصة استئجار العقارات المدعومة بالذكاء الاصطناعي في المملكة العربية السعودية. بحث أذكى، أسعار عادلة، ومنازل أفضل.",
     discover: "استكشاف",
     citiesHeading: "المدن",
     links: {
@@ -347,7 +421,7 @@ export const ar: TranslationDict = {
       compare: "مقارنة",
       scoreMethodology: "منهجية التقييم",
     },
-    copyright: "© {{year}} ماي مكان. جميع الحقوق محفوظة.",
+    copyright: "© {{year}} مسكن. جميع الحقوق محفوظة.",
     madeFor: "صُنع من أجل المملكة العربية السعودية · متوفر باللغتين العربية والإنجليزية",
   },
   searchBar: {
@@ -422,7 +496,7 @@ export const ar: TranslationDict = {
       trustedByRenters: "موثوق به من قِبل أكثر من 38,000 مستأجر",
       aiScoring: "تقييم أسعار عادل مدعوم بالذكاء الاصطناعي",
     },
-    exploreMore: "طرق أخرى يساعدك بها ماي مكان",
+    exploreMore: "طرق أخرى يساعدك بها مسكن",
     viewFullMap: "عرض الخريطة كاملة",
     truPartner: {
       badge: "TruPartner™",
@@ -434,7 +508,7 @@ export const ar: TranslationDict = {
       badge: "TruAIAdvisor™",
       new: "جديد",
       title: "هل تواجه صعوبة في إيجاد العقار المناسب؟",
-      body: "اسأل TruAIAdvisor™ من ماي مكان — احصل على إجابات فورية مدعومة بالبيانات حول الأحياء، الأسعار العادلة، وأفضل خيار لعائلتك.",
+      body: "اسأل TruAIAdvisor™ من مسكن — احصل على إجابات فورية مدعومة بالبيانات حول الأحياء، الأسعار العادلة، وأفضل خيار لعائلتك.",
     },
     truEstimate: {
       badge: "TruEstimate™",
@@ -445,8 +519,8 @@ export const ar: TranslationDict = {
     truPropertyRequest: {
       badge: "وكيل العقار الذكي",
       new: "جديد",
-      title: "أخبر ماي مكان بما تحتاجه — وسنواصل البحث",
-      body: "صف منزلك المثالي مرة واحدة. يواصل وكيل ماي مكان العقاري الذكي مطابقة الإعلانات الجديدة معه وينبّهك فور ظهور خيار رائع.",
+      title: "أخبر مسكن بما تحتاجه — وسنواصل البحث",
+      body: "صف منزلك المثالي مرة واحدة. يواصل وكيل مسكن العقاري الذكي مطابقة الإعلانات الجديدة معه وينبّهك فور ظهور خيار رائع.",
     },
   },
   furnishing: {
@@ -565,7 +639,7 @@ export const ar: TranslationDict = {
     },
     registerLease: {
       title: "سجّل عقد الإيجار الخاص بك",
-      desc: "بمجرد الاتفاق على الإيجار، يمكن لماي مكان مساعدتك في إصدار عقد إيجار رقمي — ابدأ بطلب تواصل.",
+      desc: "بمجرد الاتفاق على الإيجار، يمكن لمسكن مساعدتك في إصدار عقد إيجار رقمي — ابدأ بطلب تواصل.",
       cta: "ابدأ الآن",
     },
     description: {
@@ -585,17 +659,17 @@ export const ar: TranslationDict = {
       licenseExpiration: "تاريخ انتهاء الترخيص",
       lastUpdated: "آخر تحديث",
       source: "المصدر",
-      sourceValue: "منصة ماي مكان",
+      sourceValue: "منصة مسكن",
     },
     rentalIntelligence: {
-      badge: "ذكاء ماي مكان الإيجاري الاصطناعي",
+      badge: "ذكاء مسكن الإيجاري الاصطناعي",
       title: "تقييم الإيجار",
       subtitle:
-        "مُركّب من عدالة السعر، جودة المنطقة، المرافق، التنقل، والملاءمة العائلية — من ذكاء منصة ماي مكان.",
-      badgeSale: "ذكاء ماي مكان لتقييم الشراء",
+        "مُركّب من عدالة السعر، جودة المنطقة، المرافق، التنقل، والملاءمة العائلية — من ذكاء منصة مسكن.",
+      badgeSale: "ذكاء مسكن لتقييم الشراء",
       titleSale: "تقييم الشراء",
       subtitleSale:
-        "مُركّب من موقع السعر، جودة المنطقة، المرافق، التنقل، والملاءمة العائلية — من ذكاء منصة ماي مكان.",
+        "مُركّب من موقع السعر، جودة المنطقة، المرافق، التنقل، والملاءمة العائلية — من ذكاء منصة مسكن.",
       priceFairness: "عدالة السعر",
       areaQuality: "جودة المنطقة",
       amenities: "المرافق",
@@ -605,7 +679,7 @@ export const ar: TranslationDict = {
       verdictStrong: "قيمة قوية",
       verdictFair: "قيمة مقبولة",
       verdictBelow: "أقل من المتوسط",
-      lastRefreshed: "تقييمات منصة ماي مكان · آخر تحديث {{date}}",
+      lastRefreshed: "تقييمات منصة مسكن · آخر تحديث {{date}}",
       aiGenerated: "تقييم مُولّد بالذكاء الاصطناعي",
       estimateGenerated: "تقييم تقديري (الذكاء الاصطناعي غير متاح حاليًا)",
     },
@@ -654,7 +728,7 @@ export const ar: TranslationDict = {
     },
     areaSummary: {
       titleSuffix: "— رؤى المنطقة",
-      scoresLoaded: "تقييمات منصة ماي مكان · {{minutes}} دقيقة تنقل إلى وسط المدينة",
+      scoresLoaded: "تقييمات منصة مسكن · {{minutes}} دقيقة تنقل إلى وسط المدينة",
       scoresLoading: "كيف يُقيَّم هذا الحي في الأمور التي تهم المستأجرين أكثر.",
       exploreArea: "استكشف المنطقة",
       howScoresWork: "كيف تُحسب التقييمات",
@@ -673,8 +747,8 @@ export const ar: TranslationDict = {
     },
     nearby: {
       title: "الأماكن القريبة",
-      loading: "جارٍ تحميل الأماكن القريبة من ماي مكان…",
-      realDistances: "مسافات حقيقية من {{district}} · عبر ذكاء ماي مكان للمناطق",
+      loading: "جارٍ تحميل الأماكن القريبة من مسكن…",
+      realDistances: "مسافات حقيقية من {{district}} · عبر ذكاء مسكن للمناطق",
       schools: "المدارس",
       hospitals: "المستشفيات والعيادات",
       mosques: "المساجد",
@@ -689,7 +763,7 @@ export const ar: TranslationDict = {
       viewAll: "عرض الكل",
     },
     aiSummary: {
-      badge: "ملخص ماي مكان الذكي",
+      badge: "ملخص مسكن الذكي",
       askAI: "اسأل الذكاء الاصطناعي عن هذا المنزل",
       negotiationTips: "نصائح للتفاوض",
       familyExcellent: "خيار ممتاز للعائلات",
@@ -788,7 +862,7 @@ export const ar: TranslationDict = {
     },
     landlord: {
       listedBy: "أُدرج بواسطة",
-      verifiedAgent: "وكيل موثّق من ماي مكان",
+      verifiedAgent: "وكيل موثّق من مسكن",
       profile: "الملف الشخصي",
       callAgent: "الاتصال بالوكيل",
       noPhone: "لا يوجد رقم هاتف مسجل",
@@ -849,7 +923,7 @@ export const ar: TranslationDict = {
         },
         mediator: {
           listings: "{{count}} إعلان نشط",
-          noReviewsYet: "لا توجد تقييمات بعد على ماي مكان",
+          noReviewsYet: "لا توجد تقييمات بعد على مسكن",
           noMediator: "لا يوجد وسيط مسجل لهذا العقار.",
         },
         freshness: {
@@ -867,7 +941,7 @@ export const ar: TranslationDict = {
           },
         },
         priceConfidence: {
-          subtitle: "من ذكاء ماي مكان العقاري.",
+          subtitle: "من ذكاء مسكن العقاري.",
           unavailable: "لا توجد إعلانات مماثلة كافية بعد لتقييم موثوقية السعر.",
         },
         thingsToVerify: {
@@ -876,7 +950,7 @@ export const ar: TranslationDict = {
         reportConcern: {
           cta: "الإبلاغ عن مشكلة",
           title: "الإبلاغ عن مشكلة",
-          subtitle: "ساعدنا في الحفاظ على موثوقية ماي مكان. أخبرنا ما هي المشكلة في هذا الإعلان.",
+          subtitle: "ساعدنا في الحفاظ على موثوقية مسكن. أخبرنا ما هي المشكلة في هذا الإعلان.",
           reasonLabel: "السبب",
           reasons: {
             duplicate_listing: "إعلان مكرر",
@@ -932,16 +1006,16 @@ export const ar: TranslationDict = {
       signIn: "تسجيل الدخول",
     },
     intelligence: {
-      badge: "ذكاء myMakan",
-      loading: "جارٍ تحميل ذكاء myMakan…",
-      unavailable: "ذكاء myMakan غير متاح لهذا العقار حاليًا.",
+      badge: "ذكاء Maskan",
+      loading: "جارٍ تحميل ذكاء Maskan…",
+      unavailable: "ذكاء Maskan غير متاح لهذا العقار حاليًا.",
       matchLabel: "تطابق {{percent}}%",
       askingRent: "الإيجار المطلوب",
       askingPrice: "السعر المطلوب",
       actions: {
         whyThisProperty: "لماذا هذا العقار؟",
         compare: "قارن",
-        askMyMakan: "اسأل myMakan",
+        askMyMakan: "اسأل Maskan",
         contactAgent: "تواصل مع الوكيل",
       },
       decisionScore: {
@@ -968,7 +1042,7 @@ export const ar: TranslationDict = {
         factorsUsed: "المقارنة بناءً على",
         comparableCount: "استنادًا إلى {{count}} إعلان مشابه",
         insufficientData: "بيانات سوق محدودة — لا توجد إعلانات مشابهة كافية لتقدير نطاق عادل بعد.",
-        disclaimerBuy: "تقدير سوقي من myMakan استنادًا إلى البيانات المتاحة على المنصة.",
+        disclaimerBuy: "تقدير سوقي من Maskan استنادًا إلى البيانات المتاحة على المنصة.",
         factors: {
           district: "الحي",
           type: "نوع العقار",
@@ -998,7 +1072,7 @@ export const ar: TranslationDict = {
       },
       similarProperties: {
         title: "عقارات مشابهة",
-        subtitle: "إعلانات مشابهة وجدتها myMakan لهذا العقار.",
+        subtitle: "إعلانات مشابهة وجدتها Maskan لهذا العقار.",
         show: "عرض العقارات المشابهة",
         hide: "إخفاء العقارات المشابهة",
         compareWith: "قارن مع هذا العقار",
@@ -1034,12 +1108,12 @@ export const ar: TranslationDict = {
         whyItWorks: "لماذا يناسبك",
         tradeOffs: "المقايضات",
         thingsToVerify: "أمور يجب التحقق منها",
-        askAI: "اسأل myMakan عن هذا",
+        askAI: "اسأل Maskan عن هذا",
         empty: "لا توجد بيانات كافية بعد لبناء ورقة قرار كاملة لهذا الإعلان.",
       },
       smartQuestions: {
         title: "أسئلة ذكية لطرحها",
-        subtitle: "أسئلة تقترحها myMakan قبل اتخاذ قرارك.",
+        subtitle: "أسئلة تقترحها Maskan قبل اتخاذ قرارك.",
         copyQuestions: "نسخ الأسئلة",
         copied: "تم النسخ!",
         sendToAgent: "إرسال إلى الوكيل",
@@ -1053,11 +1127,11 @@ export const ar: TranslationDict = {
         draftMessage: "صياغة رسالة",
         drafting: "جارٍ الصياغة…",
         draftedTitle: "مسودة رسالة إلى الوكيل",
-        draftedDesc: "راجع وعدّل قبل الإرسال — لن ترسل myMakan هذه الرسالة نيابة عنك.",
+        draftedDesc: "راجع وعدّل قبل الإرسال — لن ترسل Maskan هذه الرسالة نيابة عنك.",
         useInContact: "استخدم في التواصل مع الوكيل",
       },
       quickQuestions: {
-        title: "اسأل myMakan",
+        title: "اسأل Maskan",
         subtitle: "أسئلة سريعة يجيب عليها المستشار الذكي لهذا العقار.",
         fairPricing: "هل سعر هذا العقار عادل؟",
         compromises: "ما التنازلات التي أقدم عليها مع هذا العقار؟",
@@ -1221,7 +1295,7 @@ export const ar: TranslationDict = {
       yoy: "{{sign}}{{pct}}% سنويًا",
       noMatches: "لا توجد أحياء مطابقة للفلاتر الحالية.",
     },
-    footerNote: "ذكاء الأحياء يدعم توصيات المستشار الذكي في ماي مكان.",
+    footerNote: "ذكاء الأحياء يدعم توصيات المستشار الذكي في مسكن.",
     detail: {
       closeDetail: "إغلاق التفاصيل",
       tabOverview: "نظرة عامة",
@@ -1258,11 +1332,11 @@ export const ar: TranslationDict = {
     inputPlaceholder: "اسأل عن الأحياء، عدالة الإيجار… أو قل 'أريد إيجاد شقة 3 غرف في الياسمين'",
     send: "إرسال",
     footerDisclaimer:
-      "يجيب ذكاء ماي مكان الاصطناعي بناءً على بيانات المنصة الحية. يمكنك أيضًا أن تطلب منه إنشاء طلب.",
+      "يجيب ذكاء مسكن الاصطناعي بناءً على بيانات المنصة الحية. يمكنك أيضًا أن تطلب منه إنشاء طلب.",
     errorReachingAI: "عذرًا، تعذّر الوصول إلى خدمة الذكاء الاصطناعي. يرجى المحاولة مرة أخرى.",
     emptyState: {
       askAboutProperty: "اسأل عن هذا العقار",
-      title: "مستشار ماي مكان الذكي",
+      title: "مستشار مسكن الذكي",
       desc: "اسأل أي شيء عن العقارات الإيجارية، الأحياء، أو الأسعار العادلة — أو دعني أساعدك في إنشاء طلب مع أحد الشركاء.",
       getMatchedTitle: "احصل على مطابقة مع شريك",
       getMatchedDesc: "أخبرني بما تحتاجه — سأجد لك الشريك المناسب.",
@@ -1306,7 +1380,7 @@ export const ar: TranslationDict = {
   },
   partners: {
     badge: "شركاء موثّقون",
-    heading: "ابحث عن شريك ماي مكان",
+    heading: "ابحث عن شريك مسكن",
     subtitle:
       "شركاء عقاريون مرخّصون يغطون كل حي في جميع أنحاء المملكة العربية السعودية. أرسل طلبًا واحصل على مطابقة مع الشريك المناسب لمنطقتك خلال 24 ساعة.",
     searchPlaceholder: "ابحث بالاسم، الحي، المدينة…",
@@ -1326,15 +1400,15 @@ export const ar: TranslationDict = {
     noActivePartners: "لا يوجد شركاء نشطون مسجّلون بعد. كن أول من ينضم!",
     becomeAPartner: "كن شريكًا",
     areYouLicensed: "هل أنت وكيل مرخّص؟",
-    joinDesc: "انضم إلى ماي مكان كشريك واحصل على طلبات موثّقة في حيّك مقابل 99 ريال شهريًا.",
+    joinDesc: "انضم إلى مسكن كشريك واحصل على طلبات موثّقة في حيّك مقابل 99 ريال شهريًا.",
     registerAsPartner: "سجّل كشريك",
   },
   agent: {
     allPartners: "كل الشركاء",
-    defaultAgentName: "وكيل ماي مكان",
+    defaultAgentName: "وكيل مسكن",
     loadingProfile: "جارٍ تحميل الملف الشخصي…",
     partnerNotFound: "الشريك غير موجود",
-    partnerNotFoundDesc: "قد لا يكون هذا الوكيل نشطًا على ماي مكان بعد الآن.",
+    partnerNotFoundDesc: "قد لا يكون هذا الوكيل نشطًا على مسكن بعد الآن.",
     browseAllListings: "← تصفّح جميع الإعلانات",
     verified: "موثّق",
     memberSince: "عضو منذ {{date}}",
@@ -1373,7 +1447,7 @@ export const ar: TranslationDict = {
       submit: "إرسال",
       submittedPendingTitle: "تم إرسال التقييم — قيد موافقة الإدارة",
       submittedPendingDesc:
-        "سيظهر تقييمك للعامة بعد موافقة أحد مسؤولي ماي مكان. يستغرق هذا عادةً 24-48 ساعة.",
+        "سيظهر تقييمك للعامة بعد موافقة أحد مسؤولي مسكن. يستغرق هذا عادةً 24-48 ساعة.",
       editReview: "تعديل التقييم",
       noReviewsBeFirst: "لا توجد تقييمات بعد. كن أول من يقيّم {{name}}.",
       failedToSubmit: "فشل إرسال التقييم. يرجى المحاولة مرة أخرى.",
@@ -1412,13 +1486,13 @@ export const ar: TranslationDict = {
   },
   methodology: {
     badge: "منهجية التقييم",
-    heading: "كيف يقيّم ماي مكان الأحياء",
+    heading: "كيف يقيّم مسكن الأحياء",
     heroDesc:
       "كل تقييم تراه محسوب من بيانات حية يجمعها ويحدّثها محرك {{engine}}. لا تخمينات تحريرية. لا رعايات. يُحدَّث كل ليلة عند منتصف الليل.",
-    heroEngine: "ذكاء منصة ماي مكان",
+    heroEngine: "ذكاء منصة مسكن",
     dataFreshness: "حداثة البيانات",
     dataFreshnessDesc:
-      'تُعاد حساب التقييمات كل ليلة الساعة {{time}} عبر تحديث ذكاء المناطق لماي مكان لكل حي. يُظهر تاريخ "آخر تحديث" في كل صفحة عقار ومنطقة بالضبط متى تم تحديث البيانات.',
+      'تُعاد حساب التقييمات كل ليلة الساعة {{time}} عبر تحديث ذكاء المناطق لمسكن لكل حي. يُظهر تاريخ "آخر تحديث" في كل صفحة عقار ومنطقة بالضبط متى تم تحديث البيانات.',
     dataFreshnessTime: "00:00 بتوقيت السعودية",
     refreshedNightly: "يُحدَّث ليليًا",
     districtsCovered: "16 حيًا مغطّى",
@@ -1450,7 +1524,7 @@ export const ar: TranslationDict = {
         w2: "الوصول للرعاية الصحية",
         w3: "التنقل إلى وسط المدينة",
         w4: "المرافق ونمط الحياة",
-        src1: "ذكاء مناطق ماي مكان: المدارس، المستشفيات، المطاعم، الصالات الرياضية، المساجد، المراكز التجارية، الحدائق",
+        src1: "ذكاء مناطق مسكن: المدارس، المستشفيات، المطاعم، الصالات الرياضية، المساجد، المراكز التجارية، الحدائق",
       },
       school: {
         label: "تقييم المدارس",
@@ -1460,7 +1534,7 @@ export const ar: TranslationDict = {
         w1: "متوسط تقييم المجتمع للمدارس القريبة (مُعاد تدريجه من 3–5 إلى 45–95)",
         w2: "عدد المدارس ضمن 3 كم (حتى +18 نقطة)",
         w3: "وجود مدارس عالمية / ثنائية اللغة (ميزة إضافية حتى +10 نقاط)",
-        src1: "بيانات منصة ماي مكان: المدارس",
+        src1: "بيانات منصة مسكن: المدارس",
         src2: "كشف الكلمات المفتاحية لـ: عالمية، أمريكية، بريطانية، فرنسية، ألمانية، باكستانية، هندية",
         radius: "نطاق 3 كم",
       },
@@ -1472,7 +1546,7 @@ export const ar: TranslationDict = {
         w1: "متوسط تقييم المجتمع للمستشفيات/العيادات القريبة (مُعاد تدريجه)",
         w2: "عدد المستشفيات/العيادات ضمن 3 كم (حتى +15 نقطة)",
         w3: "ميزة المستشفيات التخصصية / المعروفة (الملك فهد، السعودي الألماني، إلخ)",
-        src1: "بيانات منصة ماي مكان: المستشفيات والعيادات",
+        src1: "بيانات منصة مسكن: المستشفيات والعيادات",
         src2: "كشف الكلمات المفتاحية لـ: أخصائي، مركز طبي، الملك، الوطني، السعودي الألماني",
         radius: "نطاق 3 كم",
       },
@@ -1481,7 +1555,7 @@ export const ar: TranslationDict = {
         tagline: "سهولة التنقل إلى وسط المدينة",
         description:
           "يقيس زمن القيادة التقديري في ساعة الذروة من مركز الحي إلى المركز التجاري الرئيسي (كافد / العليا للرياض، الكورنيش لجدة، طريق الخبر للدمام). العتبات المُخصصة للرياض تراعي طبيعة المدينة المعتمدة على السيارات.",
-        src1: "ذكاء التنقل من ماي مكان (تقديرات ساعة الذروة، تُحدَّث ليليًا)",
+        src1: "ذكاء التنقل من مسكن (تقديرات ساعة الذروة، تُحدَّث ليليًا)",
         radius: "من نقطة إلى نقطة إلى وسط المدينة",
       },
       family: {
@@ -1498,7 +1572,7 @@ export const ar: TranslationDict = {
     },
     lifestyle: {
       heading: "تقييم نمط الحياة — ما المُتضمّن",
-      desc: "يُغذّي تقييم نمط الحياة كلًا من تقييم المنطقة (20%) والتقييم العائلي (20%). يُبنى من خمس فئات أماكن يتتبعها ذكاء مناطق ماي مكان، كل منها محدودة بسقف لمنع عامل واحد من الهيمنة. عدد المساجد محدود بسقف منخفض عمدًا — المساجد موجودة في كل حي بالرياض، لذا العدد ليس عاملًا مميزًا.",
+      desc: "يُغذّي تقييم نمط الحياة كلًا من تقييم المنطقة (20%) والتقييم العائلي (20%). يُبنى من خمس فئات أماكن يتتبعها ذكاء مناطق مسكن، كل منها محدودة بسقف لمنع عامل واحد من الهيمنة. عدد المساجد محدود بسقف منخفض عمدًا — المساجد موجودة في كل حي بالرياض، لذا العدد ليس عاملًا مميزًا.",
       max: "الحد الأقصى {{cap}}",
       restaurants: "المطاعم",
       restaurantsNote: "2 كم، حتى 22 نقطة",
@@ -1540,7 +1614,7 @@ export const ar: TranslationDict = {
         "الإيجارات السكنية في السعودية معفاة من ضريبة القيمة المضافة بموجب أنظمة هيئة الزكاة والضريبة والجمارك. لا تضيف الحاسبة الضريبة.",
       affordabilityCheck: "فحص القدرة على التحمل",
       affordabilityDesc:
-        "بناءً على {{rule}} الشائعة الاستخدام: يجب ألا تتجاوز تكاليف السكن 30% من الدخل الشهري الإجمالي. يُطوّر ماي مكان هذا إلى ثلاث فئات.",
+        "بناءً على {{rule}} الشائعة الاستخدام: يجب ألا تتجاوز تكاليف السكن 30% من الدخل الشهري الإجمالي. يُطوّر مسكن هذا إلى ثلاث فئات.",
       thirtyPercentRule: "قاعدة الـ30%",
       pctFormula: "% من الدخل  =  ",
       pctFormulaCalc: "(الإيجار السنوي ÷ 12) ÷ الراتب الشهري × 100",
@@ -1629,10 +1703,10 @@ export const ar: TranslationDict = {
     },
   },
   homeFinder: {
-    entryTitle: "أخبر ماي مكان بما تبحث عنه",
-    entrySubtitle: "صف منزلك المثالي بكلماتك — وسيحوّله ذكاء ماي مكان إلى قائمة مختصرة ومرتبة.",
+    entryTitle: "أخبر مسكن بما تبحث عنه",
+    entrySubtitle: "صف منزلك المثالي بكلماتك — وسيحوّله ذكاء مسكن إلى قائمة مختصرة ومرتبة.",
     searchNormally: "بحث عادي",
-    askAI: "اسأل ذكاء ماي مكان",
+    askAI: "اسأل ذكاء مسكن",
     examplesTitle: "جرّب أن تسأل",
     examples: {
       rent1: "شقة 3 غرف في الرياض بأقل من 75 ألف ريال سنويًا قرب كافد",
@@ -1648,11 +1722,11 @@ export const ar: TranslationDict = {
       rent: "إيجار",
       buy: "شراء",
       submit: "ابحث عن أفضل التطابقات",
-      thinking: "ماي مكان يقرأ طلبك…",
+      thinking: "مسكن يقرأ طلبك…",
       errorFailed: "حدث خطأ أثناء فهم طلبك. يرجى المحاولة مرة أخرى.",
     },
     understood: {
-      heading: "هذا ما فهمه ماي مكان",
+      heading: "هذا ما فهمه مسكن",
       lookingFor: "تبحث عن",
       purpose: "الغرض",
       budget: "الميزانية",
@@ -1660,7 +1734,7 @@ export const ar: TranslationDict = {
       mustHave: "لا بد منه",
       lifestyle: "نمط الحياة",
       commute: "التنقل",
-      notTracked: "ماي مكان لا يتتبع هذا بعد — يُعرض كملاحظة فقط.",
+      notTracked: "مسكن لا يتتبع هذا بعد — يُعرض كملاحظة فقط.",
       clarifyingQuestions: "بعض الأمور للتأكد منها",
       findMatches: "ابحث عن أفضل التطابقات",
       modify: "تعديل",
@@ -1721,9 +1795,9 @@ export const ar: TranslationDict = {
       priceInsight: "معلومات عن السعر",
       withinBudget: "ضمن ميزانيتك (SAR {{price}} مقابل حد أقصى SAR {{max}}).",
       aboveBudget: "أعلى من ميزانيتك (SAR {{price}} مقابل حد أقصى SAR {{max}}).",
-      askMyMakan: "اسأل ماي مكان",
+      askMyMakan: "اسأل مسكن",
       continueToAdvisor: "المتابعة في المستشار الذكي",
-      loading: "ماي مكان يفكر…",
+      loading: "مسكن يفكر…",
       close: "إغلاق",
     },
     history: {
@@ -1753,7 +1827,7 @@ export const ar: TranslationDict = {
   compare: {
     badge: "مقارنة جنبًا إلى جنب",
     heading: "قارن العقارات",
-    desc: "قارن حتى 3 إعلانات من ناحية الماليات، جودة المنطقة، المرافق، وذكاء القيمة الاصطناعي — ثم دع ذكاء ماي مكان يختار الأنسب.",
+    desc: "قارن حتى 3 إعلانات من ناحية الماليات، جودة المنطقة، المرافق، وذكاء القيمة الاصطناعي — ثم دع ذكاء مسكن يختار الأنسب.",
     selectedCount: "{{count}}/3 مُحدَّد",
     picker: {
       selectTitle: "اختر عقارًا",
@@ -1785,7 +1859,7 @@ export const ar: TranslationDict = {
       area: "المنطقة",
       amenities: "المرافق",
       rentalIntelligence: "ذكاء القيمة بالذكاء الاصطناعي",
-      myMakanIntelligence: "ذكاء myMakan",
+      myMakanIntelligence: "ذكاء Maskan",
     },
     rows: {
       price: "السعر",
@@ -1823,7 +1897,7 @@ export const ar: TranslationDict = {
     rentalLabel: "تقييم القيمة",
     propertyScoreLabel: "تقييم العقار",
     aiReco: {
-      badge: "توصية ماي مكان الذكية",
+      badge: "توصية مسكن الذكية",
       strongestMatch: "{{title}} هو الأنسب",
       description:
         "بموازنة القيمة الإيجارية، جودة المنطقة، الملاءمة العائلية والمطابقة الذكية، يحصل {{district}} على {{score}}/100 — بموازنة إيجار تنافسي قدره {{price}} ريال/سنويًا مع تقييم عائلي {{family}}/100 وجودة منطقة {{area}}/100.",
@@ -1846,11 +1920,11 @@ export const ar: TranslationDict = {
       compositeScore: "التقييم الإجمالي",
     },
     myMakanReco: {
-      title: "توصية myMakan",
+      title: "توصية Maskan",
       bestOverall: "الأفضل إجمالًا",
       bestValue: "الأفضل من حيث القيمة",
       bestLocation: "الأفضل من حيث الموقع",
-      whyOverall: "أعلى مؤشر قرار myMakan ({{score}}/100).",
+      whyOverall: "أعلى مؤشر قرار Maskan ({{score}}/100).",
       whyValue: "مُسعَّر كـ {{classification}} مقارنة بإعلانات مشابهة.",
       whyLocation: "أعلى تقييم للمنطقة ({{score}}/100).",
       view: "عرض العقار",
@@ -1881,7 +1955,7 @@ export const ar: TranslationDict = {
     propertySummary: "{{bedrooms}} غرف {{type}}",
     propertySummaryWithSize: "{{bedrooms}} غرف {{type}} · {{size}} م²",
     disclaimer:
-      "تقدير فقط، بناءً على إعلانات ماي مكان الحية ومتوسطات الأحياء. يعتمد الإيجار الفعلي على الحالة والمرافق والتفاوض.",
+      "تقدير فقط، بناءً على إعلانات مسكن الحية ومتوسطات الأحياء. يعتمد الإيجار الفعلي على الحالة والمرافق والتفاوض.",
     viewSimilarListings: "عرض إعلانات مشابهة",
     submitLeadRequest: "إرسال طلب",
   },
@@ -1998,15 +2072,15 @@ export const ar: TranslationDict = {
     bedroomsPrefix: "{{count}} غرف · ",
     perMonth: "{{amount}} ريال/شهريًا",
     chatWithPartner: "محادثة مع شريكك",
-    messagesFromMaskan: "رسائل من ماي مكان",
+    messagesFromMaskan: "رسائل من مسكن",
     availableOncePartnerAssigned: "متاح بعد تعيين شريك",
     partnerWillMessage: "سيراسلك شريكك هنا. يمكنك أيضًا بدء المحادثة.",
     teamMayMessage: "قد يرسل فريقنا أسئلة هنا قبل مطابقتك مع شريك.",
     chatOpensOnceAccepted: "ستُفتح المحادثة بمجرد قبول شريك لطلبك.",
     partnerLabel: "الشريك",
-    maskanTeamLabel: "فريق ماي مكان",
+    maskanTeamLabel: "فريق مسكن",
     messagePlaceholderPartner: "اكتب رسالة لشريكك…",
-    messagePlaceholderTeam: "رد على فريق ماي مكان…",
+    messagePlaceholderTeam: "رد على فريق مسكن…",
     messagePlaceholderWaiting: "بانتظار تعيين شريك…",
     browseProperties: "تصفح العقارات",
     submitAnotherLead: "إرسال طلب آخر",
@@ -2109,7 +2183,7 @@ export const ar: TranslationDict = {
     acceptFailed: "تعذّر قبول الوقت المقترح. حاول مرة أخرى.",
     checklist: {
       title: "استعد لزيارتك",
-      subtitle: "قائمة معاينة الذكاء الاصطناعي من myMakan لهذا العقار.",
+      subtitle: "قائمة معاينة الذكاء الاصطناعي من Maskan لهذا العقار.",
       aiAnnotated: "معزّزة بالذكاء الاصطناعي",
       deterministicOnly: "قائمة قياسية",
       duringVisitTitle: "أثناء الزيارة",
@@ -2150,14 +2224,14 @@ export const ar: TranslationDict = {
       },
     },
     nextSteps: {
-      title: "اسأل myMakan: ما التالي؟",
+      title: "اسأل Maskan: ما التالي؟",
       subtitle: "احصل على ملخص لزيارتك من الذكاء الاصطناعي وخطوات تالية مقترحة.",
-      cta: "اسأل myMakan",
+      cta: "اسأل Maskan",
       loading: "جارٍ التفكير…",
       failed: "تعذّر إنشاء الخطوات التالية الآن. حاول مرة أخرى.",
       summaryTitle: "ملخص زيارتك",
       stepsTitle: "الخطوات التالية المقترحة",
-      disclaimer: "هذه الاقتراحات للعلم فقط — لن تتواصل myMakan مع الوسيط أو تتفاوض نيابة عنك.",
+      disclaimer: "هذه الاقتراحات للعلم فقط — لن تتواصل Maskan مع الوسيط أو تتفاوض نيابة عنك.",
     },
   },
   negotiationDetail: {
@@ -2205,7 +2279,7 @@ export const ar: TranslationDict = {
       },
     },
     summary: {
-      title: "ملخص myMakan",
+      title: "ملخص Maskan",
     },
     timeline: {
       title: "الجدول الزمني",
@@ -2223,13 +2297,13 @@ export const ar: TranslationDict = {
       acceptFailed: "تعذّر قبول هذا العرض. حاول مرة أخرى.",
       counterAgain: "تقديم عرض مضاد",
       withdraw: "سحب العرض",
-      askMyMakan: "اسأل myMakan",
+      askMyMakan: "اسأل Maskan",
       viewAgreement: "عرض ملخص الاتفاق",
       viewProperty: "عرض العقار",
       waitingOnMediator: "بانتظار رد الوسيط.",
     },
     askPanel: {
-      title: "اسأل myMakan",
+      title: "اسأل Maskan",
       subtitle: "احصل على قراءة مبنية على البيانات لتفاوضك — هل هذا العرض معقول، وما مدى بعده عن سعر الإعلان، وماذا تقول بعد ذلك.",
       placeholder: "اطرح سؤالاً (اختياري) — مثال: «هل عرضي معقول؟»",
       ask: "اسأل",
@@ -2273,7 +2347,7 @@ export const ar: TranslationDict = {
     agreed: {
       title: "تم الاتفاق على العرض",
       agreedAmount: "المبلغ المتفق عليه",
-      disclaimer: "هذا يسجّل الاتفاق التجاري في myMakan. وهو ليس عقد الإيجار/الشراء القانوني.",
+      disclaimer: "هذا يسجّل الاتفاق التجاري في Maskan. وهو ليس عقد الإيجار/الشراء القانوني.",
       messageMediator: "مراسلة الوسيط",
       continueTransaction: "متابعة المعاملة",
       openingTransaction: "جارٍ الفتح…",
@@ -2381,7 +2455,7 @@ export const ar: TranslationDict = {
       messageMediator: "مراسلة الوسيط",
       viewProperty: "عرض العقار",
       viewAgreement: "عرض ملخص الاتفاقية",
-      askMyMakan: "اسأل myMakan",
+      askMyMakan: "اسأل Maskan",
       cancelTransaction: "إلغاء المعاملة",
     },
     tabs: {
@@ -2466,11 +2540,11 @@ export const ar: TranslationDict = {
       },
     },
     askPanel: {
-      subtitle: "اسأل myMakan عن هذه المعاملة — استنادًا إلى قائمة التحقق والمستندات والشروط الخاصة بك.",
+      subtitle: "اسأل Maskan عن هذه المعاملة — استنادًا إلى قائمة التحقق والمستندات والشروط الخاصة بك.",
       asking: "جارٍ التفكير…",
       aiLabel: "ذكاء اصطناعي",
       failed: "تعذّر الحصول على رد الآن.",
-      fallbackNote: "هذا ملخص محدد آليًا — مساعد myMakan الذكي غير متاح مؤقتًا.",
+      fallbackNote: "هذا ملخص محدد آليًا — مساعد Maskan الذكي غير متاح مؤقتًا.",
       quickActions: {
         whats_next: "ما التالي؟",
         whats_missing: "ما الناقص؟",
@@ -2520,7 +2594,7 @@ export const ar: TranslationDict = {
       currentOffer: "العرض الحالي",
       lastActivity: "آخر نشاط {{datetime}}",
       open: "فتح",
-      askMyMakan: "اسأل myMakan",
+      askMyMakan: "اسأل Maskan",
       messageMediator: "مراسلة",
     },
   },
@@ -2584,7 +2658,7 @@ export const ar: TranslationDict = {
   },
   partnerDashboard: {
     becomePartner: {
-      heading: "كن شريكًا في ماي مكان",
+      heading: "كن شريكًا في مسكن",
       desc: "اربط المستأجرين بالعقارات في منطقتك واكسب مقابل كل طلب مقبول.",
       cta: "سجّل كشريك",
     },
@@ -2592,12 +2666,12 @@ export const ar: TranslationDict = {
       pendingHeading: "الموافقة قيد التقدم",
       rejectedHeading: "تم رفض الوصول",
       pendingDesc:
-        "حسابك كشريك قيد المراجعة. يرجى انتظار موافقة إدارة ماي مكان — ستحصل على الوصول الكامل بمجرد الموافقة على حسابك.",
-      rejectedDesc: "تم رفض وصول حسابك كشريك. يرجى التواصل مع إدارة ماي مكان للمساعدة.",
+        "حسابك كشريك قيد المراجعة. يرجى انتظار موافقة إدارة مسكن — ستحصل على الوصول الكامل بمجرد الموافقة على حسابك.",
+      rejectedDesc: "تم رفض وصول حسابك كشريك. يرجى التواصل مع إدارة مسكن للمساعدة.",
       signOut: "تسجيل الخروج",
     },
     sidebar: {
-      brand: "شريك ماي مكان",
+      brand: "شريك مسكن",
       navDashboard: "لوحة التحكم",
       navMyProperties: "عقاراتي",
       navRentalListings: "إعلانات الإيجار",
@@ -2649,7 +2723,7 @@ export const ar: TranslationDict = {
     },
     subscriptionView: {
       heading: "الاشتراك",
-      subtitle: "حالة اشتراكك في شريك ماي مكان وفئته.",
+      subtitle: "حالة اشتراكك في شريك مسكن وفئته.",
       status: "الحالة",
       tier: "الفئة",
       expires: "ينتهي",
@@ -2718,6 +2792,8 @@ export const ar: TranslationDict = {
         Draft: "مسودة",
         Rejected: "مرفوض",
         Suspended: "مُعلَّق",
+        Unpublished: "غير منشور",
+        Archived: "محذوف",
       },
     },
     projectsView: {
@@ -2808,7 +2884,7 @@ export const ar: TranslationDict = {
         "صف العقار — أبرز الميزات الرئيسية، المرافق القريبة، الوصول، وجودة التشطيب…",
       editNote:
         "سيؤدي الحفظ إلى إعادة تقديم هذا الإعلان لمراجعة الإدارة. سيتم إخفاؤه من المنصة حتى تتم الموافقة عليه مجددًا.",
-      newNote: "سيتم تقديم إعلانك لمراجعة الإدارة. بمجرد الموافقة عليه، سيظهر على منصة ماي مكان.",
+      newNote: "سيتم تقديم إعلانك لمراجعة الإدارة. بمجرد الموافقة عليه، سيظهر على منصة مسكن.",
       cancel: "إلغاء",
       submitting: "جارٍ الإرسال…",
       saveResubmit: "حفظ وإعادة التقديم للموافقة",
@@ -2860,7 +2936,7 @@ export const ar: TranslationDict = {
       },
       duplicateWarning: {
         title: "قد يكون هذا الإعلان موجودًا بالفعل",
-        desc: "وجدنا إعلانات مشابهة على ماي مكان بالفعل. تم حفظ إعلانك — ألقِ نظرة قبل المتابعة.",
+        desc: "وجدنا إعلانات مشابهة على مسكن بالفعل. تم حفظ إعلانك — ألقِ نظرة قبل المتابعة.",
         compare: "مقارنة الإعلان",
         continueAnyway: "المتابعة على أي حال",
       },
@@ -2885,11 +2961,11 @@ export const ar: TranslationDict = {
     registrationFailed: "فشل التسجيل",
     paymentFailed: "فشل الدفع. يرجى المحاولة مرة أخرى.",
     steps: { profile: "الملف الشخصي", subscribe: "الاشتراك", active: "نشط" },
-    heading: "كن شريكًا في ماي مكان",
+    heading: "كن شريكًا في مسكن",
     subtitle: "اربط المستأجرين بالعقارات المناسبة واكسب من كل صفقة مُنجزة.",
     form: {
       heading: "ملفك الشخصي كشريك",
-      createAccount: "أنشئ حساب ماي مكان الخاص بك",
+      createAccount: "أنشئ حساب مسكن الخاص بك",
       alreadyHaveOne: "لديك حساب بالفعل؟",
       signIn: "تسجيل الدخول ←",
       fullName: "الاسم الكامل",
@@ -2935,7 +3011,7 @@ export const ar: TranslationDict = {
     done: {
       heading: "تم إرسال التسجيل!",
       desc: "حساب الشريك الخاص بك الآن",
-      pendingApproval: "قيد موافقة إدارة ماي مكان",
+      pendingApproval: "قيد موافقة إدارة مسكن",
       descSuffix: ". ستحصل على وصول كامل إلى لوحة التحكم والطلبات بمجرد موافقة الإدارة على حسابك.",
       checkStatus: "تحقق من حالة الموافقة",
     },
@@ -3227,11 +3303,11 @@ export const ar: TranslationDict = {
       },
       aiAssistant: {
         title: "المساعد الذكي",
-        subtitle: "اسأل myMakan عن هذه المعاملة — استنادًا إلى قائمة التحقق والمستندات والشروط.",
+        subtitle: "اسأل Maskan عن هذه المعاملة — استنادًا إلى قائمة التحقق والمستندات والشروط.",
         asking: "جارٍ التفكير…",
         aiLabel: "ذكاء اصطناعي",
         failed: "تعذّر الحصول على رد الآن.",
-        fallbackNote: "هذا ملخص محدد آليًا — مساعد myMakan الذكي غير متاح مؤقتًا.",
+        fallbackNote: "هذا ملخص محدد آليًا — مساعد Maskan الذكي غير متاح مؤقتًا.",
         quickActions: {
           summarize_outstanding: "لخّص العناصر المتبقية",
           whats_blocking: "ما الذي يعيق التقدم؟",
@@ -3261,11 +3337,11 @@ export const ar: TranslationDict = {
   },
   phaseGate: {
     heading: "غير متاح في هذا الإصدار",
-    desc: "هذه الميزة ليست جزءًا من myMakan حتى الآن. نركز حاليًا على البحث عن الإيجار والشراء — تابعنا في تحديث لاحق.",
+    desc: "هذه الميزة ليست جزءًا من Maskan حتى الآن. نركز حاليًا على البحث عن الإيجار والشراء — تابعنا في تحديث لاحق.",
     backHome: "العودة للرئيسية",
   },
   auth: {
-    brand: "ماي مكان الذكي",
+    brand: "مسكن الذكي",
     headingSmarter: "إيجار أذكى،",
     headingMadeFor: "مصمم للسعودية.",
     marketingDesc:
@@ -3280,7 +3356,7 @@ export const ar: TranslationDict = {
     welcomeBack: "مرحبًا بعودتك",
     createAccount: "أنشئ حسابك",
     signInDesc: "سجّل الدخول لمتابعة بحثك عن منزل والوصول إلى إعلاناتك المحفوظة.",
-    signUpDesc: "انضم إلى ماي مكان لحفظ المنازل ومقارنة الأحياء والاستفادة من رؤى الذكاء الاصطناعي.",
+    signUpDesc: "انضم إلى مسكن لحفظ المنازل ومقارنة الأحياء والاستفادة من رؤى الذكاء الاصطناعي.",
     orContinueWithEmail: "أو تابع عبر البريد الإلكتروني",
     fullName: "الاسم الكامل",
     emailAddress: "البريد الإلكتروني",
@@ -3298,7 +3374,7 @@ export const ar: TranslationDict = {
     createAccountBtn: "إنشاء حساب",
     dontHaveAccount: "ليس لديك حساب؟ ",
     alreadyMember: "عضو بالفعل؟ ",
-    footerCopyright: "© {{year}} ماي مكان · الرياض، السعودية",
+    footerCopyright: "© {{year}} مسكن · الرياض، السعودية",
     comingSoon: "قريبًا",
     google: "جوجل",
     apple: "آبل",
@@ -3313,9 +3389,9 @@ export const ar: TranslationDict = {
   },
   propertyRequest: {
     entryPoint: {
-      heading: "أخبر ماي مكان بما تحتاجه",
-      desc: "صف منزلك المثالي مرة واحدة — يواصل وكيل ماي مكان العقاري الذكي مطابقة الإعلانات الجديدة معه وينبّهك فور ظهور خيار مناسب.",
-      cta: "أخبر ماي مكان بما تحتاجه",
+      heading: "أخبر مسكن بما تحتاجه",
+      desc: "صف منزلك المثالي مرة واحدة — يواصل وكيل مسكن العقاري الذكي مطابقة الإعلانات الجديدة معه وينبّهك فور ظهور خيار مناسب.",
+      cta: "أخبر مسكن بما تحتاجه",
       ctaShort: "ابدأ طلب عقار",
     },
     status: {
@@ -3345,7 +3421,7 @@ export const ar: TranslationDict = {
       signInToView: "سجّل الدخول لعرض طلبات العقار الخاصة بك",
       empty: {
         heading: "لا توجد طلبات هنا بعد",
-        descActive: "أنشئ طلب عقار وسيواصل الذكاء الاصطناعي في ماي مكان مطابقة الإعلانات معه تلقائيًا.",
+        descActive: "أنشئ طلب عقار وسيواصل الذكاء الاصطناعي في مسكن مطابقة الإعلانات معه تلقائيًا.",
         descDrafts: "ستظهر هنا المسودات التي تبدأها ولا تُفعّلها.",
         descPaused: "ستظهر هنا الطلبات التي توقفها مؤقتًا.",
         descFulfilled: "ستظهر هنا الطلبات التي تضعها كمنجزة.",
@@ -3381,9 +3457,9 @@ export const ar: TranslationDict = {
       },
     },
     new: {
-      heading: "أخبر ماي مكان بما تحتاجه",
+      heading: "أخبر مسكن بما تحتاجه",
       subtitle:
-        "صف منزلك المثالي بكلماتك الخاصة، أو املأ نموذجًا مُنظّمًا — سيواصل وكيل ماي مكان العقاري الذكي مطابقة الإعلانات معه.",
+        "صف منزلك المثالي بكلماتك الخاصة، أو املأ نموذجًا مُنظّمًا — سيواصل وكيل مسكن العقاري الذكي مطابقة الإعلانات معه.",
       modeToggle: {
         describe: "صِف احتياجك",
         form: "املأ نموذجًا",
@@ -3611,12 +3687,12 @@ export const ar: TranslationDict = {
         empty: "لا يوجد نشاط بعد.",
       },
       agent: {
-        heading: "اسأل وكيل ماي مكان العقاري الذكي",
+        heading: "اسأل وكيل مسكن العقاري الذكي",
         desc: "اسأل عن مطابقاتك، احصل على اقتراحات أحياء، أو اعرف سبب محدودية المطابقات.",
         placeholder: "اسأل عن هذا الطلب…",
         send: "إرسال",
         thinking: "جارٍ التفكير…",
-        errorReaching: "تعذّر الوصول إلى وكيل ماي مكان العقاري الذكي. يرجى المحاولة مرة أخرى.",
+        errorReaching: "تعذّر الوصول إلى وكيل مسكن العقاري الذكي. يرجى المحاولة مرة أخرى.",
         suggested1: "لماذا لا أحصل على المزيد من المطابقات؟",
         suggested2: "ما الأحياء التي يجب أن أفكر فيها؟",
         suggested3: "اشرح لي أفضل مطابقة لدي.",

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_admin_user, get_current_user, get_db, get_mediator_user
 from app.core.config import settings
+from app.core.roles import is_admin_user
 from app.core.idempotency import IdempotencyConflict, IdempotencyStore
 from app.core.jobs import enqueue
 from app.core.metrics import leads_created_total
@@ -257,7 +258,7 @@ def get_lead(
     lead = db.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found.")
-    is_admin = current_user.email in settings.admin_emails
+    is_admin = is_admin_user(current_user)
     mediator = db.query(Mediator).filter(Mediator.user_id == current_user.id).first()
     is_assigned_mediator = mediator and any(a.mediator_id == mediator.id and a.status in ("pending", "accepted") for a in lead.assignments)
     if lead.customer_user_id != current_user.id and not is_admin and not is_assigned_mediator:
@@ -718,6 +719,6 @@ def _check_lead_access(lead: Lead, user: User, db: Session) -> str:
     mediator = db.query(Mediator).filter(Mediator.user_id == user.id).first()
     if mediator and any(a.mediator_id == mediator.id and a.status in ("pending", "accepted") for a in lead.assignments):
         return "mediator"
-    if user.email in settings.admin_emails:
+    if is_admin_user(user):
         return "mediator"  # admin can read/write as mediator side
     raise HTTPException(status_code=403, detail="Access denied.")

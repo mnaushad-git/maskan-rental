@@ -12,7 +12,7 @@ import { NEGOTIATION_SIGNAL_TONE, NEGOTIATION_SIGNAL_I18N_KEY } from "@/lib/nego
 import { fetchPartnerNegotiations, acceptNegotiationAsPartner, type ApiPartnerNegotiation } from "@/lib/api/maskan";
 
 export const Route = createFileRoute("/partner/negotiations")({
-  head: () => ({ meta: [{ title: "Offers & Negotiations — myMakan Partner" }] }),
+  head: () => ({ meta: [{ title: "Offers & Negotiations — Maskan Partner" }] }),
   component: PartnerNegotiationsPage,
 });
 

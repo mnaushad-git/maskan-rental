@@ -34,11 +34,29 @@ ALL_QUEUES = [
     QUEUE_SCHEDULED_JOBS,
 ]
 
+WORKER_TASK_MODULES = [
+    "app.tasks.leads",
+    "app.tasks.area_intelligence",
+    "app.tasks.outbox",
+    "app.tasks.notifications",
+    "app.tasks.lead_notifications",
+    "app.tasks.property_requests",
+    "app.tasks.viewing_notifications",
+    "app.tasks.negotiation_notifications",
+    "app.tasks.transaction_notifications",
+]
+
 celery_app = Celery(
     "maskan",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["app.tasks.leads", "app.tasks.area_intelligence", "app.tasks.outbox", "app.tasks.notifications", "app.tasks.lead_notifications", "app.tasks.property_requests"],
+    # Every module that registers outbox handlers (@register_handler) or
+    # defines tasks MUST be listed here: the worker only imports these, and
+    # the outbox publisher runs on the worker. A module missing from this list
+    # has its handlers silently skipped (event marked published, nothing
+    # sent) and its tasks rejected as unregistered. Guarded by
+    # tests/test_celery_worker_registration.py.
+    include=WORKER_TASK_MODULES,
 )
 
 celery_app.conf.update(
@@ -50,6 +68,9 @@ celery_app.conf.update(
         "app.tasks.notifications.*": {"queue": QUEUE_NOTIFICATIONS},
         "app.tasks.lead_notifications.*": {"queue": QUEUE_NOTIFICATIONS},
         "app.tasks.property_requests.*": {"queue": QUEUE_NOTIFICATIONS},
+        "app.tasks.viewing_notifications.*": {"queue": QUEUE_NOTIFICATIONS},
+        "app.tasks.negotiation_notifications.*": {"queue": QUEUE_NOTIFICATIONS},
+        "app.tasks.transaction_notifications.*": {"queue": QUEUE_NOTIFICATIONS},
     },
     # A task that's already running when its worker is killed goes back on
     # the queue instead of being silently lost.

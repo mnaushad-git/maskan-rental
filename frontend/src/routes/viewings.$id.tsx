@@ -23,7 +23,7 @@ import {
 } from "@/lib/api/maskan";
 
 export const Route = createFileRoute("/viewings/$id")({
-  head: () => ({ meta: [{ title: "Viewing Details — myMakan" }] }),
+  head: () => ({ meta: [{ title: "Viewing Details — Maskan" }] }),
   component: ViewingDetailPage,
 });
 
@@ -197,7 +197,7 @@ function ViewingDetailPage() {
             {/* Post-viewing decision (brief §16) */}
             {viewing.status === "completed" && <FeedbackSection viewing={viewing} onUpdated={setViewing} />}
 
-            {/* Ask myMakan What Next? (brief §17) */}
+            {/* Ask Maskan What Next? (brief §17) */}
             {viewing.status === "completed" && <NextStepsSection viewing={viewing} />}
           </div>
 

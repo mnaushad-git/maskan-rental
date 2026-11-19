@@ -10,10 +10,11 @@ kept deliberately small (a handful of template functions, not a full i18n
 engine) and isolated so it's the only place in the backend that ships
 user-facing copy.
 
-`render()` returns (title, body, deep_link). Deep links use the same
-`myhome://` / web route shapes the mobile and web apps already use for
-property/search navigation.
+`render()` returns (title, body, deep_link). Deep links are built with
+`app.core.deep_links.app_link()` (`maskan://…`), using the same route shapes
+the mobile and web apps already use for property/search navigation.
 """
+from app.core.deep_links import app_link
 from app.models.property import Property
 from app.models.property_request import PropertyRequest
 from app.models.saved_search import SavedSearch
@@ -100,7 +101,7 @@ def render(
     else:  # new_listing
         body = f"{property_label} يطابق بحثك '{saved_search.name}'." if locale == "ar" else f"{property_label} matches your '{saved_search.name}' search."
 
-    deep_link = f"myhome://property/{prop.id}" if change_type != "digest" else f"myhome://saved-searches/{saved_search.id}/matches"
+    deep_link = app_link(f"property/{prop.id}") if change_type != "digest" else app_link(f"saved-searches/{saved_search.id}/matches")
     return title, body, deep_link
 
 
@@ -110,7 +111,7 @@ _PROPERTY_REQUEST_TITLES = {
         "new_match": "New match for '{title}'",
         "improved_match": "A match for '{title}' just got better",
         "mediator_response": "A partner responded to '{title}'",
-        "clarification_received": "myMakan AI has a question about '{title}'",
+        "clarification_received": "Maskan AI has a question about '{title}'",
         "expiring": "Your request '{title}' is expiring soon",
         "expired": "Your request '{title}' has expired",
         "no_match_suggestion": "No matches yet for '{title}' — here's why",
@@ -121,7 +122,7 @@ _PROPERTY_REQUEST_TITLES = {
         "new_match": "تطابق جديد مع '{title}'",
         "improved_match": "تحسّن تطابق مع '{title}'",
         "mediator_response": "قام أحد الشركاء بالرد على '{title}'",
-        "clarification_received": "لدى ماي مكان AI سؤال بخصوص '{title}'",
+        "clarification_received": "لدى مسكن AI سؤال بخصوص '{title}'",
         "expiring": "طلبك '{title}' سينتهي قريبًا",
         "expired": "انتهت صلاحية طلبك '{title}'",
         "no_match_suggestion": "لا توجد تطابقات بعد لـ '{title}' — إليك السبب",
@@ -176,7 +177,7 @@ def render_property_request(
     body = bodies.get(change_type, bodies["new_match"]).format(property_label=property_label, days=context.get("days", 0))
 
     if match_id is not None:
-        deep_link = f"myhome://property-requests/{request.id}/matches/{match_id}"
+        deep_link = app_link(f"property-requests/{request.id}/matches/{match_id}")
     else:
-        deep_link = f"myhome://property-requests/{request.id}"
+        deep_link = app_link(f"property-requests/{request.id}")
     return title, body, deep_link

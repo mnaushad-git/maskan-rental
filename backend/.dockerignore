@@ -1,0 +1,42 @@
+# Build context for the backend image (Dockerfile does `COPY . .`).
+# Anything not excluded here is baked into every image layer.
+
+# ── Secrets ────────────────────────────────────────────────────────────────
+# Runtime configuration comes from docker-compose `environment:` / .env.production
+# on the host — never from files copied into the image.
+.env
+.env.*
+*.pem
+*.key
+
+# ── User uploads (listing photos, PRIVATE transaction documents) ────────────
+# Served from the /srv/maskan/uploads bind mount at /app/uploads in production.
+# Must never be copied into an image.
+uploads/
+
+# ── Local environments, caches, tooling ────────────────────────────────────
+venv/
+.venv/
+env/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── Not needed at runtime ──────────────────────────────────────────────────
+tests/
+pytest.ini
+*.log
+*.dump
+*.sql
+*.sql.gz
+*.tgz
+*.tar.gz
+.git
+.gitignore
+.DS_Store
+Thumbs.db

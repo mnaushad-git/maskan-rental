@@ -81,7 +81,7 @@ class AdminPartnerCreate(BaseModel):
 # property-level Trust Model. Centralized here so every caller that needs to
 # render a verification badge from `MediatorPublicOut.verification_label`
 # uses this exact string rather than composing its own.
-MEDIATOR_VERIFIED_LABEL = "✓ Verified by myMakan"
+MEDIATOR_VERIFIED_LABEL = "✓ Verified by Maskan"
 
 
 class MediatorPublicOut(BaseModel):

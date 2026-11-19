@@ -33,6 +33,8 @@ import {
   type AuthUser,
 } from "@/lib/api/maskan";
 import { useAuth } from "@/lib/auth-context";
+import { AdminBackLink } from "@/components/admin/AdminBackLink";
+import { loginErrorMessage } from "@/lib/adminFeedback";
 import { cn } from "@/lib/utils";
 
 // Self-contained (no imports from routes/admin.tsx), same rationale as
@@ -48,10 +50,10 @@ import { cn } from "@/lib/utils";
 // "Prompt 11" for judgment calls (notably: no i18n — this codebase's admin
 // console has never used the customer-facing i18n system, confirmed against
 // admin.tsx / admin_.property-requests.tsx before writing this file; and
-// "Request correction" is a UI-only affordance, not a new backend endpoint —
-// Prompt 6 didn't build one).
+// "Draft correction request" only composes + copies a message — there is no
+// correction-request endpoint, so nothing is sent or persisted).
 export const Route = createFileRoute("/admin_/trust-moderation")({
-  head: () => ({ meta: [{ title: "Trust & Moderation — myMakan Admin" }] }),
+  head: () => ({ meta: [{ title: "Trust & Moderation — Maskan Admin" }] }),
   component: AdminTrustModerationPage,
 });
 
@@ -103,8 +105,8 @@ function AdminTrustModerationLoginGate({
         return;
       }
       onAuth(response.user, response.access_token);
-    } catch {
-      setError("Invalid email or password.");
+    } catch (err) {
+      setError(loginErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -802,6 +804,9 @@ function PropertyReviewDetail({ propertyId, onBack }: { propertyId: number; onBa
             <Link
               to="/agent/$id"
               params={{ id: String(mediator.id) }}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Opens the public partner profile in a new tab"
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface"
             >
               <ExternalLink className="size-3.5" /> Review mediator
@@ -812,7 +817,7 @@ function PropertyReviewDetail({ propertyId, onBack }: { propertyId: number; onBa
             onClick={() => setCorrectionOpen((o) => !o)}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface"
           >
-            <ClipboardCopy className="size-3.5" /> Request correction
+            <ClipboardCopy className="size-3.5" /> Draft correction request
           </button>
           {detail.status === "Hidden" ? (
             <button
@@ -850,9 +855,8 @@ function PropertyReviewDetail({ propertyId, onBack }: { propertyId: number; onBa
       {correctionOpen && (
         <div className="rounded-xl border border-border bg-surface/60 p-4 text-sm">
           <p className="mb-2 text-xs text-muted-foreground">
-            UI-only affordance — no admin correction-request endpoint exists yet (Prompt 6 didn't build one). This composes a message from the missing-field
-            suggestions below and copies it to your clipboard to send however your team normally reaches mediators (email/WhatsApp) — nothing is sent or
-            persisted automatically.
+            Maskan doesn't send correction requests to partners automatically yet. Copy the message below and send it to the partner by email or
+            WhatsApp — nothing is sent or saved from this screen.
           </p>
           {detail.data_quality.missing_field_suggestions.length === 0 ? (
             <p className="text-muted-foreground">No missing-field suggestions for this listing.</p>
@@ -1024,7 +1028,7 @@ function PropertyReviewDetail({ propertyId, onBack }: { propertyId: number; onBa
         )}
       </Panel>
 
-      <Panel title="Property intelligence" subtitle="Reused from the customer-facing myMakan Intelligence assembly — not recomputed here.">
+      <Panel title="Property intelligence" subtitle="Reused from the customer-facing Maskan Intelligence assembly — not recomputed here.">
         {detail.property_intelligence ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -1104,7 +1108,8 @@ function AdminTrustModerationPage() {
   return (
     <div className="min-h-screen bg-surface">
       <header className="border-b border-border bg-background px-6 py-4">
-        <div className="mx-auto flex max-w-6xl items-center gap-2">
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          <AdminBackLink />
           <ShieldCheck className="size-5 text-primary" />
           <h1 className="text-lg font-bold">Trust & Moderation</h1>
         </div>

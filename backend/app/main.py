@@ -18,6 +18,7 @@ import app.tasks.transaction_notifications  # noqa: F401 — registers outbox ev
 from app.api.routes import properties, search, analytics, areas, auth, users, saved_searches, saved_properties, ai, health, projects
 from app.api.routes import area_intelligence, mediators, leads, contracts, payments, reviews, notifications, devices, bookings
 from app.api.routes import property_requests, property_request_partner, property_request_admin, verification, subscriptions
+from app.api.routes import media
 from app.api.routes import financing
 from app.api.routes import home_finder
 from app.api.routes import partner_quality
@@ -73,7 +74,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="myMakan Rental API",
+    title="Maskan Rental API",
     version="0.1.0-beta.1",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -132,6 +133,7 @@ _ROUTERS = [
     (auth.router, "/auth", ["auth"]),
     (users.router, "/users", ["users"]),
     (properties.router, "/properties", ["properties"]),
+    (media.router, "/media", ["media"]),
     *([(projects.router, "/projects", ["projects"])] if settings.FEATURE_PROJECTS else []),
     (saved_properties.router, "/saved-properties", ["saved-properties"]),
     (saved_searches.router, "/saved-searches", ["saved-searches"]),

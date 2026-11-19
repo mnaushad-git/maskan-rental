@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
+from app.core.deep_links import app_link
 from app.core.feature_flags import is_enabled
 from app.core.metrics import lead_notifications_total, notifications_created_total
 from app.core.notification_stream import publish_invalidate
@@ -95,7 +96,7 @@ def _render(event_type: str, lead: Lead, *, locale: str, notification_key: str, 
             body = f"Your request in {label} was closed successfully." if won else f"Your request in {label} was closed."
     elif notification_key == "lead_message":
         sender = extra.get("sender_role", "")
-        who = {"customer": "العميل" if locale == "ar" else "the customer", "mediator": "الوسيط" if locale == "ar" else "the agent", "admin": "فريق myHome" if locale == "ar" else "the myHome team"}.get(sender, "")
+        who = {"customer": "العميل" if locale == "ar" else "the customer", "mediator": "الوسيط" if locale == "ar" else "the agent", "admin": "فريق مسكن" if locale == "ar" else "the Maskan team"}.get(sender, "")
         body = f"رسالة جديدة من {who} بخصوص {label}." if locale == "ar" else f"New message from {who} about {label}."
     else:  # lead_status_update fallback
         body = f"تغيرت حالة طلبك في {label}." if locale == "ar" else f"Your request in {label} changed status."
@@ -285,7 +286,7 @@ def create_lead_notification(self, event_type: str, aggregate_id: str, payload: 
                 locale=locale,
                 entity_type="lead",
                 entity_id=lead.id,
-                deep_link=f"myhome://lead/{lead.id}",
+                deep_link=app_link(f"lead/{lead.id}"),
                 delivery_status={},
                 meta={"event_type": event_type},
                 trace_id=trace_id,

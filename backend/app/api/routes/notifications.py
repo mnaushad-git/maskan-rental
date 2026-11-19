@@ -129,7 +129,7 @@ def _user_from_stream_token(token: str, db: Session) -> UserModel:
         user = db.get(UserModel, int(user_id))
     except JWTError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid stream token") from exc
-    if user is None:
+    if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid stream token")
     return user
 
@@ -317,8 +317,8 @@ def test_push(
     provider = get_push_provider()
     results = []
     for device in devices:
-        fake_notification = Notification(id=0, user_id=current_user.id, type="system_announcement", title="myHome test notification", body="This is a test push from your notification settings.", delivery_status={}, meta={})
-        result = provider.send(device, fake_notification, title="myHome test notification", body="If you can see this, push notifications are working.")
+        fake_notification = Notification(id=0, user_id=current_user.id, type="system_announcement", title="Maskan test notification", body="This is a test push from your notification settings.", delivery_status={}, meta={})
+        result = provider.send(device, fake_notification, title="Maskan test notification", body="If you can see this, push notifications are working.")
         results.append({"device_id": device.id, "status": result.status, "detail": result.detail})
     record_audit(db, user_id=current_user.id, action="notification.test_push_sent", entity_type="user", entity_id=current_user.id, metadata={"device_count": len(devices)})
     return {"sent": len(devices), "results": results}

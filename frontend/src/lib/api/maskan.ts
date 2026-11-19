@@ -17,9 +17,19 @@ const API_BASE_URL =
     : (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api");
 const PROPERTY_IMAGES = [prop1, prop2, prop3, prop4] as const;
 
-export class UnauthorizedError extends Error {
-  constructor(detail: string) {
+/** Non-2xx API response. `status` lets callers tell e.g. 429 from 500. */
+export class ApiError extends Error {
+  status: number;
+  constructor(detail: string, status: number) {
     super(detail);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+export class UnauthorizedError extends ApiError {
+  constructor(detail: string) {
+    super(detail, 401);
     this.name = "UnauthorizedError";
   }
 }
@@ -94,6 +104,10 @@ export type AuthResponse = {
 };
 
 export type AnalyticsSummary = {
+  generated_at: string;
+  window_days: number;
+  /** Sections Maskan doesn't record data for yet — rendered as "not tracked". */
+  unavailable: string[];
   total_properties: number;
   total_users: number;
   kpis: Array<{
@@ -101,15 +115,15 @@ export type AnalyticsSummary = {
     value: string;
     delta: string;
     sub: string;
-    trend: "up" | "down";
+    trend: "up" | "down" | "flat";
     accent: string;
   }>;
   searchDemand: Array<{ day: string; riyadh: number; jeddah: number; dammam: number }>;
-  popularAreas: Array<{ name: string; city: string; searches: number; share: number }>;
+  popularAreas: Array<{ name: string; city: string; listings: number; share: number }>;
   funnel: Array<{ stage: string; value: number; color: string }>;
-  aiTrends: Array<{ label: string; value: number; delta: string }>;
+  aiTrends: Array<{ label: string; value: number; count: number }>;
   dataQuality: Array<{ label: string; value: number; target: number }>;
-  inventory: Array<{ city: string; available: number; reserved: number; rented: number }>;
+  inventory: Array<{ city: string; published: number; pending: number; inactive: number }>;
   activity: Array<{ tone: string; title: string; meta: string; time: string }>;
 };
 
@@ -240,7 +254,7 @@ export function mapApiProperty(property: ApiProperty): UiProperty {
     // the listing is still available.
     status: property.status === "Published" ? "Available" : "Reserved",
     pricePerSqm: estimatedArea > 0 ? Math.round(displayPrice / estimatedArea) : 0,
-    agent: property.mediator_agent_name ?? property.owner_name ?? "myMakan Agent",
+    agent: property.mediator_agent_name ?? property.owner_name ?? "Maskan Agent",
     agentPhone: property.call_phone ?? property.mediator_phone ?? null,
     agentWhatsapp: property.whatsapp_number ?? property.mediator_phone ?? null,
     agentProfileImage: property.mediator_profile_image_url ?? null,
@@ -381,7 +395,7 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
       }
       throw new UnauthorizedError(detail);
     }
-    throw new Error(detail);
+    throw new ApiError(detail, response.status);
   }
 
   if (response.status === 204) {
@@ -564,6 +578,44 @@ export function patchPartnerListing(id: number, payload: Partial<PartnerProperty
     method: "PATCH",
     body: JSON.stringify(payload),
   });
+}
+
+/** Partner takes a Published / Pending listing off the portal. */
+export function unpublishPartnerListing(id: number) {
+  return requestJson<ApiProperty>(`/properties/partner/${id}/unpublish`, { method: "POST" });
+}
+
+/** Partner sends an Unpublished / Rejected listing back for admin approval. */
+export function resubmitPartnerListing(id: number) {
+  return requestJson<ApiProperty>(`/properties/partner/${id}/resubmit`, { method: "POST" });
+}
+
+/** Partner "delete" — archives the listing; history is preserved server-side. */
+export function archivePartnerListing(id: number) {
+  return requestJson<void>(`/properties/partner/${id}`, { method: "DELETE" });
+}
+
+/** Upload a listing photo from the partner's device (JPEG/PNG/WebP ≤ 8 MB). */
+export async function uploadPartnerPropertyImage(propertyId: number, file: File) {
+  const token = typeof window !== "undefined" ? readStoredToken(currentScope()) : null;
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/properties/partner/${propertyId}/images/upload`, {
+    method: "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: form,
+  });
+  if (!response.ok) {
+    let detail = `Upload failed (${response.status})`;
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (typeof body.detail === "string") detail = body.detail;
+    } catch {
+      /* ignore parse errors */
+    }
+    throw new ApiError(detail, response.status);
+  }
+  return response.json() as Promise<ApiListingImage>;
 }
 
 // ── Partner Listing Quality (Trust Center, Prompt 8) ────────────────────────
@@ -851,6 +903,22 @@ export function login(payload: { email: string; password: string }) {
 
 export function fetchMe(token: string) {
   return requestJson<AuthUser>("/auth/me", { headers: { Authorization: `Bearer ${token}` } });
+}
+
+// Self-service account deletion (Google Play web deletion page /account/delete).
+// A wrong password is 403 (never 401), so it doesn't clear the session.
+export type AccountDeletionBlocker = { code: string; count: number; message: string };
+export type AccountDeletionEligibility = { eligible: boolean; blockers: AccountDeletionBlocker[] };
+
+export function fetchAccountDeletionEligibility() {
+  return requestJson<AccountDeletionEligibility>("/auth/me/deletion-eligibility");
+}
+
+export function deleteMyAccount(password: string, confirmation: string) {
+  return requestJson<{ status: "deleted"; message: string }>("/auth/me/delete", {
+    method: "POST",
+    body: JSON.stringify({ password, confirmation }),
+  });
 }
 
 export type ApiAreaSummary = {
@@ -1476,24 +1544,31 @@ export function updateMediatorProfile(payload: {
   });
 }
 
-export function subscribePartnerMock() {
-  return requestJson<{ status: string; subscription_expires_at: string }>(
-    "/mediators/me/subscribe",
-    { method: "POST" },
-  );
+/** Result of starting a partner subscription or renewal. With real payments
+ * the backend returns `status: "pending"` and (for a new subscription) a
+ * Moyasar `payment_url` to redirect to — access is granted only after the
+ * payment is confirmed. `status: "active"`/"renewed" only occurs in local
+ * development (mock payments). */
+export type PartnerSubscriptionResult = {
+  status: string;
+  subscription_expires_at?: string | null;
+  payment_url?: string;
+  payment_id?: number;
+  message?: string;
+};
+
+export function subscribePartner() {
+  return requestJson<PartnerSubscriptionResult>("/mediators/me/subscribe", { method: "POST" });
 }
 
-// Distinct from subscribePartnerMock() above — the backend's own
+// Distinct from subscribePartner() above — the backend's own
 // `POST /mediators/me/subscribe` rejects with 400 "Subscription is already
 // active." whenever the mediator already has an active subscription (see
 // P10-003), so a mediator whose subscription IS active (the exact case the
 // "Renew subscription" button targets) must call this endpoint instead to
 // actually extend `subscription_expires_at` by another 30 days.
 export function renewPartnerSubscription() {
-  return requestJson<{ status: string; subscription_expires_at: string }>(
-    "/mediators/me/renew",
-    { method: "POST" },
-  );
+  return requestJson<PartnerSubscriptionResult>("/mediators/me/renew", { method: "POST" });
 }
 
 export function addPartnerArea(area_name: string, city: string) {
@@ -4188,4 +4263,33 @@ export async function fetchAdminTransactions(params?: {
 
 export function fetchAdminTransaction(id: number) {
   return requestJson<ApiAdminTransactionDetail>(`/admin/transactions/${id}`);
+}
+
+// ── Identity verification review (admin) ────────────────────────────────────
+// Backed by backend/app/api/routes/verification.py. Users submit a document
+// reference from the mobile app (POST /verification/me); admins review the
+// pending queue here. There is no third-party (Nafath) check — approval is a
+// manual admin decision on the submitted reference.
+
+export type ApiVerificationRequest = {
+  id: number;
+  email: string;
+  full_name: string | null;
+  verification_status: string;
+  is_verified: boolean;
+  verification_document_ref: string | null;
+  verification_submitted_at: string | null;
+  verification_reviewed_at: string | null;
+};
+
+export function fetchPendingVerifications() {
+  return requestJson<ApiVerificationRequest[]>("/verification/admin/pending");
+}
+
+export function approveVerification(userId: number) {
+  return requestJson<ApiVerificationRequest>(`/verification/admin/${userId}/approve`, { method: "POST" });
+}
+
+export function rejectVerification(userId: number) {
+  return requestJson<ApiVerificationRequest>(`/verification/admin/${userId}/reject`, { method: "POST" });
 }

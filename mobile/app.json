@@ -1,18 +1,18 @@
 {
   "expo": {
-    "name": "myMakan",
+    "name": "Maskan",
     "slug": "myhome-rental",
     "version": "0.1.0-beta.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myhome",
+    "scheme": ["maskan", "myhome", "mymakan"],
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.myhome.mobile"
     },
     "android": {
-      "package": "com.myhome.mobile",
+      "package": "com.maskanai.app",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#FDF6EC",
@@ -21,6 +21,13 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ],
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyB-qSnoPSDm1vb6gnLfVz761veohNYVryk"
@@ -46,7 +53,9 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "myMakan uses your location to show nearby rentals and sales on the map."
+          "locationWhenInUsePermission": "Maskan uses your location to show nearby rentals and sales on the map.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
         }
       ],
       [

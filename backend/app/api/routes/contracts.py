@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.core.config import settings
+from app.core.roles import is_admin_user
 from app.models.contract import Contract
 from app.models.lead import Lead, LeadAssignment
 from app.models.mediator import Mediator
@@ -28,7 +29,7 @@ def _check_contract_access(contract: Contract, user: User, db: Session) -> str:
     mediator = db.query(Mediator).filter(Mediator.user_id == user.id).first()
     if mediator and mediator.id == contract.landlord_mediator_id:
         return "landlord"
-    if user.email in settings.admin_emails:
+    if is_admin_user(user):
         return "tenant"  # admin can read as either side
     raise HTTPException(status_code=403, detail="Access denied.")
 
