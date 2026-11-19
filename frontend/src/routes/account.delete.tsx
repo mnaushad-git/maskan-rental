@@ -36,6 +36,10 @@ export const Route = createFileRoute("/account/delete")({
 });
 
 const CONFIRMATION_WORD = "DELETE";
+// Pending business decision (D1 in docs/releases/maskan-android-google-play.md).
+// The "can't sign in" fallback stays hidden until a support address is set, so
+// no unresolved placeholder is ever shown publicly.
+const SUPPORT_EMAIL = "";
 
 function DeleteAccountPage() {
   const { user, setAuth, clearAuth } = useAuth();
@@ -62,13 +66,18 @@ function DeleteAccountPage() {
                 <strong>Delete account</strong>.
               </li>
               <li>On the web: sign in below and follow the steps on this page.</li>
-              <li>
-                Can't sign in? Email{" "}
-                <mark className="rounded bg-warning/20 px-1">
-                  [To be confirmed: support email address]
-                </mark>{" "}
-                from the email address registered to your account.
-              </li>
+              {SUPPORT_EMAIL && (
+                <li>
+                  Can't sign in? Email{" "}
+                  <a
+                    href={`mailto:${SUPPORT_EMAIL}`}
+                    className="font-semibold text-primary hover:underline"
+                  >
+                    {SUPPORT_EMAIL}
+                  </a>{" "}
+                  from the email address registered to your account.
+                </li>
+              )}
             </ul>
           </section>
 

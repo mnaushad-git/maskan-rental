@@ -17,7 +17,9 @@ import { useLanguage } from "@/lib/i18n/context";
  * LAST_UPDATED. Update this file whenever data handling changes (e.g. real
  * payments, push notifications or a new AI/analytics provider are enabled).
  */
-const POLICY_APPROVED = false;
+// Also gates publication: routes/privacy.tsx serves the generic "not published
+// yet" notice instead of this draft while false.
+export const POLICY_APPROVED = false;
 const LAST_UPDATED = "[date of approval]";
 
 function ToConfirm({ children }: { children: ReactNode }) {
