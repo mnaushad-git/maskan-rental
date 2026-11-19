@@ -2,7 +2,8 @@
 # Maskan — move backend uploads from the container's writable layer to the
 # persistent host directory /srv/maskan/uploads (bind-mounted at /app/uploads).
 #
-# Subcommands (run from anywhere; defaults match the Hostinger VPS):
+# Subcommands (run from anywhere — preflight/backup are designed to run from a
+# bootstrapped copy while the checkout is still pre-mount; see README):
 #   preflight   READ-ONLY. Counts/sizes files in the running backend, checks
 #               the host directory, free space and compose configuration.
 #   backup      Database dump + copy of every container upload + SHA-256
@@ -65,7 +66,25 @@ copy_out_of_container() {  # $1 = empty local target dir; works on stopped conta
         log "container has no $CONTAINER_DIR yet — treating as empty"
     fi
 }
+# The backend must be recreated from the SAME compose file it is running from:
+# e.g. the Hostinger VPS runs docker-compose.hostinger.yml (backend published on
+# 127.0.0.1:8000 for host Nginx); recreating it from docker-compose.prod.yml
+# would drop that port mapping while the in-container health check still passes.
+check_compose_file() {
+    local cid used; cid="$(container_id)"; [ -n "$cid" ] || die "no $SERVICE container found"
+    used="$("$DOCKER" inspect -f '{{index .Config.Labels "com.docker.compose.project.config_files"}}' "$cid")"
+    [ "$(basename -- "$used")" = "$(basename -- "$COMPOSE_FILE")" ] \
+        || die "running $SERVICE was created from '$used', not '$COMPOSE_FILE' — set COMPOSE_FILE to the file this server is deployed with"
+}
 dir_is_empty() { [ -z "$(ls -A "$1" 2>/dev/null)" ]; }
+# Copy the CONTENTS of directory $1 into existing directory $2 without ever
+# replacing a file (replaces `cp -a -n`, whose behaviour differs between
+# coreutils releases). GNU tar --keep-old-files treats any existing file as an
+# error and exits non-zero, so a collision fails loudly instead of being
+# silently skipped or overwritten. Modes, timestamps and numeric owners kept.
+copy_no_clobber() {
+    tar -C "$1" --numeric-owner -cf - . | tar -C "$2" --numeric-owner --keep-old-files -xf -
+}
 count_lines() { if [ -s "$1" ]; then wc -l < "$1" | tr -d ' '; else echo 0; fi; }
 wait_healthy() {
     local waited=0
@@ -95,7 +114,17 @@ cmd_preflight() {
     local need=$(( kb * 3 + 102400 ))   # backup copy + staging + host copy + 100 MiB margin
     log "free space at $probe: ${free_kb} KiB (need ≥ ${need} KiB)"
     [ "$free_kb" -ge "$need" ] || die "not enough free disk space"
-    log "compose file contains '$MOUNT_SPEC': $(compose_has_mount && echo yes || echo 'no (pull the change before cutover)')"
+    if compose_has_mount; then
+        log "compose file contains '$MOUNT_SPEC': yes"
+        if [ "$mounted" -eq 0 ]; then
+            log "WARNING: the compose file already has the mount but the running backend does not."
+            log "         Do NOT run 'docker compose up/restart/--build' or any deploy now: recreating the"
+            log "         backend before 'cutover' hides its files behind an empty $HOST_DIR."
+            log "         Run 'backup' and then 'cutover', which copy the files before activating the mount."
+        fi
+    else
+        log "compose file contains '$MOUNT_SPEC': no — expected before the cutover window (README step 3 adds it)"
+    fi
     # Database references vs files actually present (counts only — no paths printed).
     local refs listing_refs
     refs="$(dc exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from transaction_documents where file_reference is not null"' 2>/dev/null | tr -d '\r ' || echo '?')"
@@ -155,7 +184,10 @@ cmd_cutover() {
     log "    files: backup $(count_lines "$dir/MANIFEST.sha256"), final $(count_lines "$dir/final.sha256") (new since backup: $(missing_from "$dir/final.sha256" "$dir/MANIFEST.sha256" | wc -l | tr -d ' '))"
     log "3/6 populating $HOST_DIR (no-clobber)"
     mkdir -p "$HOST_DIR"; chmod 700 "$HOST_DIR"
-    cp -a -n "$final/." "$HOST_DIR/"
+    if ! copy_no_clobber "$final" "$HOST_DIR"; then
+        dc start "$SERVICE"; die "copy into $HOST_DIR failed (existing files are never overwritten) — backend restarted unchanged (no mount); inspect $HOST_DIR"
+    fi
+    chmod 700 "$HOST_DIR"   # tar may apply the source directory's mode to the target root
     manifest_dir "$HOST_DIR" > "$dir/host.sha256"
     if ! cmp -s "$dir/final.sha256" "$dir/host.sha256"; then
         dc start "$SERVICE"; die "host directory checksums differ from the final copy — backend restarted unchanged (no mount); inspect $HOST_DIR"
@@ -197,10 +229,13 @@ cmd_rollback() {
 }
 
 case "${1:-}" in
+    preflight|backup|cutover|verify|rollback) check_compose_file ;;
+esac
+case "${1:-}" in
     preflight) cmd_preflight ;;
     backup)    cmd_backup ;;
     cutover)   cmd_cutover ;;
     verify)    cmd_verify ;;
     rollback)  cmd_rollback ;;
-    *) sed -n '2,20p' "$0"; exit 2 ;;
+    *) sed -n '2,21p' "$0"; exit 2 ;;
 esac

@@ -22,7 +22,8 @@
 #   ENCRYPT_LOCAL  1 = keep only encrypted archives locally (needs GPG_RECIPIENT)
 #   OFFSITE_TARGET optional: user@host:/path (scp over SSH to a machine you own).
 #                  Only encrypted archives are ever sent off-server.
-#   STATUS_DIR     /var/lib/maskan-monitor (read by maskan-storage-check.sh)
+#   STATUS_DIR     /var/lib/maskan-monitor (read by maskan-storage-check.sh);
+#                  only `run` writes backup_state — verify/restore never do
 set -Eeuo pipefail
 
 CONF="${MASKAN_BACKUP_CONF:-/etc/maskan-backup.conf}"
@@ -44,6 +45,7 @@ DOCKER="${DOCKER:-docker}"
 TODAY="${BACKUP_DATE:-$(date -u +%Y-%m-%d)}"   # BACKUP_DATE only for tests
 
 umask 077
+MODE="${1:-}"
 STEP="init"
 WORK=""
 LOCK=""
@@ -52,9 +54,18 @@ syslog() { command -v logger >/dev/null 2>&1 && logger -t maskan-backup -p "$1" 
 fail() {
     local msg="FAILED at step '$STEP': ${1:-command failed}"
     printf 'ERROR: %s\n' "$msg" >&2
-    mkdir -p "$STATUS_DIR"
-    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) failed step=$STEP" > "$STATUS_DIR/backup_state"
-    syslog user.err "$msg"
+    if [ "$MODE" = "run" ]; then
+        # backup_state records the outcome of the last BACKUP RUN only; the
+        # storage watchdog alerts on it.
+        mkdir -p "$STATUS_DIR"
+        echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) failed step=$STEP" > "$STATUS_DIR/backup_state"
+        syslog user.err "$msg"
+    else
+        # Manual verify/restore-uploads: report and exit non-zero, but never
+        # overwrite the last backup run's status (a refused restore is not a
+        # failed nightly backup).
+        syslog user.err "manual ${MODE:-command}: $msg"
+    fi
     # Never leave a partial backup behind that could be mistaken for a good one.
     [ -n "$WORK" ] && rm -rf -- "$WORK"
     exit 1
@@ -176,7 +187,12 @@ cmd_restore_uploads() {
     tar -xzf "$archive" -C "$tmp"
     [ "$archive" = "$b/uploads.tgz" ] || rm -f "$archive"
     mkdir -p "$target"; chmod 700 "$target"
-    cp -a -n "$tmp/$(ls "$tmp")/." "$target/"
+    # No-clobber copy (replaces `cp -a -n`): GNU tar --keep-old-files fails on
+    # any existing file instead of overwriting or silently skipping it.
+    if ! tar -C "$tmp/$(ls "$tmp")" --numeric-owner -cf - . | tar -C "$target" --numeric-owner --keep-old-files -xf -; then
+        rm -rf "$tmp"; fail "copy into $target failed (existing files are never overwritten) — inspect $target"
+    fi
+    chmod 700 "$target"
     rm -rf "$tmp"
     manifest_dir "$target" | cmp -s - "$b/uploads.sha256" || fail "restored files do not match uploads.sha256"
     log "restore OK: $(wc -l < "$b/uploads.sha256" | tr -d ' ') file(s) restored to $target and verified"
@@ -186,5 +202,5 @@ case "${1:-}" in
     run)             cmd_run ;;
     verify)          cmd_verify "${2:-}" ;;
     restore-uploads) cmd_restore_uploads "${2:-}" "${3:-}" ;;
-    *) sed -n '2,30p' "$0"; exit 2 ;;
+    *) sed -n '2,26p' "$0"; exit 2 ;;
 esac

@@ -475,6 +475,11 @@ git pull
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 ```
 
+> **Server deployed before the uploads mount existed?** Do **not** use this command for
+> the first update that brings in `/srv/maskan/uploads` — it would recreate the backend
+> on an empty upload directory and discard the stored files. Run the one-time migration
+> in [`deploy/uploads/README.md`](deploy/uploads/README.md) first.
+
 ### The app restarts automatically if the server reboots
 
 Docker is configured with `restart: always` — all services come back

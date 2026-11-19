@@ -468,6 +468,12 @@ git pull
 docker compose -f docker-compose.hostinger.yml --env-file .env.production up -d --build
 ```
 
+> **First update that brings in the uploads mount (`/srv/maskan/uploads`)?** Do **not**
+> use this command for it — it would recreate the backend on an empty upload directory
+> and discard the stored photos and documents. Run the one-time migration in
+> [`deploy/uploads/README.md`](deploy/uploads/README.md) first (it uses
+> `docker-compose.hostinger.yml` on this server). Uploads persist across updates afterwards.
+
 ### App auto-restarts on server reboot
 
 Docker is configured with `restart: always` — all containers come

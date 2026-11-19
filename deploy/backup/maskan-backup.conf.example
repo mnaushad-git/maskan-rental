@@ -1,5 +1,6 @@
 # Copy to /etc/maskan-backup.conf (chown root:root; chmod 600). All optional.
 APP_DIR=/root/maskan-rental
+# The file this server is deployed with — Hostinger VPS: docker-compose.hostinger.yml
 COMPOSE_FILE=docker-compose.prod.yml
 ENV_FILE=.env.production
 UPLOADS_DIR=/srv/maskan/uploads
