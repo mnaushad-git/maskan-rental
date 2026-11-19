@@ -241,6 +241,13 @@ export async function reregisterIfPermittedAsync(locale: string): Promise<string
 
 /** Called on logout, before auth is cleared, so the right device row (the
  * one this install actually registered) gets unregistered server-side. */
+/** Forget this install's device row locally without calling the API — used
+ * after account deletion, where the server already removed every device row
+ * and the (now revoked) token would make the unregister call 401. */
+export async function forgetCurrentDeviceAsync(): Promise<void> {
+  await clearStoredDeviceRowId();
+}
+
 export async function unregisterCurrentDeviceAsync(): Promise<void> {
   const id = await getStoredDeviceRowId();
   if (id == null) return;

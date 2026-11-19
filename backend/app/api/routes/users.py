@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_admin_user, get_current_user, get_db
 from app.core.config import settings
+from app.core.roles import is_admin_user
 from app.models.lead import Lead, LeadMessage
 from app.models.mediator import Mediator
 from app.models.review import Review
@@ -169,10 +170,32 @@ def update_user(
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    _admin: User = Depends(get_admin_user),
+    admin: User = Depends(get_admin_user),
 ):
+    """Admin-initiated account deletion. Uses the same safeguards as customer
+    self-service deletion (app/services/account_deletion.py): the users row is
+    deactivated and anonymized, never hard-deleted, so transactions, bookings,
+    contracts, payments, negotiations, viewings and partner data are preserved
+    (a hard delete hit ON DELETE RESTRICT or cascaded into mediator profiles
+    and property requests). Audited as `account.admin_deleted`."""
+    from app.services.account_deletion import delete_account, find_blockers
+
     user = db.get(User, user_id)
-    if not user:
+    if not user or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    db.delete(user)
-    db.commit()
+    if user.id == admin.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can't delete your own account.")
+    if is_admin_user(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Admin accounts can't be deleted. Remove the admin role first.")
+    blockers = find_blockers(db, user)
+    if blockers:
+        reasons = ", ".join(f"{b.code} ({b.count})" for b in blockers)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=f"User can't be deleted while they have unresolved obligations: {reasons}.")
+    try:
+        delete_account(db, user, actor=admin)
+    except ValueError:  # blocker appeared between the check and the delete
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="User changed while deleting. Please try again.")

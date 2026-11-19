@@ -905,6 +905,22 @@ export function fetchMe(token: string) {
   return requestJson<AuthUser>("/auth/me", { headers: { Authorization: `Bearer ${token}` } });
 }
 
+// Self-service account deletion (Google Play web deletion page /account/delete).
+// A wrong password is 403 (never 401), so it doesn't clear the session.
+export type AccountDeletionBlocker = { code: string; count: number; message: string };
+export type AccountDeletionEligibility = { eligible: boolean; blockers: AccountDeletionBlocker[] };
+
+export function fetchAccountDeletionEligibility() {
+  return requestJson<AccountDeletionEligibility>("/auth/me/deletion-eligibility");
+}
+
+export function deleteMyAccount(password: string, confirmation: string) {
+  return requestJson<{ status: "deleted"; message: string }>("/auth/me/delete", {
+    method: "POST",
+    body: JSON.stringify({ password, confirmation }),
+  });
+}
+
 export type ApiAreaSummary = {
   name: string;
   city: string;

@@ -58,6 +58,7 @@ import { Route as AdminPropertyRequestsRouteImport } from './routes/admin_.prope
 import { Route as AdminNotificationsRouteImport } from './routes/admin_.notifications'
 import { Route as AdminImportRouteImport } from './routes/admin_.import'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin_.analytics'
+import { Route as AccountDeleteRouteImport } from './routes/account.delete'
 import { Route as PropertyRouteImport } from './routes/property.'
 import { Route as PartnerViewingsIdRouteImport } from './routes/partner.viewings.$id'
 import { Route as PartnerTransactionsIdRouteImport } from './routes/partner.transactions.$id'
@@ -311,6 +312,11 @@ const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
   path: '/admin/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountDeleteRoute = AccountDeleteRouteImport.update({
+  id: '/account/delete',
+  path: '/account/delete',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PropertyRoute = PropertyRouteImport.update({
   id: '/property/',
   path: '/property/',
@@ -375,6 +381,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/viewings': typeof ViewingsRouteWithChildren
   '/property/': typeof PropertyRoute
+  '/account/delete': typeof AccountDeleteRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/import': typeof AdminImportRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -433,6 +440,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/viewings': typeof ViewingsRouteWithChildren
   '/property': typeof PropertyRoute
+  '/account/delete': typeof AccountDeleteRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/import': typeof AdminImportRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -492,6 +500,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/viewings': typeof ViewingsRouteWithChildren
   '/property/': typeof PropertyRoute
+  '/account/delete': typeof AccountDeleteRoute
   '/admin_/analytics': typeof AdminAnalyticsRoute
   '/admin_/import': typeof AdminImportRoute
   '/admin_/notifications': typeof AdminNotificationsRoute
@@ -552,6 +561,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/viewings'
     | '/property/'
+    | '/account/delete'
     | '/admin/analytics'
     | '/admin/import'
     | '/admin/notifications'
@@ -610,6 +620,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/viewings'
     | '/property'
+    | '/account/delete'
     | '/admin/analytics'
     | '/admin/import'
     | '/admin/notifications'
@@ -668,6 +679,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/viewings'
     | '/property/'
+    | '/account/delete'
     | '/admin_/analytics'
     | '/admin_/import'
     | '/admin_/notifications'
@@ -727,6 +739,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   ViewingsRoute: typeof ViewingsRouteWithChildren
   PropertyRoute: typeof PropertyRoute
+  AccountDeleteRoute: typeof AccountDeleteRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminImportRoute: typeof AdminImportRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
@@ -1087,6 +1100,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account/delete': {
+      id: '/account/delete'
+      path: '/account/delete'
+      fullPath: '/account/delete'
+      preLoaderRoute: typeof AccountDeleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/property/': {
       id: '/property/'
       path: '/property'
@@ -1275,6 +1295,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   ViewingsRoute: ViewingsRouteWithChildren,
   PropertyRoute: PropertyRoute,
+  AccountDeleteRoute: AccountDeleteRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminImportRoute: AdminImportRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,

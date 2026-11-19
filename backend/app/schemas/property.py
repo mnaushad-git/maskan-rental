@@ -1,6 +1,8 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
+
+from app.core.config import settings
 
 
 class PropertyBase(BaseModel):
@@ -214,6 +216,17 @@ class PropertyOut(PropertyBase):
     # cost per row.
     mediator_rating: float | None = None
     mediator_review_count: int = 0
+
+    @field_validator("is_bookable", mode="after")
+    @classmethod
+    def _bookable_only_when_booking_enabled(cls, value: bool) -> bool:
+        # Clients show the booking calendar / reservation actions for
+        # is_bookable listings, but the /bookings router is only registered
+        # when FEATURE_BOOKING is on (main.py) — report False otherwise so no
+        # client ever exposes a booking flow whose API returns 404. Output
+        # only: the stored column and the `is_bookable` list filter are
+        # unchanged, so re-enabling the flag restores the listings as they were.
+        return bool(value) and settings.FEATURE_BOOKING
 
     # `Property.listing_type` predates `transaction_type`, the field name used
     # by PropertyRequest/SavedSearch for the same rent/sale concept (see

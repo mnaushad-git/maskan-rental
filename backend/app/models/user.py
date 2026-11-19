@@ -36,6 +36,11 @@ class User(Base):
     subscription_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     moyasar_card_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Set when the customer deleted their own account (services/account_deletion.py).
+    # The row is kept (RESTRICT FKs from retained records) but deactivated and
+    # anonymized; is_active=False is what actually revokes every issued token.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     saved_searches = relationship("SavedSearch", back_populates="user", cascade="all, delete-orphan")
     saved_properties = relationship("SavedProperty", back_populates="user", cascade="all, delete-orphan")
 
